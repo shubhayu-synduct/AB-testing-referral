@@ -1,8 +1,9 @@
 "use client"
 
 // API base URL for DrInfo summary service
- const DRINFO_API_URL = "https://synduct-aisummary.drinfo.ai/chat/stream";
-// const DRINFO_API_URL = "http://localhost:8000/chat/stream";
+//  const DRINFO_API_URL = "https://synduct-aisummary.drinfo.ai/chat/stream";
+const DRINFO_API_URL = "http://localhost:8000/chat/stream";
+// const DRINFO_API_URL = "https://ai-summary-stage.duckdns.org/chat/stream";
 export interface Citation {
   title: string;
   url: string;
@@ -117,12 +118,25 @@ export async function fetchDrInfoSummary(
             } else if (chunk.status === "formatting response") {
               console.log("[API] Formatting response:", chunk.message);
               onStatus("formatting", chunk.message);
+            } else if (chunk.status === "complete_image" && chunk.data) {
+              console.log("[API] Received complete_image status:", chunk.data);
+              onStatus("complete_image", JSON.stringify(chunk.data));
             } else if (chunk.status === "complete" && chunk.data && typeof chunk.data === "object") {
               console.log("[API] Received complete response", chunk.data);
               const completeData = chunk.data as DrInfoSummaryData;
               console.log('[API] Received completeData:', completeData);
+              if (!hasCalledComplete) {
                 hasCalledComplete = true;
-              onComplete(completeData);
+                onComplete(completeData);
+              }
+            } else if (chunk.data && typeof chunk.data === "object" && (chunk.data as DrInfoSummaryData).citations) {
+              // Handle citations as soon as they're available, regardless of status
+              console.log("[API] Received citations data:", chunk.data);
+              const citationData = chunk.data as DrInfoSummaryData;
+              if (!hasCalledComplete) {
+                hasCalledComplete = true;
+                onComplete(citationData);
+              }
             } else {
               console.log("[API] Unhandled chunk status:", chunk.status);
             }
