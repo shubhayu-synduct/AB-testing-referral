@@ -88,3 +88,17 @@ select {
   max-zoom: 1.0;
   user-zoom: fixed;
 }
+
+/* SVG content styling */
+.svg-content {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.svg-content svg {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+}
