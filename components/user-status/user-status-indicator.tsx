@@ -43,7 +43,7 @@ export default function UserStatusIndicator({
         const status = await getUserStatus();
         setUserStatus(status);
       } catch (err) {
-        console.error('Error fetching user status:', err);
+        // console.error('Error fetching user status:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch user status');
       } finally {
         setIsLoading(false);

@@ -40,7 +40,7 @@ export async function setSessionCookie(user: User) {
         existingSession.emailVerified === newSession.emailVerified
 
       if (!sessionIsIdentical) {
-        console.log("New/different session detected, notifying other tabs")
+        // console.log("New/different session detected, notifying other tabs")
         window.localStorage.setItem("auth-sync", JSON.stringify({ 
           action: "login", 
           uid: user.uid,
@@ -48,12 +48,12 @@ export async function setSessionCookie(user: User) {
         }))
       }
     } else if (process.env.NODE_ENV === "development") {
-      console.log("Cross-tab sync disabled in development mode")
+      // console.log("Cross-tab sync disabled in development mode")
     }
     
-    console.log("Session cookie set successfully")
+    // console.log("Session cookie set successfully")
   } catch (error) {
-    console.error("Error setting session cookie:", error)
+    // console.error("Error setting session cookie:", error)
   }
 }
 
@@ -67,7 +67,7 @@ export function getSessionCookie() {
   try {
     return JSON.parse(cookie)
   } catch (error) {
-    console.error("Error parsing session cookie:", error)
+    // console.error("Error parsing session cookie:", error)
     return null
   }
 }
@@ -87,12 +87,12 @@ export function clearSessionCookie() {
         timestamp: new Date().getTime() 
       }))
     } else if (process.env.NODE_ENV === "development") {
-      console.log("Cross-tab sync disabled in development mode")
+      // console.log("Cross-tab sync disabled in development mode")
     }
     
-    console.log("Session cookie cleared")
+    // console.log("Session cookie cleared")
   } catch (error) {
-    console.error("Error clearing session cookie:", error)
+    // console.error("Error clearing session cookie:", error)
   }
 }
 
