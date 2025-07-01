@@ -38,7 +38,7 @@ interface ChatMessage {
       content: string;
     }>;
     citations?: Record<string, Citation>;
-    svg_content?: string;
+    svg_content?: string[]; // Changed from string to string[]
   };
   feedback?: {
     likes: number;
@@ -82,7 +82,7 @@ interface ThreadData {
     content: string;
     citations: Record<string, Citation>;
     search_data: Record<string, any>;
-    svg_content?: string;
+    svg_content?: string[]; // Changed from string to string[]
   };
   context: {
     parent_thread_id: string | null;
@@ -115,7 +115,7 @@ interface DrInfoSummaryData {
     title: string;
     content: string;
   }>;
-  svg_content?: string;
+  svg_content?: string[]; // Changed from string to string[]
 }
 
 const KNOWN_STATUSES: StatusType[] = ['processing', 'searching', 'summarizing', 'formatting', 'complete', 'complete_image'];
@@ -147,6 +147,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
   const [activeMode, setActiveMode] = useState<'instant' | 'research'>(initialMode);
   const [activeTab, setActiveTab] = useState<'answer' | 'images'>('answer');
   const [imageGenerationStatus, setImageGenerationStatus] = useState<'idle' | 'generating' | 'complete'>('idle');
+  const [expandedImage, setExpandedImage] = useState<{index: number, svgContent: string} | null>(null);
   const answerIconRef = useRef<HTMLDivElement>(null);
 
   const contentRef = useRef<HTMLDivElement>(null)
@@ -285,7 +286,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
             ? lastAssistantMsg.answer.citations
             : {};
           
-          if (lastAssistantMsg.answer.svg_content) {
+          if (lastAssistantMsg.answer.svg_content && lastAssistantMsg.answer.svg_content.length > 0) {
             setImageGenerationStatus('complete');
           }
 
@@ -963,6 +964,11 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
           try {
             const imageData = JSON.parse(message);
             if (imageData.svg_content) {
+              // Ensure svg_content is an array and filter out null/undefined values
+              const svgContentArray = Array.isArray(imageData.svg_content) 
+                ? imageData.svg_content.filter((content: any) => content !== null && content !== undefined)
+                : [imageData.svg_content].filter((content: any) => content !== null && content !== undefined);
+              
               // Update the last assistant message with SVG content
               setMessages(prev => prev.map((msg, idx) =>
                 idx === prev.length - 1 && msg.type === 'assistant'
@@ -972,7 +978,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                         mainSummary: msg.answer?.mainSummary || '',
                         sections: msg.answer?.sections || [],
                         citations: msg.answer?.citations || {},
-                        svg_content: imageData.svg_content 
+                        svg_content: svgContentArray 
                       } 
                     }
                   : msg
@@ -1016,7 +1022,9 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                           source_type: citation.source_type || 'internet'
                         }
                       }), {}) : {},
-                      svg_content: msg.answer?.svg_content || data?.svg_content
+                      svg_content: msg.answer?.svg_content || (data?.svg_content ? 
+                        (Array.isArray(data.svg_content) ? data.svg_content.filter((content: any) => content !== null && content !== undefined) : [data.svg_content])
+                      : [])
                     },
                   }
                 : msg
@@ -1158,6 +1166,16 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }
   }, [imageGenerationStatus]);
 
+  // Auto-switch to Images tab when images are available in the last message
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.type === 'assistant' && lastMessage.answer?.svg_content && lastMessage.answer.svg_content.length > 0) {
+        setActiveTab('images');
+      }
+    }
+  }, [messages]);
+
   return (
     <div className="p-2 sm:p-4 md:p-6 h-[100dvh] flex flex-col relative overflow-hidden">
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -1245,25 +1263,33 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                 />
                               ) : (
                                 <div className="prose prose-slate max-w-none text-base sm:text-base">
-                                  {msg.answer?.svg_content ? (
-                                    <div className="flex flex-col items-center py-4">
-                                      <div className="relative">
-                                        <div 
-                                          className="svg-content max-w-full"
-                                          dangerouslySetInnerHTML={{ __html: msg.answer.svg_content }}
-                                        />
-                                        <button
-                                          onClick={() => msg.answer?.svg_content && downloadSvgAsPng(msg.answer.svg_content, `image-${msg.threadId}`)}
-                                          className="absolute top-2 right-2 p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full shadow-md transition-all duration-200 hover:scale-110"
-                                          title="Download as PNG"
-                                        >
-                                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                            <polyline points="7,10 12,15 17,10"/>
-                                            <line x1="12" y1="15" x2="12" y2="3"/>
-                                          </svg>
-                                        </button>
-                                      </div>
+                                  {msg.answer?.svg_content && msg.answer.svg_content.length > 0 ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 py-4">
+                                      {msg.answer.svg_content.map((svgContent, index) => (
+                                        svgContent && (
+                                          <div key={index} className="relative group cursor-pointer">
+                                            <div 
+                                              className="svg-content w-full transition-transform duration-200 group-hover:scale-105"
+                                              dangerouslySetInnerHTML={{ __html: svgContent }}
+                                              onClick={() => setExpandedImage({index, svgContent})}
+                                            />
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                downloadSvgAsPng(svgContent, `image-${msg.threadId}-${index + 1}`);
+                                              }}
+                                              className="absolute top-2 right-2 p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full shadow-md transition-all duration-200 hover:scale-110 opacity-0 group-hover:opacity-100"
+                                              title="Download as PNG"
+                                            >
+                                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                                <polyline points="7,10 12,15 17,10"/>
+                                                <line x1="12" y1="15" x2="12" y2="3"/>
+                                              </svg>
+                                            </button>
+                                          </div>
+                                        )
+                                      ))}
                                     </div>
                                   ) : (
                                     <div className="flex flex-col items-center py-4">
@@ -1274,7 +1300,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                             <p className="text-gray-600 font-medium text-lg font-['DM_Sans']">Generating your image...</p>
                                             <p className="text-gray-500 text-sm mt-2 font-['DM_Sans']">This may take a few moments</p>
                                           </>
-                                        ) : imageGenerationStatus === 'complete' ? (
+                                        ) : (imageGenerationStatus === 'complete' || (msg.answer?.svg_content && msg.answer.svg_content.length > 0)) ? (
                                           <div className="text-center">
                                             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                                               <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1405,6 +1431,32 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         citations={activeCitations}
         onClose={() => setShowCitationsSidebar(false)}
       />
+      
+      {/* Expanded Image Modal */}
+      {expandedImage && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={() => setExpandedImage(null)}
+        >
+          <div className="relative max-w-[90vw] max-h-[90vh] overflow-auto bg-white rounded-lg">
+            <button
+              onClick={() => setExpandedImage(null)}
+              className="absolute top-2 right-2 p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full shadow-md transition-all duration-200 hover:scale-110 z-10"
+              title="Close"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+            <div 
+              className="svg-content w-full"
+              dangerouslySetInnerHTML={{ __html: expandedImage.svgContent }}
+            />
+          </div>
+        </div>
+      )}
+      
       {/* Print-only reference list at the bottom */}
       {activeCitations && Object.keys(activeCitations).length > 0 && (
         <div className="print-reference-list">
