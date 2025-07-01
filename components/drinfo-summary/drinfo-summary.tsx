@@ -11,6 +11,7 @@ import AnswerFeedback from '../feedback/answer-feedback'
 import { getStatusMessage, StatusType } from '@/lib/status-messages'
 import { ReferencesSidebar } from "@/components/references/ReferencesSidebar"
 import { ReferenceGrid } from "@/components/references/ReferenceGrid"
+import { DrugInformationModal } from "@/components/references/DrugInformationModal"
 import { formatWithCitations, formatWithDummyCitations } from '@/lib/formatWithCitations'
 import { createCitationTooltip } from '@/lib/citationTooltipUtils'
 import { marked } from 'marked'
@@ -135,6 +136,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
   const [activeCitations, setActiveCitations] = useState<Record<string, Citation> | null>(null)
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null)
   const [showGuidelineModal, setShowGuidelineModal] = useState(false)
+  const [showDrugModal, setShowDrugModal] = useState(false)
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [isChatLoading, setIsChatLoading] = useState(false)
@@ -574,7 +576,19 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
   }
 
   const getCitationCount = (citations?: Record<string, Citation>) => {
-    return citations ? Object.keys(citations).length : 0;
+    if (!citations) return 0;
+    
+    // Filter out implicit drug citations
+    const visibleCitations = Object.entries(citations).filter(([key, citation]) => {
+      // If it's a drug citation and has drug_citation_type === 'implicit', exclude it
+      if (citation.source_type === 'drug_database' && citation.drug_citation_type === 'implicit') {
+        return false;
+      }
+      // Otherwise, include it
+      return true;
+    });
+    
+    return visibleCitations.length;
   }
 
   const handleShowAllCitations = (citations?: Record<string, Citation>) => {
@@ -692,6 +706,20 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         opacity: 0.5;
       }
 
+      .drug-name-clickable {
+        text-decoration: underline !important;
+        color: #214498 !important;
+        cursor: pointer;
+        transition: color 0.2s ease;
+        font-weight: bold !important;
+        display: inline;
+      }
+      
+      .drug-name-clickable:hover {
+        color: #3771FE !important;
+        text-decoration: underline !important;
+      }
+
       @media print {
         body {
           -webkit-print-color-adjust: exact !important;
@@ -748,7 +776,9 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     
     function attachTooltips() {
       const citationRefs = document.querySelectorAll('.citation-reference');
+      const drugNameRefs = document.querySelectorAll('.drug-name-clickable');
       
+      // Handle citation references
       citationRefs.forEach(ref => {
         if (ref.querySelector('.citation-tooltip')) return;
         
@@ -791,8 +821,28 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
             e.preventDefault();
             e.stopPropagation();
             if (citationObj) {
+              // Check if it's a drug citation and open drug modal directly
+              if (citationObj.source_type === 'drug_database') {
+                setSelectedCitation(citationObj);
+                setShowDrugModal(true);
+              } else {
+                // For other citation types, open the citations sidebar
+                setSelectedCitation(citationObj);
+                setShowCitationsSidebar(true);
+              }
+            }
+          }
+        });
+        
+        // Add click handler for all devices (including desktop)
+        ref.addEventListener('click', (e) => {
+          if (citationObj) {
+            // Check if it's a drug citation and open drug modal directly
+            if (citationObj.source_type === 'drug_database') {
+              e.preventDefault();
+              e.stopPropagation();
               setSelectedCitation(citationObj);
-              setShowCitationsSidebar(true);
+              setShowDrugModal(true);
             }
           }
         });
@@ -834,6 +884,29 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
           }
         });
       });
+      
+      // Handle drug name clicks
+      drugNameRefs.forEach(ref => {
+        const citationNumber = ref.getAttribute('data-citation-number');
+        let citationObj = null;
+        if (citationNumber && activeCitations && activeCitations[citationNumber]) {
+          citationObj = activeCitations[citationNumber];
+        }
+        
+        console.log('Found drug name span:', { citationNumber, citationObj, element: ref });
+        
+        // Add click handler for drug names
+        ref.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('Drug name clicked:', { citationNumber, citationObj });
+          if (citationObj && citationObj.source_type === 'drug_database') {
+            console.log('Opening drug modal for:', citationObj.title);
+            setSelectedCitation(citationObj);
+            setShowDrugModal(true);
+          }
+        });
+      });
     }
     
     const handleMouseMove = (e: MouseEvent) => {
@@ -866,7 +939,18 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       mutations.forEach(mutation => {
         if (mutation.type === 'childList' && 
             mutation.addedNodes.length > 0) {
-          shouldAttach = true;
+          // Check if any added nodes contain citation references or drug names
+          mutation.addedNodes.forEach(node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const element = node as Element;
+              if (element.querySelector('.citation-reference') || 
+                  element.querySelector('.drug-name-clickable') ||
+                  element.classList.contains('citation-reference') ||
+                  element.classList.contains('drug-name-clickable')) {
+                shouldAttach = true;
+              }
+            }
+          });
         }
       });
       
@@ -1431,6 +1515,14 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         citations={activeCitations}
         onClose={() => setShowCitationsSidebar(false)}
       />
+      <DrugInformationModal
+        open={showDrugModal}
+        citation={selectedCitation}
+        onClose={() => {
+          setShowDrugModal(false);
+          setSelectedCitation(null);
+        }}
+      />
       
       {/* Expanded Image Modal */}
       {expandedImage && (
@@ -1462,19 +1554,27 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         <div className="print-reference-list">
           <h3>References</h3>
           <ol>
-            {Object.values(activeCitations).map((citation, idx) => (
-              <li key={idx}>
-                {citation.title}
-                {citation.authors ? `, ${Array.isArray(citation.authors) ? citation.authors.join(', ') : citation.authors}` : ''}
-                {citation.year ? `, ${citation.year}` : ''}
-                {citation.url ? (
-                  <>
-                    {', '}
-                    <span style={{wordBreak: 'break-all'}}>{citation.url}</span>
-                  </>
-                ) : ''}
-              </li>
-            ))}
+            {Object.entries(activeCitations)
+              .filter(([key, citation]) => {
+                // Filter out implicit drug citations from print references
+                if (citation.source_type === 'drug_database' && citation.drug_citation_type === 'implicit') {
+                  return false;
+                }
+                return true;
+              })
+              .map(([key, citation], idx) => (
+                <li key={key}>
+                  {citation.title}
+                  {citation.authors ? `, ${Array.isArray(citation.authors) ? citation.authors.join(', ') : citation.authors}` : ''}
+                  {citation.year ? `, ${citation.year}` : ''}
+                  {citation.url ? (
+                    <>
+                      {', '}
+                      <span style={{wordBreak: 'break-all'}}>{citation.url}</span>
+                    </>
+                  ) : ''}
+                </li>
+              ))}
           </ol>
         </div>
       )}
