@@ -40,9 +40,9 @@ export async function makeAuthenticatedRequest(
     
     const idToken = await user.getIdToken();
     headers['Authorization'] = `Bearer ${idToken}`;
-    console.log(`Making authenticated request to ${endpoint} for user: ${user.email}`);
+    // console.log(`Making authenticated request to ${endpoint} for user: ${user.email}`);
   } catch (error) {
-    console.error('Authentication error:', error);
+    // console.error('Authentication error:', error);
     throw new Error('Authentication required. Please sign in to access drug information.');
   }
 

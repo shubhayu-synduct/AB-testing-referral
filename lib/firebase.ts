@@ -14,11 +14,11 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 }
 
-console.log("Firebase config loaded:", {
-  apiKey: firebaseConfig.apiKey ? "present" : "missing",
-  authDomain: firebaseConfig.authDomain,
-  projectId: firebaseConfig.projectId,
-})
+// console.log("Firebase config loaded:", {
+//   apiKey: firebaseConfig.apiKey ? "present" : "missing",
+//   authDomain: firebaseConfig.authDomain,
+//   projectId: firebaseConfig.projectId,
+// })
 
 // Declare global variables for TypeScript
 declare global {
@@ -44,7 +44,7 @@ declare global {
 function getFirebaseApp(): FirebaseApp {
   if (process.env.NODE_ENV === "development") {
     if (!globalThis.__firebaseApp) {
-      console.log("Initializing Firebase app for development...")
+      // console.log("Initializing Firebase app for development...")
       globalThis.__firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)
     }
     return globalThis.__firebaseApp
@@ -55,7 +55,7 @@ function getFirebaseApp(): FirebaseApp {
 }
 
 export const app = getFirebaseApp()
-console.log("Firebase App Initialized")
+// console.log("Firebase App Initialized")
 
 export async function getFirebaseAuth(): Promise<Auth> {
   if (globalThis.__firebaseAuth) {
@@ -64,17 +64,17 @@ export async function getFirebaseAuth(): Promise<Auth> {
 
   const auth = getAuth(app)
   globalThis.__firebaseAuth = auth
-  console.log("Firebase Auth Initialized")
+  // console.log("Firebase Auth Initialized")
 
   if (typeof window !== "undefined") {
     if (!globalThis.__authPersistenceSet) {
       try {
         const { setPersistence, browserLocalPersistence } = await import("firebase/auth")
         await setPersistence(auth, browserLocalPersistence)
-        console.log("Firebase Auth persistence set to LOCAL (global)")
+        // console.log("Firebase Auth persistence set to LOCAL (global)")
         globalThis.__authPersistenceSet = true
       } catch (error) {
-        console.error("Error setting Firebase auth persistence", error)
+        // console.error("Error setting Firebase auth persistence", error)
       }
     }
   }
@@ -87,7 +87,7 @@ export function getFirebaseFirestore(): Firestore {
   }
   const db = getFirestore(app)
   globalThis.__firebaseDB = db
-  console.log("Firestore Initialized")
+  // console.log("Firestore Initialized")
   return db
 }
 
@@ -98,7 +98,7 @@ export function getGoogleProvider(): GoogleAuthProvider {
   const provider = new GoogleAuthProvider()
   provider.setCustomParameters({ prompt: 'select_account' })
   globalThis.__googleProvider = provider
-  console.log("Google Auth Provider Initialized")
+  // console.log("Google Auth Provider Initialized")
   return provider
 }
 
@@ -109,7 +109,7 @@ export function getMicrosoftProvider(): OAuthProvider {
   const provider = new OAuthProvider('microsoft.com')
   provider.setCustomParameters({ prompt: 'select_account' })
   globalThis.__microsoftProvider = provider
-  console.log("Microsoft Auth Provider Initialized")
+  // console.log("Microsoft Auth Provider Initialized")
   return provider
 }
 
@@ -125,7 +125,7 @@ export const getFirebaseAnalytics = async () => {
     const { getAnalytics } = await import("firebase/analytics")
     return getAnalytics(app)
   } catch (error) {
-    console.error("Error initializing analytics:", error)
+    // console.error("Error initializing analytics:", error)
     return null
   }
 }
