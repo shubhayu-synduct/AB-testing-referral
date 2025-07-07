@@ -1303,7 +1303,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                         activeTab === 'images' ? 'text-blue-900' : 'text-gray-400 hover:text-blue-700'
                                       }`}
                                     >
-                                      Images
+                                      AI Infographics
                                       {imageGenerationStatus === 'complete' && (
                                         <span className="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-[linear-gradient(125deg,_#9BB8FF_0%,_#3771FE_45%,_#214498_100%)] rounded-full flex items-center justify-center"></span>
                                       )}
