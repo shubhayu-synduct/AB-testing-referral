@@ -1367,8 +1367,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                         {imageGenerationStatus === 'generating' ? (
                                           <>
                                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-                                            <p className="text-gray-600 font-medium text-lg font-['DM_Sans']">Generating your image...</p>
-                                            <p className="text-gray-500 text-sm mt-2 font-['DM_Sans']">This may take a few moments</p>
+                                            <p className="text-gray-600 font-medium text-lg font-['DM_Sans']">Generating your visuals...</p>
+                                            <p className="text-gray-500 text-sm mt-2 font-['DM_Sans']">This may take a few moments to minutes...</p>
                                           </>
                                         ) : (imageGenerationStatus === 'complete' || (msg.answer?.svg_content && msg.answer.svg_content.length > 0)) ? (
                                           <div className="text-center">
