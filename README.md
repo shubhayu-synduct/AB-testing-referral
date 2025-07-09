@@ -1,7 +1,11 @@
 #### Dr. INFO - Medical Information Platform
 
 Dr. INFO is a comprehensive web application designed for healthcare professionals to access evidence-based medical information, clinical guidelines, drug information, and other healthcare resources in one centralized platform.
+<<<<<<< HEAD
 #######
+=======
+###########
+>>>>>>> origin/main
 ###### Features
 #######
 - **Dr. INFO Summary**: AI-powered medical information summaries from trusted sources
@@ -92,7 +96,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ### mergeing sandy guidelines with ai summary
 # Deploying sandys latest commit 
 ## Another commit
-
+###
 ##### 
 fix: active substances from api
 ### reset password UI
@@ -106,7 +110,7 @@ Merge pull request #7 from synductgmbh/dev_sand
 #deploy
 
 ## deployed
-## NDA merged
+### NDA merged
 
 ## drug information first iteration
 ##

@@ -3,8 +3,12 @@
 // API base URL for DrInfo summary service
 //  const DRINFO_API_URL = "https://synduct-aisummary.drinfo.ai/chat/stream";
 // const DRINFO_API_URL = "http://localhost:8000/chat/stream";
+<<<<<<< HEAD
 const DRINFO_API_URL = "https://ai-summary-test.duckdns.org/chat/stream";
 // const DRINFO_API_URL = "https://ai-summary-stage.duckdns.org/chat/stream";
+=======
+const DRINFO_API_URL = "https://synduct-aisummary.drinfo.ai/chat/stream";
+>>>>>>> origin/main
 export interface Citation {
   title: string;
   url: string;
