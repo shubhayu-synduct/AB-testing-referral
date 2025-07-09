@@ -16,6 +16,10 @@ const nextConfig = {
     maxInactiveAge: 25 * 1000,
     pagesBufferLength: 2,
   },
+  // Remove console statements in all environments
+  compiler: {
+    removeConsole: true,
+  },
 }
 
 export default nextConfig

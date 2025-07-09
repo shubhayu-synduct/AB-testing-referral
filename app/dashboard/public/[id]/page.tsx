@@ -30,6 +30,7 @@ interface ChatMessage {
       content: string;
     }>;
     citations?: Record<string, Citation>;
+    svg_content?: string[]; // Add SVG content support
   };
 }
 
@@ -49,6 +50,7 @@ interface PublicChatData {
       content: string;
       citations: Record<string, Citation>;
       search_data: Record<string, any>;
+      svg_content?: string[]; // Add SVG content support
     };
     context: {
       parent_thread_id: string | null;
@@ -67,6 +69,8 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
   const [activeCitations, setActiveCitations] = useState<Record<string, Citation> | null>(null)
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [activeTab, setActiveTab] = useState<'answer' | 'images'>('answer');
+  const [expandedImage, setExpandedImage] = useState<{index: number, svgContent: string} | null>(null);
 
   useEffect(() => {
     // Check authentication status
@@ -88,11 +92,14 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
         }
 
         const data = chatDoc.data() as PublicChatData;
+        console.log("Public chat data:", data);
         setChatData(data);
 
         // Convert threads to messages format
         const convertedMessages: ChatMessage[] = [];
         data.threads.forEach((thread, index) => {
+          console.log(`Thread ${index}:`, thread);
+          
           // Add user message
           convertedMessages.push({
             id: `user-${index}`,
@@ -105,6 +112,9 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
 
           // Add assistant message if it exists
           if (thread.bot_response.content) {
+            console.log(`Thread ${index} bot response:`, thread.bot_response);
+            console.log(`Thread ${index} SVG content:`, thread.bot_response.svg_content);
+            
             convertedMessages.push({
               id: `assistant-${index}`,
               type: 'assistant',
@@ -113,19 +123,29 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
               answer: {
                 mainSummary: thread.bot_response.content,
                 sections: [],
-                citations: thread.bot_response.citations
+                citations: thread.bot_response.citations,
+                svg_content: thread.bot_response.svg_content
               },
               threadId: `thread-${index}`
             });
           }
         });
 
+        console.log("Converted messages:", convertedMessages);
         setMessages(convertedMessages);
 
         // Set active citations from the last assistant message
         const lastAssistantMsg = convertedMessages.filter(msg => msg.type === 'assistant').pop();
         if (lastAssistantMsg?.answer?.citations) {
           setActiveCitations(lastAssistantMsg.answer.citations);
+        }
+
+        // Auto-switch to Images tab if images are available in the last message
+        if (lastAssistantMsg?.answer?.svg_content && lastAssistantMsg.answer.svg_content.length > 0) {
+          console.log("Found SVG content, switching to images tab");
+          setActiveTab('images');
+        } else {
+          console.log("No SVG content found in last assistant message");
         }
 
       } catch (err) {
@@ -163,6 +183,76 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
     if (citations) {
       setActiveCitations(citations);
       setShowCitationsSidebar(true);
+    }
+  };
+
+  // Function to download SVG as PNG
+  const downloadSvgAsPng = (svgContent: string, filename: string = 'generated-image') => {
+    try {
+      // Create a temporary container for the SVG
+      const container = document.createElement('div');
+      container.innerHTML = svgContent;
+      const svgElement = container.querySelector('svg');
+      
+      if (!svgElement) {
+        console.error('No SVG element found in content');
+        return;
+      }
+
+      // Set SVG dimensions if not already set
+      if (!svgElement.getAttribute('width') || !svgElement.getAttribute('height')) {
+        svgElement.setAttribute('width', '800');
+        svgElement.setAttribute('height', '600');
+      }
+
+      // Convert SVG to data URL
+      const svgData = new XMLSerializer().serializeToString(svgElement);
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const svgUrl = URL.createObjectURL(svgBlob);
+
+      // Create canvas to convert SVG to PNG
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        
+        if (ctx) {
+          // Draw white background
+          ctx.fillStyle = 'white';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          // Draw the image
+          ctx.drawImage(img, 0, 0);
+          
+          // Convert to PNG and download
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${filename}.png`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }
+          }, 'image/png');
+        }
+        
+        URL.revokeObjectURL(svgUrl);
+      };
+
+      img.onerror = () => {
+        console.error('Failed to load SVG image');
+        URL.revokeObjectURL(svgUrl);
+      };
+
+      img.src = svgUrl;
+    } catch (error) {
+      console.error('Error downloading SVG as PNG:', error);
     }
   };
 
@@ -296,6 +386,20 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
         .print-reference-list {
           display: none !important;
         }
+      }
+      
+      /* SVG content styling */
+      .svg-content {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        display: block;
+      }
+      
+      .svg-content svg {
+        width: 100%;
+        height: auto;
+        max-width: 100%;
       }
     `;
     document.head.appendChild(style);
@@ -443,6 +547,17 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
     };
   }, [activeCitations]);
 
+  // Debug effect to log messages and their SVG content
+  useEffect(() => {
+    console.log("Messages updated:", messages);
+    messages.forEach((msg, index) => {
+      if (msg.type === 'assistant' && msg.answer) {
+        console.log(`Message ${index} SVG content:`, msg.answer.svg_content);
+        console.log(`Message ${index} has SVG content:`, !!(msg.answer.svg_content && msg.answer.svg_content.length > 0));
+      }
+    });
+  }, [messages]);
+
   if (isLoading) {
     return (
       <div className="p-2 sm:p-4 md:p-6 h-[100dvh] flex flex-col relative overflow-hidden">
@@ -502,22 +617,91 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
                           <img src="/answer-icon.svg" alt="Answer" className="w-5 h-5 sm:w-6 sm:h-6" />
                         </div>
                       </div>
-                      <div className="flex items-center">
-                        <span className="font-semibold text-blue-900 font-['DM_Sans'] mt-1 text-base">Answer</span>
+                      <div className="flex items-center gap-4">
+                        {msg.content && (
+                          <>
+                            <button
+                              onClick={() => setActiveTab('answer')}
+                              className={`font-semibold font-['DM_Sans'] mt-1 text-base transition-colors duration-200 ${
+                                activeTab === 'answer' ? 'text-blue-900' : 'text-gray-400 hover:text-blue-700'
+                              }`}
+                            >
+                              Answer
+                            </button>
+                            <button
+                              onClick={() => setActiveTab('images')}
+                              className={`font-semibold font-['DM_Sans'] mt-1 text-base transition-colors duration-200 relative ${
+                                activeTab === 'images' ? 'text-blue-900' : 'text-gray-400 hover:text-blue-700'
+                              }`}
+                            >
+                              AI Infographics
+                              {msg.answer?.svg_content && msg.answer.svg_content.length > 0 && (
+                                <span className="absolute -top-0.5 -right-1.5 w-1.5 h-1.5 bg-[linear-gradient(125deg,_#9BB8FF_0%,_#3771FE_45%,_#214498_100%)] rounded-full flex items-center justify-center"></span>
+                              )}
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                     {msg.content && (
                       <div className="mb-4 sm:mb-6">
-                        <div
-                          className="prose prose-slate prose-ul:text-black marker:text-black max-w-none text-base sm:text-base prose-h2:text-base prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold"
-                          style={{ fontFamily: 'DM Sans, sans-serif' }}
-                          dangerouslySetInnerHTML={{
-                            __html: formatWithCitations(
-                              marked.parse(msg.content, { async: false }),
-                              msg.answer?.citations
-                            ),
-                          }}
-                        />
+                        {activeTab === 'answer' ? (
+                          <div
+                            className="prose prose-slate prose-ul:text-black marker:text-black max-w-none text-base sm:text-base prose-h2:text-base prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold"
+                            style={{ fontFamily: 'DM Sans, sans-serif' }}
+                            dangerouslySetInnerHTML={{
+                              __html: formatWithCitations(
+                                marked.parse(msg.content, { async: false }),
+                                msg.answer?.citations
+                              ),
+                            }}
+                          />
+                        ) : (
+                          <div className="prose prose-slate max-w-none text-base sm:text-base">
+                            {msg.answer?.svg_content && msg.answer.svg_content.length > 0 ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 py-4">
+                                {msg.answer.svg_content.map((svgContent, index) => (
+                                  svgContent && (
+                                    <div key={index} className="relative group cursor-pointer">
+                                      <div 
+                                        className="svg-content w-full transition-transform duration-200 group-hover:scale-105"
+                                        dangerouslySetInnerHTML={{ __html: svgContent }}
+                                        onClick={() => setExpandedImage({index, svgContent})}
+                                      />
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          downloadSvgAsPng(svgContent, `image-${msg.threadId}-${index + 1}`);
+                                        }}
+                                        className="absolute top-2 right-2 p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full shadow-md transition-all duration-200 hover:scale-110 opacity-0 group-hover:opacity-100"
+                                        title="Download as PNG"
+                                      >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                          <polyline points="7,10 12,15 17,10"/>
+                                          <line x1="12" y1="15" x2="12" y2="3"/>
+                                        </svg>
+                                      </button>
+                                    </div>
+                                  )
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center py-4">
+                                <div className="w-full max-w-[800px] h-[600px] border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center bg-gray-50">
+                                  <div className="text-center">
+                                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                      </svg>
+                                    </div>
+                                    <p className="text-gray-600 font-medium text-lg font-['DM_Sans']">No images available</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                     {msg.answer?.citations && Object.keys(msg.answer.citations).length > 0 && (
@@ -545,6 +729,31 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
         citations={activeCitations}
         onClose={() => setShowCitationsSidebar(false)}
       />
+      
+      {/* Expanded Image Modal */}
+      {expandedImage && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={() => setExpandedImage(null)}
+        >
+          <div className="relative max-w-[90vw] max-h-[90vh] overflow-auto bg-white rounded-lg">
+            <button
+              onClick={() => setExpandedImage(null)}
+              className="absolute top-2 right-2 p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full shadow-md transition-all duration-200 hover:scale-110 z-10"
+              title="Close"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+            <div 
+              className="svg-content w-full"
+              dangerouslySetInnerHTML={{ __html: expandedImage.svgContent }}
+            />
+          </div>
+        </div>
+      )}
       
       {/* Print-only reference list at the bottom */}
       {activeCitations && Object.keys(activeCitations).length > 0 && (

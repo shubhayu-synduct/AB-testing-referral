@@ -1326,7 +1326,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
           bot_response: {
             content: threadData.bot_response?.content || '',
             citations: threadData.bot_response?.citations || {},
-            search_data: threadData.bot_response?.search_data || {}
+            search_data: threadData.bot_response?.search_data || {},
+            svg_content: threadData.bot_response?.svg_content || []
           },
           context: {
             parent_thread_id: threadData.context?.parent_thread_id || null
@@ -1865,7 +1866,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       )}
       
       {/* Feedback Reminder Modal */}
-      {showFeedbackModal && (
+      {false && showFeedbackModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-[#FCFDFF] rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all border border-[#C8C8C8]">
             <div className="p-6">
