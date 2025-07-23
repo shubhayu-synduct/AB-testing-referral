@@ -16,7 +16,7 @@ export function FirebaseTest() {
         const auth = getAuth(app)
         const db = getFirestore(app)
 
-          // console.log("Firebase app initialized:", !!app)
+        // console.log("Firebase app initialized:", !!app)
   // console.log("Auth initialized:", !!auth)
   // console.log("Firestore initialized:", !!db)
 
@@ -24,16 +24,16 @@ export function FirebaseTest() {
         try {
           await signInAnonymously(auth)
           // console.log("Anonymous sign in successful")
-        } catch (authError: any) {
-          // console.warn("Anonymous sign in failed (this is okay for testing):", authError.message)
+    } catch (authError: any) {
+      // console.warn("Anonymous sign in failed (this is okay for testing):", authError.message)
         }
 
         // Test Firestore connection
         try {
           const snapshot = await getDocs(collection(db, "test-collection"))
           // console.log("Firestore query successful, docs:", snapshot.docs.length)
-        } catch (dbError: any) {
-          // console.warn("Firestore query failed (this is okay for testing):", dbError.message)
+    } catch (dbError: any) {
+      // console.warn("Firestore query failed (this is okay for testing):", dbError.message)
         }
 
         setStatus("success")

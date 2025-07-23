@@ -1,9 +1,10 @@
 "use client"
 
+import { logger } from './logger';
+
 // API base URL for DrInfo summary service
-//  const DRINFO_API_URL = "https://synduct-aisummary.drinfo.ai/chat/stream";
-// const DRINFO_API_URL = "http://localhost:8000/chat/stream";
-const DRINFO_API_URL = "https://ai-summary-test.duckdns.org/chat/stream";
+ const DRINFO_API_URL = "https://ai-summary-test.duckdns.org/chat/stream";
+// const DRINFO_API_URL = "https://ai-summary-stage.duckdns.org/chat/stream";
 // const DRINFO_API_URL = "https://ai-summary-stage.duckdns.org/chat/stream";
 export interface Citation {
   title: string;
@@ -20,6 +21,7 @@ export interface DrInfoSummaryData {
   short_summary?: string;
   processed_content?: string;
   citations?: Record<string, Citation>;
+  thread_id?: string;
 }
 
 export interface StreamingResponse {
@@ -32,7 +34,7 @@ export interface StreamingResponse {
 interface DrInfoSummaryOptions {
   sessionId?: string;
   userId?: string;
-  is_follow_up?: boolean;
+  parent_thread_id?: string;  // Changed from is_follow_up to parent_thread_id
   mode?: string;
   country?: string;
 }
@@ -57,16 +59,16 @@ export async function fetchDrInfoSummary(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Accept": "application/json"
+        "Accept": "text/event-stream"
       },
       body: JSON.stringify({
         query,
-        session_id: options?.sessionId || "",
-        is_follow_up: options?.is_follow_up || false,
-        userId: options?.userId || "",
-        language: "string",
-        country: options?.country || "",
-        ...(options?.mode ? { mode: options.mode } : {})
+        userId: options?.userId || "anonymous_user",
+        session_id: options?.sessionId || undefined,
+        language: "English",
+        country: options?.country || "US",
+        parent_thread_id: options?.parent_thread_id || null,  // Use Firebase thread-based approach
+        mode: options?.mode || "study"  // Add mode parameter with default fallback
       })
     });
 
@@ -171,7 +173,9 @@ export async function sendFollowUpQuestion(
   onStatus: (status: string, message?: string) => void,
   onComplete: (data: DrInfoSummaryData) => void,
   sessionId: string,
-  userId: string
+  userId: string,
+  parentThreadId?: string,
+  mode?: string
 ): Promise<void> {
   // console.log("Sending follow-up question:", followUpQuestion);
   
@@ -181,10 +185,13 @@ export async function sendFollowUpQuestion(
       onChunk,
       onStatus,
       onComplete,
-      { is_follow_up: true, sessionId, userId }
+      { parent_thread_id: parentThreadId, sessionId, userId, mode }
     );
      } catch (error) {
      // console.error("Error sending follow-up question:", error);
      throw error;
+  } catch (error) {
+    logger.error("Error sending follow-up question:", error);
+    throw error;
   }
-} 
+}

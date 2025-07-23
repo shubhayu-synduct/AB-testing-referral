@@ -5,9 +5,7 @@ Dr. INFO is a comprehensive web application designed for healthcare professional
 #######
 =======
 ###########
->>>>>>> origin/main
-###### Features
-#######
+####### Features
 - **Dr. INFO Summary**: AI-powered medical information summaries from trusted sources
 - **Clinical Guidelines**: Access to evidence-based clinical practice guidelines 
 - **Drug Information**: Comprehensive medication database with dosing, side effects, and more
@@ -20,7 +18,7 @@ Dr. INFO is a comprehensive web application designed for healthcare professional
 - **History**: Track and manage your search history#
 
 ###### Tech Stack
-####
+#####
 - **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS
 - **Authentication**: Firebase Authentication
 - **Database**: Firestore
@@ -77,11 +75,11 @@ The application uses Firebase Authentication for user management:
 - Protected routes with authentication checks
 - Secure session management
 
-#### License
+##### License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-### Acknowledgments
+#### Acknowledgments
 
 - Medical information is for demonstration purposes only
 - Icons provided by [Lucide](https://lucide.dev/)

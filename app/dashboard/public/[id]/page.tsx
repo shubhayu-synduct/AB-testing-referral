@@ -14,6 +14,7 @@ import Link from 'next/link'
 import { Citation } from '@/lib/drinfo-summary-service'
 import { PublicLayout } from '@/components/dashboard/public-layout'
 import { getSessionCookie } from '@/lib/auth-service'
+import { logger } from '@/lib/logger'
 
 interface ChatMessage {
   id: string;
@@ -149,7 +150,7 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
         }
 
       } catch (err) {
-        console.error("Error loading public chat:", err);
+        logger.error("Error loading public chat:", err);
         setError("Failed to load the shared chat. Please try again later.");
       } finally {
         setIsLoading(false);
@@ -786,4 +787,4 @@ export default function PublicChatPage({ params }: { params: Promise<{ id: strin
       <PublicChatContent params={params} />
     </PublicLayout>
   );
-} 
+}

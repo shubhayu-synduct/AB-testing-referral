@@ -1,16 +1,20 @@
 "use client"
 
 import { useState, useRef, useEffect } from 'react'
-import { Copy, Check, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { Copy, Check, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react'
 import { getFirebaseFirestore } from '@/lib/firebase'
 import { doc, setDoc } from 'firebase/firestore'
 import { MovingBorder } from "@/components/ui/moving-border";
 import { cn } from "@/lib/utils";
+import { logger } from '@/lib/logger';
 
 interface AnswerFeedbackProps {
   conversationId: string;
   threadId: string;
   answerText?: string;
+  onReload?: () => void;
+  isReloading?: boolean;
+  messageId?: string;
 }
 
 const FEEDBACK_OPTIONS_HELPFUL = [
@@ -24,7 +28,10 @@ const FEEDBACK_OPTIONS_NOT_HELPFUL = [
 export default function AnswerFeedback({ 
   conversationId, 
   threadId, 
-  answerText = ''
+  answerText = '',
+  onReload,
+  isReloading,
+  messageId
 }: AnswerFeedbackProps) {
   const [selectedFeedback, setSelectedFeedback] = useState<string[]>([]);
   const [contextOfUse, setContextOfUse] = useState<string[]>([]);
@@ -98,7 +105,7 @@ export default function AnswerFeedback({
         timestamp: new Date().toISOString()
       };
 
-      console.log('Attempting to save feedback to Firebase:', {
+      logger.debug('Attempting to save feedback to Firebase:', {
         conversationId,
         threadId,
         feedbackType,
@@ -120,7 +127,7 @@ export default function AnswerFeedback({
       );
 
       await setDoc(feedbackRef, feedbackData);
-      console.log('Feedback saved successfully to Firebase');
+      logger.debug('Feedback saved successfully to Firebase');
 
       setThankYou(true);
       setShowForm(null);
@@ -133,7 +140,7 @@ export default function AnswerFeedback({
         [feedbackType]: true
       }));
     } catch (error) {
-      console.error('Error saving feedback to Firebase:', error);
+      logger.error('Error saving feedback to Firebase:', error);
       setValidationMessage('Failed to save feedback. Please try again.');
       setTimeout(() => {
         setValidationMessage('');
@@ -150,7 +157,7 @@ export default function AnswerFeedback({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      console.error('Failed to copy:', error);
+      logger.error('Failed to copy:', error);
     }
   };
 
@@ -260,6 +267,29 @@ export default function AnswerFeedback({
             </>
           )}
         </button>
+
+        {/* Reload Button */}
+        {onReload && (
+          <button
+            onClick={onReload}
+            disabled={isReloading}
+            className="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg border border-[#223258] text-[#223258] bg-white transition-all flex items-center gap-1 sm:gap-2 hover:border-[#3771FE] hover:text-[#3771FE] disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Retry answer"
+            title="Retry this answer"
+          >
+            {isReloading ? (
+              <>
+                <div className="animate-spin rounded-full h-3.5 w-3.5 sm:h-4 sm:w-4 border-b-2 border-[#3771FE]"></div>
+                <span className="text-xs sm:text-sm">Retrying...</span>
+              </>
+            ) : (
+              <>
+                <RotateCcw size={14} className="text-[#223258] sm:w-4 sm:h-4" />
+                <span className="text-xs sm:text-sm">Retry</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
       {/* Feedback form appears only after clicking Helpful/Not helpful */}
       {showForm && !thankYou && (
@@ -337,4 +367,4 @@ export default function AnswerFeedback({
       )}
     </div>
   );
-} 
+}
