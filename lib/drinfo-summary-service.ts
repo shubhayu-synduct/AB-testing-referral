@@ -3,6 +3,7 @@
 import { logger } from './logger';
 
 // API base URL for DrInfo summary service
+// const DRINFO_API_URL = "http://localhost:8000/chat/stream";
  const DRINFO_API_URL = "https://ai-summary-test.duckdns.org/chat/stream";
 // const DRINFO_API_URL = "https://ai-summary-stage.duckdns.org/chat/stream";
 // const DRINFO_API_URL = "https://ai-summary-stage.duckdns.org/chat/stream";
@@ -190,8 +191,5 @@ export async function sendFollowUpQuestion(
      } catch (error) {
      // console.error("Error sending follow-up question:", error);
      throw error;
-  } catch (error) {
-    logger.error("Error sending follow-up question:", error);
-    throw error;
-  }
-}
+
+}}
