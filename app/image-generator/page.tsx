@@ -14,7 +14,7 @@ export default function ImageGeneratorPage() {
         <div className="flex flex-col md:flex-row justify-center items-center mb-0 md:mb-[20px]">
           <div className="text-center mb-4 md:mb-0">
             <h1 className="hidden md:block text-[36px] font-semibold text-[#214498] mb-[4px] mt-0 font-['DM_Sans'] font-[600]">Visual Abstract Generator</h1>
-            <p className="hidden md:block text-gray-600 text-[16px] mt-0">Convert text abstracts into professional visual posters and abstracts</p>
+            <p className="hidden md:block text-gray-600 text-[16px] mt-0">Convert medical text into professional visual posters and abstracts</p>
           </div>
         </div>
         

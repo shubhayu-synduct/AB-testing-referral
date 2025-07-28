@@ -1,6 +1,9 @@
 "use client"
 
 import React, { useState, useRef, useEffect } from 'react'
+import { doc, setDoc } from 'firebase/firestore'
+import { getFirebaseFirestore } from '@/lib/firebase'
+import { toast } from 'sonner'
 
 interface ImageGeneratorProps {
   user?: any;
@@ -12,6 +15,20 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
   const [error, setError] = useState<string | null>(null)
   const [generatedImage, setGeneratedImage] = useState<string | null>(null)
   const [imageGenerationStatus, setImageGenerationStatus] = useState<'idle' | 'generating' | 'complete'>('idle')
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
+  const [feedbackData, setFeedbackData] = useState({
+    useCase: [] as string[],
+    useCaseOther: '',
+    frequency: [] as string[],
+    frequencyOther: '',
+    valueRating: 0,
+    infographicTypes: [] as string[],
+    infographicOther: '',
+    suggestions: ''
+  })
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
+  const feedbackRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Auto-resize textarea
@@ -56,6 +73,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
     setError(null)
     setImageGenerationStatus('generating')
     setGeneratedImage(null)
+    setFeedbackSubmitted(false)
 
     try {
       // Clean the prompt text to avoid Pydantic validation errors
@@ -90,10 +108,34 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
       if (data.status === "success" && data.svg_content) {
         setGeneratedImage(data.svg_content)
         setImageGenerationStatus('complete')
+        // Save to Firebase
+        if (user?.uid) {
+          const threadId = await saveSvgToFirebase(data.svg_content, prompt, user.uid)
+          setCurrentThreadId(threadId)
+        }
+        // Show feedback section after 5 seconds and auto-scroll
+        setTimeout(() => {
+          setShowFeedback(true)
+          setTimeout(() => {
+            feedbackRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }, 100)
+        }, 5000)
       } else if (data.svg_content) {
         // Handle case where API returns SVG content directly without success flag
         setGeneratedImage(data.svg_content)
         setImageGenerationStatus('complete')
+        // Save to Firebase
+        if (user?.uid) {
+          const threadId = await saveSvgToFirebase(data.svg_content, prompt, user.uid)
+          setCurrentThreadId(threadId)
+        }
+        // Show feedback section after 5 seconds and auto-scroll
+        setTimeout(() => {
+          setShowFeedback(true)
+          setTimeout(() => {
+            feedbackRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }, 100)
+        }, 5000)
       } else {
         throw new Error(data.message || data.error || 'Failed to generate visual abstract')
       }
@@ -103,6 +145,77 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
       setImageGenerationStatus('idle')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Function to handle feedback submission
+  const handleFeedbackSubmit = async () => {
+    if (!currentThreadId) return
+
+    try {
+      const db = getFirebaseFirestore()
+      const docId = `visual_${currentThreadId}`
+      
+      await setDoc(doc(db, 'visual_abstracts', user?.uid || 'guest', 'visuals', docId), {
+        input_text: prompt,
+        svg: {
+          svg_data: generatedImage,
+          timestamp: new Date().toISOString()
+        },
+        feedback: {
+          useCase: feedbackData.useCase,
+          useCaseOther: feedbackData.useCaseOther,
+          frequency: feedbackData.frequency,
+          frequencyOther: feedbackData.frequencyOther,
+          valueRating: feedbackData.valueRating,
+          infographicTypes: feedbackData.infographicTypes,
+          infographicOther: feedbackData.infographicOther,
+          suggestions: feedbackData.suggestions,
+          timestamp: new Date().toISOString()
+        }
+      }, { merge: true })
+      
+      console.log('Feedback saved to Firebase successfully')
+      setShowFeedback(false)
+      setFeedbackData({
+        useCase: [] as string[],
+        useCaseOther: '',
+        frequency: [] as string[],
+        frequencyOther: '',
+        valueRating: 0,
+        infographicTypes: [] as string[],
+        infographicOther: '',
+        suggestions: ''
+      })
+      setCurrentThreadId(null)
+      toast.success('Thank you for your feedback!')
+      setFeedbackSubmitted(true)
+    } catch (error) {
+      console.error('Error saving feedback to Firebase:', error)
+      toast.error('Failed to save feedback. Please try again.')
+    }
+  }
+
+  // Function to save SVG to Firebase
+  const saveSvgToFirebase = async (svgContent: string, inputText: string, userId: string): Promise<string | null> => {
+    try {
+      const db = getFirebaseFirestore()
+      const threadId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+      const docId = `visual_${threadId}`
+      
+      await setDoc(doc(db, 'visual_abstracts', userId, 'visuals', docId), {
+        input_text: inputText,
+        svg: {
+          svg_data: svgContent,
+          timestamp: new Date().toISOString()
+        }
+      })
+      
+      console.log('SVG saved to Firebase successfully')
+      return threadId
+    } catch (error) {
+      console.error('Error saving SVG to Firebase:', error)
+      return null
     }
   }
 
@@ -191,10 +304,10 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
       <div className="bg-white rounded-lg border-2 border-[#3771fe44] shadow-[0px_0px_11px_#0000000c] p-4 md:p-6">
         <div className="mb-4">
           <label htmlFor="prompt" className="block text-lg md:text-xl font-semibold text-[#214498] mb-2 font-['DM_Sans']">
-            Enter your abstract text
+            Enter your text below
           </label>
           <p className="text-gray-600 text-sm md:text-base font-['DM_Sans']">
-            Paste your research abstract or text content to convert it into a visual poster
+            Paste your research abstract or medical text content to convert it into a visual abstract.
           </p>
         </div>
         
@@ -257,7 +370,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
             <div className="w-full max-w-[800px] h-[400px] md:h-[600px] border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center bg-gray-50">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3771FE] mb-4"></div>
               <p className="text-gray-600 font-medium text-lg font-['DM_Sans'] text-center px-4">Creating your visual abstract...</p>
-              <p className="text-gray-500 text-sm mt-2 font-['DM_Sans'] text-center px-4">This may take a few moments</p>
+              <p className="text-gray-500 text-sm mt-2 font-['DM_Sans'] text-center px-4">This may take a few moments to minutes...</p>
             </div>
           ) : generatedImage ? (
             <div className="relative w-full max-w-[800px]">
@@ -291,8 +404,249 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="text-center text-[14px] text-gray-400">
+      {/* Feedback Toggle Button */}
+      {generatedImage && (
+        <div className="flex justify-center mt-6">
+          <button
+            onClick={() => setShowFeedback(!showFeedback)}
+            disabled={feedbackSubmitted}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200 font-['DM_Sans'] font-medium ${
+              feedbackSubmitted 
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                : 'bg-[#3771FE] text-white hover:bg-[#214498]'
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+            </svg>
+            {feedbackSubmitted 
+              ? 'Feedback Submitted ✓' 
+              : showFeedback 
+                ? 'Hide Feedback' 
+                : 'Share Your Feedback'
+            }
+          </button>
+        </div>
+      )}
+
+      {/* Feedback Section */}
+      {showFeedback && generatedImage && (
+        <div ref={feedbackRef} className="mt-8 p-6 bg-white rounded-lg border-2 border-[#3771fe44] shadow-[0px_0px_11px_#0000000c]">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <div className="w-10 h-10 bg-[#3771FE] bg-opacity-10 rounded-full flex items-center justify-center mr-3">
+                <svg className="w-5 h-5 text-[#3771FE]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-semibold text-[#214498] font-['DM_Sans'] text-lg">Your Feedback can help us improve</h3>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowFeedback(false)}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+          
+          <form onSubmit={(e) => { e.preventDefault(); handleFeedbackSubmit(); }} className="space-y-4">
+            {/* Use Case */}
+            <div>
+              <label className="block text-sm font-medium text-[#223258] mb-3 font-['DM_Sans']">
+                For what purpose would you use this feature?
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
+                {[
+                  { value: 'patient_education', label: 'Patient education' },
+                  { value: 'clinical_documentation', label: 'Clinical notes' },
+                  { value: 'medical_presentations', label: 'Medical presentations' },
+                  { value: 'research_papers', label: 'Research papers' },
+                  { value: 'medical_teaching', label: 'Medical teaching' },
+                  { value: 'case_studies', label: 'Case studies' },
+                  { value: 'protocols', label: 'Protocols' },
+                  { value: 'guidelines', label: 'Guidelines' },
+                  { value: 'social_media', label: 'Social media' },
+                  { value: 'other', label: 'Other' }
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      const newUseCase = feedbackData.useCase.includes(option.value)
+                        ? feedbackData.useCase.filter(item => item !== option.value)
+                        : [...feedbackData.useCase, option.value];
+                      setFeedbackData({...feedbackData, useCase: newUseCase})
+                    }}
+                    className={`p-1.5 text-xs font-['DM_Sans'] rounded border transition-colors duration-200 ${
+                      feedbackData.useCase.includes(option.value)
+                        ? 'border-[#3771FE] text-[#3771FE] bg-blue-50'
+                        : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              {feedbackData.useCase.includes('other') && (
+                <textarea
+                  value={feedbackData.useCaseOther}
+                  onChange={(e) => setFeedbackData({...feedbackData, useCaseOther: e.target.value})}
+                  placeholder="Please specify..."
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3771FE] focus:border-[#3771FE] font-['DM_Sans'] mt-2"
+                  rows={2}
+                />
+              )}
+            </div>
+
+            {/* Frequency */}
+            <div>
+              <label className="block text-sm font-medium text-[#223258] mb-3 font-['DM_Sans']">
+                How often would you use this feature?
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {[
+                  { value: 'daily', label: 'Daily' },
+                  { value: 'weekly', label: 'Weekly' },
+                  { value: 'monthly', label: 'Monthly' },
+                  { value: 'rarely', label: 'Rarely' },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      const newFrequency = feedbackData.frequency.includes(option.value)
+                        ? feedbackData.frequency.filter(item => item !== option.value)
+                        : [...feedbackData.frequency, option.value];
+                      setFeedbackData({...feedbackData, frequency: newFrequency})
+                    }}
+                    className={`p-1.5 text-xs font-['DM_Sans'] rounded border transition-colors duration-200 ${
+                      feedbackData.frequency.includes(option.value)
+                        ? 'border-[#3771FE] text-[#3771FE] bg-blue-50'
+                        : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              {feedbackData.frequency.includes('other') && (
+                <textarea
+                  value={feedbackData.frequencyOther}
+                  onChange={(e) => setFeedbackData({...feedbackData, frequencyOther: e.target.value})}
+                  placeholder="Please specify..."
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3771FE] focus:border-[#3771FE] font-['DM_Sans'] mt-2"
+                  rows={2}
+                />
+              )}
+            </div>
+
+            {/* Infographic Types */}
+            <div>
+              <label className="block text-sm font-medium text-[#223258] mb-3 font-['DM_Sans']">
+                What types of infographics would you like to see?
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5">
+                {[
+                  { value: 'treatment_flowcharts', label: 'Clinical pathways' },
+                  { value: 'medication_comparisons', label: 'Statistical graphs' },
+                  { value: 'evidence_summaries', label: 'Evidence summaries' },
+                  { value: 'other', label: 'Other' }
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      const newInfographicTypes = feedbackData.infographicTypes.includes(option.value)
+                        ? feedbackData.infographicTypes.filter(item => item !== option.value)
+                        : [...feedbackData.infographicTypes, option.value];
+                      setFeedbackData({...feedbackData, infographicTypes: newInfographicTypes})
+                    }}
+                    className={`p-1.5 text-xs font-['DM_Sans'] rounded border transition-colors duration-200 ${
+                      feedbackData.infographicTypes.includes(option.value)
+                        ? 'border-[#3771FE] text-[#3771FE] bg-blue-50'
+                        : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              {feedbackData.infographicTypes.includes('other') && (
+                <textarea
+                  value={feedbackData.infographicOther}
+                  onChange={(e) => setFeedbackData({...feedbackData, infographicOther: e.target.value})}
+                  placeholder="Please specify..."
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3771FE] focus:border-[#3771FE] font-['DM_Sans'] mt-2"
+                  rows={2}
+                />
+              )}
+            </div>
+
+            {/* Value Rating */}
+            <div>
+              <label className="block text-sm font-medium text-[#223258] mb-2 font-['DM_Sans']">
+                How useful was this image?
+              </label>
+              <div className="flex items-center space-x-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setFeedbackData({...feedbackData, valueRating: star})}
+                    className={`text-2xl transition-colors duration-200 ${
+                      star <= feedbackData.valueRating 
+                        ? 'text-yellow-400' 
+                        : 'text-gray-300 hover:text-yellow-300'
+                    }`}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-1 font-['DM_Sans']">
+                {feedbackData.valueRating === 0 && 'Click to rate'}
+                {feedbackData.valueRating === 1 && 'Poor'}
+                {feedbackData.valueRating === 2 && 'Fair'}
+                {feedbackData.valueRating === 3 && 'Good'}
+                {feedbackData.valueRating === 4 && 'Very Good'}
+                {feedbackData.valueRating === 5 && 'Excellent'}
+              </p>
+            </div>
+
+            {/* Suggestions */}
+            <div>
+              <label className="block text-sm font-medium text-[#223258] mb-2 font-['DM_Sans']">
+                Kindly share your suggestions/comments for improvement... (Optional)
+              </label>
+              <textarea
+                value={feedbackData.suggestions}
+                onChange={(e) => setFeedbackData({...feedbackData, suggestions: e.target.value})}
+                placeholder="Share your ideas..."
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3771FE] focus:border-[#3771FE] font-['DM_Sans']"
+                rows={2}
+              />
+            </div>
+
+            {/* Submit Button */}
+            <div className="pt-4">
+              <button
+                type="submit"
+                disabled={feedbackData.frequency.length === 0 || feedbackData.valueRating === 0 || feedbackSubmitted}
+                className="w-full px-6 py-3 bg-[#3771FE] text-white rounded-lg hover:bg-[#214498] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200 font-['DM_Sans'] font-semibold"
+              >
+                {feedbackSubmitted ? 'Feedback Submitted' : 'Submit Feedback'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Footer - Always at the bottom */}
+      <div className="text-center text-[14px] text-gray-400 mt-8">
         <p className="font-['DM_Sans']">
           Generated by AI, apply professional judgment. 
           <a href="https://synduct.com/terms-and-conditions/" target="_blank" rel="noopener noreferrer" className="font-regular underline text-black hover:text-[#3771FE] transition-colors duration-200 ml-1">
