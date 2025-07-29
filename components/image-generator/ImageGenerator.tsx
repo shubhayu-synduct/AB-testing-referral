@@ -402,6 +402,13 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
             </div>
           )}
         </div>
+        
+        {/* Disclaimer */}
+        <div className="mt-4 p-2">
+          <p className="text-md text-gray-700 font-['DM_Sans'] text-center">
+            <span className="font-bold">Beta:</span> This feature is currently in testing and may contain mistakes.
+          </p>
+        </div>
       </div>
 
       {/* Feedback Toggle Button */}
