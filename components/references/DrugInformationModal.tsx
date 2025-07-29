@@ -351,6 +351,42 @@ export const DrugInformationModal: React.FC<DrugInformationModalProps> = ({ open
               <ChevronLeft size={16} className="-ml-3" />
               {/* <span>Back</span> */}
             </button>
+            
+            {/* Centered drug name heading */}
+            <h1 className="text-xl font-bold text-[#214498] font-['DM_Sans'] flex-1 text-center">
+              {(() => {
+                const title = citation?.title || '';
+                
+                // Try to extract active substance from parentheses
+                const parenthesesMatch = title.match(/\(([^)]+)\)/);
+                if (parenthesesMatch) {
+                  const activeSubstance = parenthesesMatch[1].trim();
+                  const capitalizedActiveSubstance = activeSubstance.charAt(0).toUpperCase() + activeSubstance.slice(1).toLowerCase();
+                  
+                  // Extract brand name (everything before the first parenthesis) and remove trailing slash
+                  const brandName = title.split('(')[0].trim().replace(/\/$/, '').trim();
+                  const capitalizedBrandName = brandName.charAt(0).toUpperCase() + brandName.slice(1).toLowerCase();
+                  
+                  return `${capitalizedActiveSubstance} [${capitalizedBrandName}]`;
+                }
+                
+                // If no parentheses, try to extract from slash format (Brand / Active Substance)
+                const slashMatch = title.match(/^([^\/]+)\s*\/\s*(.+)$/);
+                if (slashMatch) {
+                  const brandName = slashMatch[1].trim();
+                  const activeSubstance = slashMatch[2].trim();
+                  const capitalizedActiveSubstance = activeSubstance.charAt(0).toUpperCase() + activeSubstance.slice(1).toLowerCase();
+                  const capitalizedBrandName = brandName.charAt(0).toUpperCase() + brandName.slice(1).toLowerCase();
+                  
+                  return `${capitalizedActiveSubstance} [${capitalizedBrandName}]`;
+                }
+                
+                // Fallback: just capitalize the title
+                const capitalizedTitle = title.charAt(0).toUpperCase() + title.slice(1).toLowerCase();
+                return capitalizedTitle;
+              })()}
+            </h1>
+            
             <button 
               className="p-2 hover:bg-gray-100 rounded-full"
               onClick={onClose}
