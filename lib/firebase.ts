@@ -15,6 +15,11 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 }
 
+// console.log("Firebase config loaded:", {
+//   apiKey: firebaseConfig.apiKey ? "present" : "missing",
+//   authDomain: firebaseConfig.authDomain,
+//   projectId: firebaseConfig.projectId,
+// })
 logger.firebaseLog("Firebase config loaded:", {
   apiKey: firebaseConfig.apiKey ? "present" : "missing",
   authDomain: firebaseConfig.authDomain,
