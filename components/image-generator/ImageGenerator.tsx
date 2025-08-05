@@ -84,7 +84,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
       }
 
       // Use the same API base URL as DrInfoSummary but with image generation path
-      const API_BASE_URL = "https://ai-summary-test.duckdns.org"
+      const API_BASE_URL = "https://synduct-visualabstracts.drinfo.ai"
       // const API_BASE_URL = "http://localhost:8000"
       const response = await fetch(`${API_BASE_URL}/image/generate`, {
         method: 'POST',
