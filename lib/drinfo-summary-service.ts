@@ -6,7 +6,7 @@ import { logger } from './logger';
 // const DRINFO_API_URL = "http://localhost:8000/chat/stream";
 // const DRINFO_API_URL = "https://ai-summary-test.duckdns.org/chat/stream";
 // const DRINFO_API_URL = "https://ai-summary-stage.duckdns.org/chat/stream";
-const DRINFO_API_URL = "https://synduct-aisummary.drinfo.ai/";
+const DRINFO_API_URL = "https://synduct-aisummary.drinfo.ai/chat/stream";
 export interface Citation {
   title: string;
   url: string;
