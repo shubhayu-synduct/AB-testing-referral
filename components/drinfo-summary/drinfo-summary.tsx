@@ -915,6 +915,25 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         height: auto;
         max-width: 100%;
       }
+
+      /* SVG content in answer tab */
+      .answer-svg-content {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 1rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      
+      .answer-svg-content svg {
+        width: 100%;
+        height: auto;
+        max-width: 100%;
+        display: block;
+        background: white;
+      }
     `;
     document.head.appendChild(style);
     
@@ -1417,6 +1436,17 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     return content.replace(/\[citation\]/g, () => `[${citationCount++}]`);
   };
 
+  // Helper function to check if content is SVG
+  const isSvgContent = (content: string): boolean => {
+    if (!content || typeof content !== 'string') return false;
+    const trimmedContent = content.trim();
+    const isSvg = trimmedContent.startsWith('<svg') || trimmedContent.startsWith('<?xml');
+    if (isSvg) {
+      logger.debug('[SVG_DETECTION] Detected SVG content:', trimmedContent.substring(0, 100) + '...');
+    }
+    return isSvg;
+  };
+
   // Function to download SVG as PNG
   const downloadSvgAsPng = (svgContent: string, filename: string = 'generated-image') => {
     try {
@@ -1761,21 +1791,51 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                           {(msg.content || (idx === messages.length - 1 && isStreaming)) && (
                             <div className="mb-4 sm:mb-6">
                               {activeTab === 'answer' ? (
-                                <div
-                                  className="prose prose-slate prose-ul:text-black marker:text-black max-w-none text-base sm:text-base prose-h2:text-base prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold"
-                                  style={{ fontFamily: 'DM Sans, sans-serif' }}
-                                  dangerouslySetInnerHTML={{
-                                    __html:
-                                      idx === messages.length - 1 && status !== 'complete' && status !== 'complete_image'
-                                        ? formatWithDummyCitations(
-                                            marked.parse(addDummyCitations(msg.content || ''), { async: false })
-                                          )
-                                        : formatWithCitations(
-                                            marked.parse(msg.content || '', { async: false }),
-                                            msg.answer?.citations
-                                          ),
-                                  }}
-                                />
+                                isSvgContent(msg.content || '') ? (
+                                  (() => {
+                                    logger.debug('[SVG_RENDERING] Rendering SVG content for message:', msg.id);
+                                    return (
+                                      // Render SVG content as image
+                                      <div className="flex justify-center relative group">
+                                        <div 
+                                          className="answer-svg-content w-full max-w-4xl"
+                                          dangerouslySetInnerHTML={{ __html: msg.content || '' }}
+                                        />
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            downloadSvgAsPng(msg.content || '', `answer-${msg.threadId}`);
+                                          }}
+                                          className="absolute top-2 right-2 p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full shadow-md transition-all duration-200 hover:scale-110 opacity-0 group-hover:opacity-100"
+                                          title="Download as PNG"
+                                        >
+                                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                            <polyline points="7,10 12,15 17,10"/>
+                                            <line x1="12" y1="15" x2="12" y2="3"/>
+                                          </svg>
+                                        </button>
+                                      </div>
+                                    );
+                                  })()
+                                ) : (
+                                  // Render text content as before
+                                  <div
+                                    className="prose prose-slate prose-ul:text-black marker:text-black max-w-none text-base sm:text-base prose-h2:text-base prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold"
+                                    style={{ fontFamily: 'DM Sans, sans-serif' }}
+                                    dangerouslySetInnerHTML={{
+                                      __html:
+                                        idx === messages.length - 1 && status !== 'complete' && status !== 'complete_image'
+                                          ? formatWithDummyCitations(
+                                              marked.parse(addDummyCitations(msg.content || ''), { async: false })
+                                            )
+                                          : formatWithCitations(
+                                              marked.parse(msg.content || '', { async: false }),
+                                              msg.answer?.citations
+                                            ),
+                                    }}
+                                  />
+                                )
                               ) : (
                                 <div className="prose prose-slate max-w-none text-base sm:text-base">
                                   {msg.answer?.svg_content && msg.answer.svg_content.length > 0 ? (

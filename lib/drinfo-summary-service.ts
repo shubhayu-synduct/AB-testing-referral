@@ -3,9 +3,9 @@
 import { logger } from './logger';
 
 // API base URL for DrInfo summary service
+// const DRINFO_API_URL = "https://synduct-aisummary.drinfo.ai/chat/stream";
+ const DRINFO_API_URL = "https://ai-summary-test.duckdns.org/chat/stream";  
 // const DRINFO_API_URL = "http://localhost:8000/chat/stream";
- const DRINFO_API_URL = "https://ai-summary-test.duckdns.org/chat/stream";
-// const DRINFO_API_URL = "https://ai-summary-stage.duckdns.org/chat/stream";
 // const DRINFO_API_URL = "https://ai-summary-stage.duckdns.org/chat/stream";
 export interface Citation {
   title: string;
@@ -123,6 +123,9 @@ export async function fetchDrInfoSummary(
                          } else if (chunk.status === "formatting response") {
                // console.log("[API] Formatting response:", chunk.message);
                onStatus("formatting", chunk.message);
+                         } else if (chunk.status === "generating_visual") {
+               // console.log("[API] Generating visual:", chunk.message);
+               onStatus("generating_visual", chunk.message);
                          } else if (chunk.status === "complete_image" && chunk.data) {
                // console.log("[API] Received complete_image status:", chunk.data);
                onStatus("complete_image", JSON.stringify(chunk.data));
