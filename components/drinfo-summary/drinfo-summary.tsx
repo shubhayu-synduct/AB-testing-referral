@@ -657,7 +657,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     });
     
     // Start the search/streaming first to create the answer icon
-    handleSearchWithContent(followUpQuestion, true, activeMode === 'instant' ? 'swift' : 'study');
+    handleSearchWithContent(followUpQuestion, true, activeMode === 'instant' ? 'swift' : 'study', false);
     setFollowUpQuestion(''); // Clear follow-up input after follow-up
 
     // Wait for the DOM to update with the new answer icon
@@ -1122,7 +1122,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     };
   }, [activeCitations]);
 
-  const handleSearchWithContent = async (content: string, isFollowUp: boolean = false, mode?: string) => {
+  const handleSearchWithContent = async (content: string, isFollowUp: boolean = false, mode?: string, directImageRequest: boolean = false) => {
     let hasCompleted = false;
     if (!content.trim()) return;
     if (!sessionId) {
@@ -1306,7 +1306,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         userId, 
         parent_thread_id: parentThreadId, 
         mode: activeMode === 'instant' ? 'swift' : 'study',
-        country: userCountry // Add country to the options
+        country: userCountry, // Add country to the options
+        direct_image_request: directImageRequest // Add direct image request flag
       }
     );
   };
@@ -1445,6 +1446,24 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       logger.debug('[SVG_DETECTION] Detected SVG content:', trimmedContent.substring(0, 100) + '...');
     }
     return isSvg;
+  };
+
+  // Helper function to count words in text content
+  const countWords = (content: string): number => {
+    if (!content || typeof content !== 'string') return 0;
+    // Remove HTML tags and count words
+    const textContent = content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    return textContent.split(/\s+/).filter(word => word.length > 0).length;
+  };
+
+  // Helper function to check if answer should show infographic option
+  const shouldShowInfographicOption = (content: string, msgIndex: number, totalMessages: number): boolean => {
+    if (!content || isSvgContent(content)) return false;
+    const wordCount = countWords(content);
+    // Only show for the last assistant message and when streaming is complete
+    const isLastMessage = msgIndex === totalMessages - 1;
+    const isStreamingComplete = status === 'complete' || status === 'complete_image';
+    return wordCount > 200 && isLastMessage && isStreamingComplete;
   };
 
   // Function to download SVG as PNG
@@ -1791,51 +1810,78 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                           {(msg.content || (idx === messages.length - 1 && isStreaming)) && (
                             <div className="mb-4 sm:mb-6">
                               {activeTab === 'answer' ? (
-                                isSvgContent(msg.content || '') ? (
-                                  (() => {
-                                    logger.debug('[SVG_RENDERING] Rendering SVG content for message:', msg.id);
-                                    return (
-                                      // Render SVG content as image
-                                      <div className="flex justify-center relative group">
-                                        <div 
-                                          className="answer-svg-content w-full max-w-4xl"
-                                          dangerouslySetInnerHTML={{ __html: msg.content || '' }}
-                                        />
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            downloadSvgAsPng(msg.content || '', `answer-${msg.threadId}`);
-                                          }}
-                                          className="absolute top-2 right-2 p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full shadow-md transition-all duration-200 hover:scale-110 opacity-0 group-hover:opacity-100"
-                                          title="Download as PNG"
-                                        >
-                                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                            <polyline points="7,10 12,15 17,10"/>
-                                            <line x1="12" y1="15" x2="12" y2="3"/>
-                                          </svg>
-                                        </button>
-                                      </div>
-                                    );
-                                  })()
-                                ) : (
-                                  // Render text content as before
-                                  <div
-                                    className="prose prose-slate prose-ul:text-black marker:text-black max-w-none text-base sm:text-base prose-h2:text-base prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold"
-                                    style={{ fontFamily: 'DM Sans, sans-serif' }}
-                                    dangerouslySetInnerHTML={{
-                                      __html:
-                                        idx === messages.length - 1 && status !== 'complete' && status !== 'complete_image'
-                                          ? formatWithDummyCitations(
-                                              marked.parse(addDummyCitations(msg.content || ''), { async: false })
-                                            )
-                                          : formatWithCitations(
-                                              marked.parse(msg.content || '', { async: false }),
-                                              msg.answer?.citations
-                                            ),
-                                    }}
-                                  />
-                                )
+                                <>
+                                  {isSvgContent(msg.content || '') ? (
+                                    (() => {
+                                      logger.debug('[SVG_RENDERING] Rendering SVG content for message:', msg.id);
+                                      return (
+                                        // Render SVG content as image
+                                        <div className="flex justify-center relative group">
+                                          <div 
+                                            className="answer-svg-content w-full max-w-4xl"
+                                            dangerouslySetInnerHTML={{ __html: msg.content || '' }}
+                                          />
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              downloadSvgAsPng(msg.content || '', `answer-${msg.threadId}`);
+                                            }}
+                                            className="absolute top-2 right-2 p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full shadow-md transition-all duration-200 hover:scale-110 opacity-0 group-hover:opacity-100"
+                                            title="Download as PNG"
+                                          >
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                              <polyline points="7,10 12,15 17,10"/>
+                                              <line x1="12" y1="15" x2="12" y2="3"/>
+                                            </svg>
+                                          </button>
+                                        </div>
+                                      );
+                                    })()
+                                  ) : (
+                                    // Render text content as before
+                                    <div
+                                      className="prose prose-slate prose-ul:text-black marker:text-black max-w-none text-base sm:text-base prose-h2:text-base prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold"
+                                      style={{ fontFamily: 'DM Sans, sans-serif' }}
+                                      dangerouslySetInnerHTML={{
+                                        __html:
+                                          idx === messages.length - 1 && status !== 'complete' && status !== 'complete_image'
+                                            ? formatWithDummyCitations(
+                                                marked.parse(addDummyCitations(msg.content || ''), { async: false })
+                                              )
+                                            : formatWithCitations(
+                                                marked.parse(msg.content || '', { async: false }),
+                                                msg.answer?.citations
+                                              ),
+                                      }}
+                                    />
+                                  )}
+                                  
+                                  {/* Show infographic option for long text answers */}
+                                  {shouldShowInfographicOption(msg.content || '', idx, messages.length) && (
+                                    <div className="mt-4 sm:mt-6">
+                                      <button
+                                        onClick={() => {
+                                          const infographicRequest = `Create an infographic for this answer: ${msg.content}`;
+                                          // Send directly to backend without filling follow-up search bar
+                                          handleSearchWithContent(infographicRequest, true, activeMode === 'instant' ? 'swift' : 'study', true);
+                                        }}
+                                        className="w-auto px-6 py-3 sm:px-8 sm:py-4 border rounded-lg transition-all duration-200 hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+                                        style={{ 
+                                          borderColor: 'rgba(55, 113, 254, 0.5)', 
+                                          fontFamily: 'DM Sans, sans-serif', 
+                                          fontWeight: 500, 
+                                          fontSize: '16px', 
+                                          color: '#223258', 
+                                          backgroundColor: '#E4ECFF',
+                                          borderRadius: '8px'
+                                        }}
+                                      >
+                                        Create an infographic for this answer
+                                      </button>
+                                    </div>
+                                  )}
+                                </>
                               ) : (
                                 <div className="prose prose-slate max-w-none text-base sm:text-base">
                                   {msg.answer?.svg_content && msg.answer.svg_content.length > 0 ? (

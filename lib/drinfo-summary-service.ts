@@ -38,6 +38,7 @@ interface DrInfoSummaryOptions {
   parent_thread_id?: string;  // Changed from is_follow_up to parent_thread_id
   mode?: string;
   country?: string;
+  direct_image_request?: boolean;  // Add direct image request flag
 }
 
 /**
@@ -69,7 +70,8 @@ export async function fetchDrInfoSummary(
         language: "English",
         country: options?.country || "US",
         parent_thread_id: options?.parent_thread_id || null,  // Use Firebase thread-based approach
-        mode: options?.mode || "study"  // Add mode parameter with default fallback
+        mode: options?.mode || "study",  // Add mode parameter with default fallback
+        direct_image_request: options?.direct_image_request || false  // Add direct image request flag
       })
     });
 
