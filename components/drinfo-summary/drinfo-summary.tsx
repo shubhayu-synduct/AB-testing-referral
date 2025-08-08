@@ -934,6 +934,25 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         display: block;
         background: white;
       }
+
+      /* Shimmer text effect for status message */
+      .shimmer-text {
+        background: linear-gradient(90deg,rgba(31, 41, 55, 0.77), #E5E7EB,rgba(31, 41, 55, 0.82));
+        background-size: 200% 100%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        animation: shimmer-text-move 4s ease-in-out infinite;
+      }
+
+      @keyframes shimmer-text-move {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .shimmer-text { animation: none; }
+      }
     `;
     document.head.appendChild(style);
     
@@ -1778,7 +1797,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                             </div>
                             <div className="flex items-center gap-4">
                               {idx === messages.length - 1 && status !== 'complete' && status !== 'complete_image' && !msg.content ? (
-                                <span className="text-gray-500 italic text-sm sm:text-base">{getStatusMessage(status as StatusType)}</span>
+                                <span className="shimmer-text italic text-sm sm:text-base">{getStatusMessage(status as StatusType)}</span>
                               ) : (
                                 msg.type === 'assistant' && msg.content && (
                                   <>
