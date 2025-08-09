@@ -17,6 +17,7 @@ import { createCitationTooltip } from '@/lib/citationTooltipUtils'
 import { marked } from 'marked'
 import Link from 'next/link'
 import { MovingBorder } from "@/components/ui/moving-border"
+import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { logger } from '@/lib/logger'
 
@@ -935,6 +936,26 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         background: white;
       }
 
+      /* Reference grid shimmer placeholder */
+      .reference-skeleton {
+        position: relative;
+        overflow: hidden;
+        background: #EEF3FF;
+        border: 1px solid #3771FE;
+        border-radius: 12px;
+      }
+      .reference-skeleton::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(100deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.6) 50%, rgba(255,255,255,0) 60%);
+        transform: translateX(-100%);
+        animation: reference-shimmer 1.4s ease-in-out infinite;
+      }
+      @keyframes reference-shimmer {
+        100% { transform: translateX(100%); }
+      }
+
       /* Shimmer text effect for status message */
       .shimmer-text {
         background: linear-gradient(90deg,rgba(31, 41, 55, 0.77), #E5E7EB,rgba(31, 41, 55, 0.82));
@@ -1316,8 +1337,34 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
           }, 2000);
         } catch (error) {
           logger.error('Error updating messages:', error);
-          setError('Failed to update messages. Please try again.');
+          const fallback = 'Servers are overloaded. Please try again later.';
+          // Add a small randomized delay (2-3 seconds) before showing the fallback answer
+          const randomDelayMs = 2000 + Math.floor(Math.random() * 1000);
+          await new Promise((resolve) => setTimeout(resolve, randomDelayMs));
+          // Show the error as the assistant's answer and mark as complete
+          setMessages(prev => {
+            if (prev.length === 0) return prev;
+            const lastIndex = prev.length - 1;
+            return prev.map((msg, idx) =>
+              idx === lastIndex && msg.type === 'assistant'
+                ? {
+                    ...msg,
+                    content: fallback,
+                    answer: {
+                      ...(msg.answer || { mainSummary: '', sections: [], citations: {} }),
+                      mainSummary: fallback,
+                      sections: [],
+                      citations: msg.answer?.citations || {}
+                    }
+                  }
+                : msg
+            );
+          });
+          setStatus('complete');
           setIsLoading(false);
+          setIsStreaming(false);
+          setStatusMessage(null);
+          setError(null);
         }
       },
       { 
@@ -1965,6 +2012,20 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                   )}
                                 </div>
                               )}
+                            </div>
+                          )}
+                          {/* Probable references shimmer during formatting/formatting response stage (after streaming, before citations) */}
+                          {idx === messages.length - 1 && (status === 'formatting' || status === 'formatting response') && (() => {
+                            const hasCitations = (msg.answer?.citations && Object.keys(msg.answer.citations).length > 0) ||
+                              (activeCitations && Object.keys(activeCitations).length > 0);
+                            return !hasCitations;
+                          })() && (
+                            <div className="mt-4 sm:mt-6">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+                                <div className="reference-skeleton col-span-2 sm:col-span-1 h-[95px] sm:h-[105px] lg:h-[125px]" />
+                                <div className="reference-skeleton hidden sm:block h-[95px] sm:h-[105px] lg:h-[125px]" />
+                                <div className="reference-skeleton hidden sm:block h-[95px] sm:h-[105px] lg:h-[125px]" />
+                              </div>
                             </div>
                           )}
                           {(() => {
