@@ -76,10 +76,19 @@ export default function LibraryPage() {
       console.log('Query result:', querySnapshot.size, 'documents found')
       
       const newAbstracts: VisualAbstract[] = []
+      const seenIds = new Set<string>()
       
       querySnapshot.forEach((doc) => {
         const data = doc.data()
         console.log('Document data:', doc.id, data)
+        
+        // Skip if we've already seen this ID
+        if (seenIds.has(doc.id)) {
+          console.log('Skipping duplicate ID:', doc.id)
+          return
+        }
+        
+        seenIds.add(doc.id)
         
         // Extract the nested svg data structure
         const svgData = data.svg || {}
@@ -97,7 +106,19 @@ export default function LibraryPage() {
       console.log('Processed abstracts:', newAbstracts.length)
 
       if (isLoadMore) {
-        setVisualAbstracts(prev => [...prev, ...newAbstracts])
+        setVisualAbstracts(prev => {
+          // Create a Map to ensure unique IDs
+          const uniqueMap = new Map()
+          
+          // Add existing abstracts
+          prev.forEach(abstract => uniqueMap.set(abstract.id, abstract))
+          
+          // Add new abstracts (this will overwrite any duplicates)
+          newAbstracts.forEach(abstract => uniqueMap.set(abstract.id, abstract))
+          
+          // Convert back to array
+          return Array.from(uniqueMap.values())
+        })
       } else {
         setVisualAbstracts(newAbstracts)
       }
