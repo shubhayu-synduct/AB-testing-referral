@@ -1928,7 +1928,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                     <div className="mt-4 sm:mt-6">
                                       <button
                                         onClick={() => {
-                                          const infographicRequest = `Create an infographic for this answer: ${msg.content}`;
+                                          const infographicRequest = `Create a visual abstract for this answer: ${msg.content}`;
                                           // Send directly to backend without filling follow-up search bar
                                           handleSearchWithContent(infographicRequest, true, activeMode === 'instant' ? 'swift' : 'study', true);
                                         }}
@@ -1943,7 +1943,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                           borderRadius: '8px'
                                         }}
                                       >
-                                        Create an infographic for this answer
+                                        Create a visual abstract for this answer
                                       </button>
                                     </div>
                                   )}
