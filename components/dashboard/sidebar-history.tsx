@@ -171,7 +171,7 @@ export function SidebarHistory() {
   })
 
   return (
-    <div ref={menuRef} className="px-2 pb-2 overflow-y-auto scrollbar-hide">
+    <div ref={menuRef} className="px-2 pb-16 overflow-y-auto scrollbar-hide">
       {loading ? (
         <div className="text-xs text-gray-400 py-4 text-center">Loading...</div>
       ) : chatSessions.length === 0 ? (

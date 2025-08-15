@@ -533,22 +533,22 @@ export default function LibraryPage() {
 
         {/* Loading Content based on active tab */}
         {activeTab === 'visual-abstracts' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Card key={i} className="bg-white shadow-sm border-[#B5C9FC]">
-                <CardContent className="p-6">
-                  <Skeleton className="h-48 w-full mb-4" />
-                  <Skeleton className="h-4 w-3/4 mb-2" />
-                  <Skeleton className="h-3 w-1/2" />
-                </CardContent>
-              </Card>
-            ))}
+          <div className="flex items-center justify-center h-32">
+            <div className="flex space-x-1">
+              <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            </div>
           </div>
         )}
 
         {activeTab === 'conversations' && (
           <div className="flex items-center justify-center h-32">
-            <div className="h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <div className="flex space-x-1">
+              <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            </div>
           </div>
         )}
       </div>
@@ -678,7 +678,10 @@ export default function LibraryPage() {
             {visualAbstracts.length === 0 && !loading ? (
               <div className="text-center py-12">
                 <div className="h-24 w-24 rounded-full bg-[#E4ECFF] flex items-center justify-center mx-auto mb-4">
-                  <FolderOpen className="h-12 w-12 text-[#223258]/50" />
+                  <svg className="h-12 w-12 text-[#223258]/50" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-1 16H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h12c.55 0 1 .45 1 1v12c0 .55-.45 1-1 1z"/>
+                    <path d="M8 7h8v2H8zm0 4h8v2H8zm0 4h5v2H8z"/>
+                  </svg>
                 </div>
                 <h3 className="text-xl font-semibold text-[#223258] mb-2">No visual abstracts yet</h3>
                 <p className="text-[#223258]/70 mb-4">Your generated visual abstracts will appear here</p>
@@ -686,7 +689,7 @@ export default function LibraryPage() {
                   onClick={() => window.location.href = '/image-generator'}
                   className="bg-[#223258] hover:bg-[#223258]/90 text-white"
                 >
-                  Create Your First Visual Abstract
+                  Create a visual abstract
                 </Button>
               </div>
             ) : (
@@ -783,31 +786,7 @@ export default function LibraryPage() {
           </>
         )}
 
-        {/* Category Filters */}
-        {activeTab === 'visual-abstracts' && (
-          <div className="mb-6">
-            <div className="flex flex-wrap gap-2">
-              <button className="px-3 py-1.5 text-sm font-medium bg-[#F5F5DC] text-[#223258] rounded-lg border border-[#B5C9FC]">
-                All
-              </button>
-              <button className="px-3 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 rounded-lg border border-transparent hover:border-gray-300">
-                Learn something
-              </button>
-              <button className="px-3 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 rounded-lg border border-transparent hover:border-gray-300">
-                Life hacks
-              </button>
-              <button className="px-3 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 rounded-lg border border-transparent hover:border-gray-300">
-                Play a game
-              </button>
-              <button className="px-3 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 rounded-lg border border-transparent hover:border-gray-300">
-                Be creative
-              </button>
-              <button className="px-3 py-1.5 text-sm font-medium text-gray-500 hover:text-gray-700 rounded-lg border border-transparent hover:border-gray-300">
-                Touch grass
-              </button>
-            </div>
-          </div>
-        )}
+
 
         {activeTab === 'conversations' && (
           <div className="w-full">
@@ -870,7 +849,11 @@ export default function LibraryPage() {
             <div className="flex-1 overflow-y-auto scrollbar-hide">
               {chatHistoryLoading ? (
                 <div className="flex items-center justify-center h-32">
-                  <div className="h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
                 </div>
               ) : chatHistoryError ? (
                 <div className="p-4 text-red-600">{chatHistoryError}</div>
