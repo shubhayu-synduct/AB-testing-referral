@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirebaseFirestore } from "@/lib/firebase";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { useAuth } from "@/hooks/use-auth";
@@ -14,6 +14,9 @@ export default function ProfilePage() {
   const [success, setSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'subscription' | 'feedback'>('profile');
   const [showSpecialtiesDropdown, setShowSpecialtiesDropdown] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const specialtiesRef = useRef<HTMLDivElement>(null);
 
   // Occupation and Specialties options
@@ -123,6 +126,43 @@ export default function ProfilePage() {
       setSuccess(true);
     }
     setSaving(false);
+  };
+
+  const deleteProfile = async () => {
+    if (deleteConfirmation !== 'DELETE') return;
+    
+    setDeleting(true);
+    try {
+      const auth = await getFirebaseAuth();
+      const user = auth.currentUser;
+      if (user) {
+        const db = getFirebaseFirestore();
+        const docRef = doc(db, "users", user.uid);
+        
+        // Delete the user document from Firestore
+        await deleteDoc(docRef);
+        
+        // Delete the user's authentication account
+        await user.delete();
+        
+        // Sign out to clear authentication cookies
+        await auth.signOut();
+        
+        // Reset local state
+        setProfile(null);
+        setShowDeleteModal(false);
+        setDeleteConfirmation('');
+        
+        // Redirect to signup page
+        window.location.href = '/signup';
+      }
+    } catch (error) {
+      console.error('Error deleting profile:', error);
+      // If there's an error, it might be because the user needs to re-authenticate
+      // You might want to show a message asking them to sign in again
+    } finally {
+      setDeleting(false);
+    }
   };
 
   if (authLoading || loading) return <div className="flex justify-center items-center h-screen font-['DM_Sans']">Loading...</div>;
@@ -517,9 +557,66 @@ export default function ProfilePage() {
                 {saving ? 'Saving...' : 'Update profile'}
               </button>
             </div>
+            <div className="flex justify-end mt-4 w-full mb-4 md:mb-0">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(true)}
+                className="bg-[#F4F7FF] border border-[#B5C9FC] text-[#747474] font-regular px-8 py-2 rounded-[8px] transition-colors text-lg w-48 hover:bg-[#E8F0FF] hover:text-[#223258]"
+              >
+                Delete Profile
+              </button>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Delete Profile Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[10px] p-6 max-w-md w-full border border-[#B5C9FC]">
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-medium text-[#000000] mb-2">Delete Profile</h3>
+              <p className="text-[#747474] text-sm leading-relaxed">
+                We are sorry to see you go. This action will delete your profile and cannot be undone.
+              </p>
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-[#000000] mb-2 font-medium text-sm">
+                Type <span className="font-bold text-[#223258]">DELETE</span> to confirm
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder="Type DELETE to confirm"
+                className="w-full border border-[#B5C9FC] rounded-[8px] px-4 py-2 bg-white text-[#223258] font-medium outline-none focus:ring-2 focus:ring-[#B5C9FC] text-center"
+              />
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteConfirmation('');
+                }}
+                className="flex-1 bg-[#F4F7FF] border border-[#B5C9FC] text-[#747474] font-medium px-4 py-2 rounded-[8px] transition-colors hover:bg-[#E8F0FF] hover:text-[#223258]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={deleteProfile}
+                disabled={deleteConfirmation !== 'DELETE' || deleting}
+                className="flex-1 bg-[#F4F7FF] border border-[#B5C9FC] text-[#223258] font-medium px-4 py-2 rounded-[8px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#E8F0FF] disabled:hover:bg-[#F4F7FF]"
+              >
+                {deleting ? 'Deleting...' : 'Delete Profile'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 } 
