@@ -18,6 +18,12 @@ export default function ProfilePage() {
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleting, setDeleting] = useState(false);
   const specialtiesRef = useRef<HTMLDivElement>(null);
+  const placeOfWorkRef = useRef<HTMLDivElement>(null);
+  const occupationRef = useRef<HTMLDivElement>(null);
+  const countryRef = useRef<HTMLDivElement>(null);
+  const [showPlaceOfWorkDropdown, setShowPlaceOfWorkDropdown] = useState(false);
+  const [showOccupationDropdown, setShowOccupationDropdown] = useState(false);
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
 
   // Occupation and Specialties options
   const occupationOptions = [
@@ -83,6 +89,15 @@ export default function ProfilePage() {
       if (specialtiesRef.current && event.target instanceof Node && !specialtiesRef.current.contains(event.target)) {
         setShowSpecialtiesDropdown(false);
       }
+      if (placeOfWorkRef.current && event.target instanceof Node && !placeOfWorkRef.current.contains(event.target)) {
+        setShowPlaceOfWorkDropdown(false);
+      }
+      if (occupationRef.current && event.target instanceof Node && !occupationRef.current.contains(event.target)) {
+        setShowOccupationDropdown(false);
+      }
+      if (countryRef.current && event.target instanceof Node && !countryRef.current.contains(event.target)) {
+        setShowCountryDropdown(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -112,8 +127,10 @@ export default function ProfilePage() {
       const db = getFirebaseFirestore();
       const docRef = doc(db, "users", user.uid);
       // Update only the specified fields inside the 'profile' object using dot notation
-      const { firstName, lastName, occupation, institution, specialties, placeOfWork, country } = profile;
-      await updateDoc(docRef, {
+      const { firstName, lastName, occupation, institution, specialties, placeOfWork, country, otherSpecialty, otherOccupation, otherPlaceOfWork } = profile;
+      
+      // Create update object with only defined values
+      const updateData: any = {
         "profile.firstName": firstName,
         "profile.lastName": lastName,
         "profile.occupation": occupation,
@@ -121,8 +138,13 @@ export default function ProfilePage() {
         "profile.specialties": specialties,
         "profile.placeOfWork": placeOfWork,
         "profile.country": country,
+        "profile.otherSpecialty": otherSpecialty || "",
+        "profile.otherOccupation": otherOccupation || "",
+        "profile.otherPlaceOfWork": otherPlaceOfWork || "",
         "country": country // Also update the top-level country field
-      });
+      };
+      
+      await updateDoc(docRef, updateData);
       setSuccess(true);
     }
     setSaving(false);
@@ -226,235 +248,354 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <label className="block text-[#000000] mb-1 font-medium">Country</label>
-                  <select
-                    name="country"
-                    value={profile?.country || 'united-states'}
-                    onChange={handleSelectChange}
-                    className="w-full border border-[#B5C9FC] rounded-[8px] px-4 py-2 bg-white text-[#223258] font-medium outline-none focus:ring-2 focus:ring-[#B5C9FC]"
-                  >
-                    <option value="afghanistan">Afghanistan</option>
-                    <option value="albania">Albania</option>
-                    <option value="algeria">Algeria</option>
-                    <option value="andorra">Andorra</option>
-                    <option value="angola">Angola</option>
-                    <option value="antigua-and-barbuda">Antigua and Barbuda</option>
-                    <option value="argentina">Argentina</option>
-                    <option value="armenia">Armenia</option>
-                    <option value="australia">Australia</option>
-                    <option value="austria">Austria</option>
-                    <option value="azerbaijan">Azerbaijan</option>
-                    <option value="bahamas">Bahamas</option>
-                    <option value="bahrain">Bahrain</option>
-                    <option value="bangladesh">Bangladesh</option>
-                    <option value="barbados">Barbados</option>
-                    <option value="belarus">Belarus</option>
-                    <option value="belgium">Belgium</option>
-                    <option value="belize">Belize</option>
-                    <option value="benin">Benin</option>
-                    <option value="bhutan">Bhutan</option>
-                    <option value="bolivia">Bolivia</option>
-                    <option value="bosnia-and-herzegovina">Bosnia and Herzegovina</option>
-                    <option value="botswana">Botswana</option>
-                    <option value="brazil">Brazil</option>
-                    <option value="brunei">Brunei</option>
-                    <option value="bulgaria">Bulgaria</option>
-                    <option value="burkina-faso">Burkina Faso</option>
-                    <option value="burundi">Burundi</option>
-                    <option value="cabo-verde">Cabo Verde</option>
-                    <option value="cambodia">Cambodia</option>
-                    <option value="cameroon">Cameroon</option>
-                    <option value="canada">Canada</option>
-                    <option value="central-african-republic">Central African Republic</option>
-                    <option value="chad">Chad</option>
-                    <option value="chile">Chile</option>
-                    <option value="china">China</option>
-                    <option value="colombia">Colombia</option>
-                    <option value="comoros">Comoros</option>
-                    <option value="congo">Congo</option>
-                    <option value="costa-rica">Costa Rica</option>
-                    <option value="croatia">Croatia</option>
-                    <option value="cuba">Cuba</option>
-                    <option value="cyprus">Cyprus</option>
-                    <option value="czech-republic">Czech Republic</option>
-                    <option value="denmark">Denmark</option>
-                    <option value="djibouti">Djibouti</option>
-                    <option value="dominica">Dominica</option>
-                    <option value="dominican-republic">Dominican Republic</option>
-                    <option value="ecuador">Ecuador</option>
-                    <option value="egypt">Egypt</option>
-                    <option value="el-salvador">El Salvador</option>
-                    <option value="equatorial-guinea">Equatorial Guinea</option>
-                    <option value="eritrea">Eritrea</option>
-                    <option value="estonia">Estonia</option>
-                    <option value="eswatini">Eswatini</option>
-                    <option value="ethiopia">Ethiopia</option>
-                    <option value="fiji">Fiji</option>
-                    <option value="finland">Finland</option>
-                    <option value="france">France</option>
-                    <option value="gabon">Gabon</option>
-                    <option value="gambia">Gambia</option>
-                    <option value="georgia">Georgia</option>
-                    <option value="germany">Germany</option>
-                    <option value="ghana">Ghana</option>
-                    <option value="greece">Greece</option>
-                    <option value="grenada">Grenada</option>
-                    <option value="guatemala">Guatemala</option>
-                    <option value="guinea">Guinea</option>
-                    <option value="guinea-bissau">Guinea-Bissau</option>
-                    <option value="guyana">Guyana</option>
-                    <option value="haiti">Haiti</option>
-                    <option value="honduras">Honduras</option>
-                    <option value="hungary">Hungary</option>
-                    <option value="iceland">Iceland</option>
-                    <option value="india">India</option>
-                    <option value="indonesia">Indonesia</option>
-                    <option value="iran">Iran</option>
-                    <option value="iraq">Iraq</option>
-                    <option value="ireland">Ireland</option>
-                    <option value="israel">Israel</option>
-                    <option value="italy">Italy</option>
-                    <option value="jamaica">Jamaica</option>
-                    <option value="japan">Japan</option>
-                    <option value="jordan">Jordan</option>
-                    <option value="kazakhstan">Kazakhstan</option>
-                    <option value="kenya">Kenya</option>
-                    <option value="kiribati">Kiribati</option>
-                    <option value="kuwait">Kuwait</option>
-                    <option value="kyrgyzstan">Kyrgyzstan</option>
-                    <option value="laos">Laos</option>
-                    <option value="latvia">Latvia</option>
-                    <option value="lebanon">Lebanon</option>
-                    <option value="lesotho">Lesotho</option>
-                    <option value="liberia">Liberia</option>
-                    <option value="libya">Libya</option>
-                    <option value="liechtenstein">Liechtenstein</option>
-                    <option value="lithuania">Lithuania</option>
-                    <option value="luxembourg">Luxembourg</option>
-                    <option value="madagascar">Madagascar</option>
-                    <option value="malawi">Malawi</option>
-                    <option value="malaysia">Malaysia</option>
-                    <option value="maldives">Maldives</option>
-                    <option value="mali">Mali</option>
-                    <option value="malta">Malta</option>
-                    <option value="marshall-islands">Marshall Islands</option>
-                    <option value="mauritania">Mauritania</option>
-                    <option value="mauritius">Mauritius</option>
-                    <option value="mexico">Mexico</option>
-                    <option value="micronesia">Micronesia</option>
-                    <option value="moldova">Moldova</option>
-                    <option value="monaco">Monaco</option>
-                    <option value="mongolia">Mongolia</option>
-                    <option value="montenegro">Montenegro</option>
-                    <option value="morocco">Morocco</option>
-                    <option value="mozambique">Mozambique</option>
-                    <option value="myanmar">Myanmar</option>
-                    <option value="namibia">Namibia</option>
-                    <option value="nauru">Nauru</option>
-                    <option value="nepal">Nepal</option>
-                    <option value="netherlands">Netherlands</option>
-                    <option value="new-zealand">New Zealand</option>
-                    <option value="nicaragua">Nicaragua</option>
-                    <option value="niger">Niger</option>
-                    <option value="nigeria">Nigeria</option>
-                    <option value="north-korea">North Korea</option>
-                    <option value="north-macedonia">North Macedonia</option>
-                    <option value="norway">Norway</option>
-                    <option value="oman">Oman</option>
-                    <option value="pakistan">Pakistan</option>
-                    <option value="palau">Palau</option>
-                    <option value="palestine">Palestine</option>
-                    <option value="panama">Panama</option>
-                    <option value="papua-new-guinea">Papua New Guinea</option>
-                    <option value="paraguay">Paraguay</option>
-                    <option value="peru">Peru</option>
-                    <option value="philippines">Philippines</option>
-                    <option value="poland">Poland</option>
-                    <option value="portugal">Portugal</option>
-                    <option value="qatar">Qatar</option>
-                    <option value="romania">Romania</option>
-                    <option value="russia">Russia</option>
-                    <option value="rwanda">Rwanda</option>
-                    <option value="saint-kitts-and-nevis">Saint Kitts and Nevis</option>
-                    <option value="saint-lucia">Saint Lucia</option>
-                    <option value="saint-vincent-and-the-grenadines">Saint Vincent and the Grenadines</option>
-                    <option value="samoa">Samoa</option>
-                    <option value="san-marino">San Marino</option>
-                    <option value="sao-tome-and-principe">Sao Tome and Principe</option>
-                    <option value="saudi-arabia">Saudi Arabia</option>
-                    <option value="senegal">Senegal</option>
-                    <option value="serbia">Serbia</option>
-                    <option value="seychelles">Seychelles</option>
-                    <option value="sierra-leone">Sierra Leone</option>
-                    <option value="singapore">Singapore</option>
-                    <option value="slovakia">Slovakia</option>
-                    <option value="slovenia">Slovenia</option>
-                    <option value="solomon-islands">Solomon Islands</option>
-                    <option value="somalia">Somalia</option>
-                    <option value="south-africa">South Africa</option>
-                    <option value="south-korea">South Korea</option>
-                    <option value="south-sudan">South Sudan</option>
-                    <option value="spain">Spain</option>
-                    <option value="sri-lanka">Sri Lanka</option>
-                    <option value="sudan">Sudan</option>
-                    <option value="suriname">Suriname</option>
-                    <option value="sweden">Sweden</option>
-                    <option value="switzerland">Switzerland</option>
-                    <option value="syria">Syria</option>
-                    <option value="taiwan">Taiwan</option>
-                    <option value="tajikistan">Tajikistan</option>
-                    <option value="tanzania">Tanzania</option>
-                    <option value="thailand">Thailand</option>
-                    <option value="timor-leste">Timor-Leste</option>
-                    <option value="togo">Togo</option>
-                    <option value="tonga">Tonga</option>
-                    <option value="trinidad-and-tobago">Trinidad and Tobago</option>
-                    <option value="tunisia">Tunisia</option>
-                    <option value="turkey">Turkey</option>
-                    <option value="turkmenistan">Turkmenistan</option>
-                    <option value="tuvalu">Tuvalu</option>
-                    <option value="uganda">Uganda</option>
-                    <option value="ukraine">Ukraine</option>
-                    <option value="united-arab-emirates">United Arab Emirates</option>
-                    <option value="united-kingdom">United Kingdom</option>
-                    <option value="united-states">United States</option>
-                    <option value="uruguay">Uruguay</option>
-                    <option value="uzbekistan">Uzbekistan</option>
-                    <option value="vanuatu">Vanuatu</option>
-                    <option value="vatican-city">Vatican City</option>
-                    <option value="venezuela">Venezuela</option>
-                    <option value="vietnam">Vietnam</option>
-                    <option value="yemen">Yemen</option>
-                    <option value="zambia">Zambia</option>
-                    <option value="zimbabwe">Zimbabwe</option>
-                  </select>
+                  <div className="relative" ref={countryRef}>
+                    <div
+                      className={`w-full min-h-[40px] px-2 py-1 border border-[#B5C9FC] rounded-[8px] bg-white flex items-center justify-between gap-1 focus-within:ring-2 focus-within:ring-[#B5C9FC] focus-within:border-transparent`}
+                      tabIndex={0}
+                      onClick={() => setShowCountryDropdown(true)}
+                      style={{ cursor: 'text', position: 'relative' }}
+                    >
+                      {!profile?.country && (
+                        <span className="text-gray-400 select-none font-medium">Select Country</span>
+                      )}
+                      {profile?.country && (
+                        <span className="text-[#223258] select-none font-medium">
+                          {profile.country.split("-").map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}
+                        </span>
+                      )}
+                      {/* Remove down arrow symbol */}
+                    </div>
+                    {showCountryDropdown && (
+                      <div className="absolute z-10 left-0 right-0 bg-white border border-[#B5C9FC] rounded-b-[8px] shadow-lg max-h-48 overflow-y-auto mt-1">
+                        {Object.entries({
+                          "afghanistan": "Afghanistan",
+                          "albania": "Albania",
+                          "algeria": "Algeria",
+                          "andorra": "Andorra",
+                          "angola": "Angola",
+                          "antigua-and-barbuda": "Antigua and Barbuda",
+                          "argentina": "Argentina",
+                          "armenia": "Armenia",
+                          "australia": "Australia",
+                          "austria": "Austria",
+                          "azerbaijan": "Azerbaijan",
+                          "bahamas": "Bahamas",
+                          "bahrain": "Bahrain",
+                          "bangladesh": "Bangladesh",
+                          "barbados": "Barbados",
+                          "belarus": "Belarus",
+                          "belgium": "Belgium",
+                          "belize": "Belize",
+                          "benin": "Benin",
+                          "bhutan": "Bhutan",
+                          "bolivia": "Bolivia",
+                          "bosnia-and-herzegovina": "Bosnia and Herzegovina",
+                          "botswana": "Botswana",
+                          "brazil": "Brazil",
+                          "brunei": "Brunei",
+                          "bulgaria": "Bulgaria",
+                          "burkina-faso": "Burkina Faso",
+                          "burundi": "Burundi",
+                          "cabo-verde": "Cabo Verde",
+                          "cambodia": "Cambodia",
+                          "cameroon": "Cameroon",
+                          "canada": "Canada",
+                          "central-african-republic": "Central African Republic",
+                          "chad": "Chad",
+                          "chile": "Chile",
+                          "china": "China",
+                          "colombia": "Colombia",
+                          "comoros": "Comoros",
+                          "congo": "Congo",
+                          "costa-rica": "Costa Rica",
+                          "croatia": "Croatia",
+                          "cuba": "Cuba",
+                          "cyprus": "Cyprus",
+                          "czech-republic": "Czech Republic",
+                          "denmark": "Denmark",
+                          "djibouti": "Djibouti",
+                          "dominica": "Dominica",
+                          "dominican-republic": "Dominican Republic",
+                          "ecuador": "Ecuador",
+                          "egypt": "Egypt",
+                          "el-salvador": "El Salvador",
+                          "equatorial-guinea": "Equatorial Guinea",
+                          "eritrea": "Eritrea",
+                          "estonia": "Estonia",
+                          "eswatini": "Eswatini",
+                          "ethiopia": "Ethiopia",
+                          "fiji": "Fiji",
+                          "finland": "Finland",
+                          "france": "France",
+                          "gabon": "Gabon",
+                          "gambia": "Gambia",
+                          "georgia": "Georgia",
+                          "germany": "Germany",
+                          "ghana": "Ghana",
+                          "greece": "Greece",
+                          "grenada": "Grenada",
+                          "guatemala": "Guatemala",
+                          "guinea": "Guinea",
+                          "guinea-bissau": "Guinea-Bissau",
+                          "guyana": "Guyana",
+                          "haiti": "Haiti",
+                          "honduras": "Honduras",
+                          "hungary": "Hungary",
+                          "iceland": "Iceland",
+                          "india": "India",
+                          "indonesia": "Indonesia",
+                          "iran": "Iran",
+                          "iraq": "Iraq",
+                          "ireland": "Ireland",
+                          "israel": "Israel",
+                          "italy": "Italy",
+                          "jamaica": "Jamaica",
+                          "japan": "Japan",
+                          "jordan": "Jordan",
+                          "kazakhstan": "Kazakhstan",
+                          "kenya": "Kenya",
+                          "kiribati": "Kiribati",
+                          "kuwait": "Kuwait",
+                          "kyrgyzstan": "Kyrgyzstan",
+                          "laos": "Laos",
+                          "latvia": "Latvia",
+                          "lebanon": "Lebanon",
+                          "lesotho": "Lesotho",
+                          "liberia": "Liberia",
+                          "libya": "Libya",
+                          "liechtenstein": "Liechtenstein",
+                          "lithuania": "Lithuania",
+                          "luxembourg": "Luxembourg",
+                          "madagascar": "Madagascar",
+                          "malawi": "Malawi",
+                          "malaysia": "Malaysia",
+                          "maldives": "Maldives",
+                          "mali": "Mali",
+                          "malta": "Malta",
+                          "marshall-islands": "Marshall Islands",
+                          "mauritania": "Mauritania",
+                          "mauritius": "Mauritius",
+                          "mexico": "Mexico",
+                          "micronesia": "Micronesia",
+                          "moldova": "Moldova",
+                          "monaco": "Monaco",
+                          "mongolia": "Mongolia",
+                          "montenegro": "Montenegro",
+                          "morocco": "Morocco",
+                          "mozambique": "Mozambique",
+                          "myanmar": "Myanmar",
+                          "namibia": "Namibia",
+                          "nauru": "Nauru",
+                          "nepal": "Nepal",
+                          "netherlands": "Netherlands",
+                          "new-zealand": "New Zealand",
+                          "nicaragua": "Nicaragua",
+                          "niger": "Niger",
+                          "nigeria": "Nigeria",
+                          "north-korea": "North Korea",
+                          "north-macedonia": "North Macedonia",
+                          "norway": "Norway",
+                          "oman": "Oman",
+                          "pakistan": "Pakistan",
+                          "palau": "Palau",
+                          "palestine": "Palestine",
+                          "panama": "Panama",
+                          "papua-new-guinea": "Papua New Guinea",
+                          "paraguay": "Paraguay",
+                          "peru": "Peru",
+                          "philippines": "Philippines",
+                          "poland": "Poland",
+                          "portugal": "Portugal",
+                          "qatar": "Qatar",
+                          "romania": "Romania",
+                          "russia": "Russia",
+                          "rwanda": "Rwanda",
+                          "saint-kitts-and-nevis": "Saint Kitts and Nevis",
+                          "saint-lucia": "Saint Lucia",
+                          "saint-vincent-and-the-grenadines": "Saint Vincent and the Grenadines",
+                          "samoa": "Samoa",
+                          "san-marino": "San Marino",
+                          "sao-tome-and-principe": "Sao Tome and Principe",
+                          "saudi-arabia": "Saudi Arabia",
+                          "senegal": "Senegal",
+                          "serbia": "Serbia",
+                          "seychelles": "Seychelles",
+                          "sierra-leone": "Sierra Leone",
+                          "singapore": "Singapore",
+                          "slovakia": "Slovakia",
+                          "slovenia": "Slovenia",
+                          "solomon-islands": "Solomon Islands",
+                          "somalia": "Somalia",
+                          "south-africa": "South Africa",
+                          "south-korea": "South Korea",
+                          "south-sudan": "South Sudan",
+                          "spain": "Spain",
+                          "sri-lanka": "Sri Lanka",
+                          "sudan": "Sudan",
+                          "suriname": "Suriname",
+                          "sweden": "Sweden",
+                          "switzerland": "Switzerland",
+                          "syria": "Syria",
+                          "taiwan": "Taiwan",
+                          "tajikistan": "Tajikistan",
+                          "tanzania": "Tanzania",
+                          "thailand": "Thailand",
+                          "timor-leste": "Timor-Leste",
+                          "togo": "Togo",
+                          "tonga": "Tonga",
+                          "trinidad-and-tobago": "Trinidad and Tobago",
+                          "tunisia": "Tunisia",
+                          "turkey": "Turkey",
+                          "turkmenistan": "Turkmenistan",
+                          "tuvalu": "Tuvalu",
+                          "uganda": "Uganda",
+                          "ukraine": "Ukraine",
+                          "united-arab-emirates": "United Arab Emirates",
+                          "united-kingdom": "United Kingdom",
+                          "united-states": "United States",
+                          "uruguay": "Uruguay",
+                          "uzbekistan": "Uzbekistan",
+                          "vanuatu": "Vanuatu",
+                          "vatican-city": "Vatican City",
+                          "venezuela": "Venezuela",
+                          "vietnam": "Vietnam",
+                          "yemen": "Yemen",
+                          "zambia": "Zambia",
+                          "zimbabwe": "Zimbabwe"
+                        }).map(([value, label]) => (
+                          <div
+                            key={value}
+                            className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
+                            style={{ fontSize: '12px', color: '#223258' }}
+                            onClick={() => {
+                              setProfile((prev: any) => ({ ...prev, country: value }));
+                              setShowCountryDropdown(false);
+                            }}
+                          >
+                            {label}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-[#000000] mb-1 font-medium">Occupation</label>
-                  <select
-                    name="occupation"
-                    value={profile.occupation || ''}
-                    onChange={handleSelectChange}
-                    className="w-full border border-[#B5C9FC] rounded-[8px] px-4 py-2 bg-white text-[#223258] font-medium outline-none focus:ring-2 focus:ring-[#B5C9FC]"
-                  >
-                    <option value="" disabled>Select Occupation</option>
-                    {occupationOptions.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                  <div className="relative" ref={occupationRef}>
+                    <div
+                      className={`w-full min-h-[40px] px-2 py-1 border border-[#B5C9FC] rounded-[8px] bg-white flex items-center justify-between gap-1 focus-within:ring-2 focus-within:ring-[#B5C9FC] focus-within:border-transparent`}
+                      tabIndex={0}
+                      onClick={() => setShowOccupationDropdown(true)}
+                      style={{ cursor: 'text', position: 'relative' }}
+                    >
+                      {!profile?.occupation && (
+                        <span className="text-gray-400 select-none font-medium">Select Occupation</span>
+                      )}
+                      {profile?.occupation && (
+                        <span className="text-[#223258] select-none font-medium">
+                          {profile.occupation === "other" ? "Other" : profile.occupation.split("-").map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}
+                        </span>
+                      )}
+                      {/* Remove down arrow symbol */}
+                    </div>
+                    {showOccupationDropdown && (
+                      <div className="absolute z-10 left-0 right-0 bg-white border border-[#B5C9FC] rounded-b-[8px] shadow-lg max-h-48 overflow-y-auto mt-1">
+                        {occupationOptions.filter(opt => opt.value !== profile?.occupation).map(opt => (
+                          <div
+                            key={opt.value}
+                            className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
+                            style={{ fontSize: '12px', color: '#223258' }}
+                            onClick={() => {
+                              setProfile((prev: any) => ({ 
+                                ...prev, 
+                                occupation: opt.value,
+                                otherOccupation: opt.value === "other" ? "" : ""
+                              }));
+                              setShowOccupationDropdown(false);
+                            }}
+                          >
+                            {opt.label}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {profile?.occupation === "other" && (
+                    <div className="mt-2">
+                      <label className="block text-sm font-medium text-black mb-1">Specify Other Occupation</label>
+                      <input
+                        type="text"
+                        name="otherOccupation"
+                        placeholder="Please specify your occupation"
+                        value={profile.otherOccupation || ""}
+                        onChange={e => setProfile((prev: any) => ({ ...prev, otherOccupation: e.target.value }))}
+                        className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[8px] text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent text-sm bg-white"
+                        style={{ fontSize: 14 }}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[#000000] mb-1 font-medium">Place of Work</label>
-                  <select
-                    name="placeOfWork"
-                    value={profile.placeOfWork || ''}
-                    onChange={handleSelectChange}
-                    className="w-full border border-[#B5C9FC] rounded-[8px] px-4 py-2 bg-white text-[#223258] font-medium outline-none focus:ring-2 focus:ring-[#B5C9FC]"
-                  >
-                    <option value="" disabled>Select Place of Work</option>
-                    <option value="hospital-clinic">Hospital/Clinic</option>
-                    <option value="outpatient-clinic">Outpatient Clinic</option>
-                    <option value="private-practice">Private Practice</option>
-                  </select>
+                  <div className="relative" ref={placeOfWorkRef}>
+                    <div
+                      className={`w-full min-h-[40px] px-2 py-1 border border-[#B5C9FC] rounded-[8px] bg-white flex items-center justify-between gap-1 focus-within:ring-2 focus-within:ring-[#B5C9FC] focus-within:border-transparent`}
+                      tabIndex={0}
+                      onClick={() => setShowPlaceOfWorkDropdown(true)}
+                      style={{ cursor: 'text', position: 'relative' }}
+                    >
+                      {!profile?.placeOfWork && (
+                        <span className="text-gray-400 select-none font-medium">Select Place of Work</span>
+                      )}
+                      {profile?.placeOfWork && (
+                        <span className="text-[#223258] select-none font-medium">
+                          {profile.placeOfWork === "other" ? "Other" : profile.placeOfWork.split("-").map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}
+                        </span>
+                      )}
+                      {/* Remove down arrow symbol */}
+                    </div>
+                    {showPlaceOfWorkDropdown && (
+                      <div className="absolute z-10 left-0 right-0 bg-white border border-[#B5C9FC] rounded-b-[8px] shadow-lg max-h-48 overflow-y-auto mt-1">
+                        {[
+                          { value: "hospital-clinic", label: "Hospital/Clinic" },
+                          { value: "outpatient-clinic", label: "Outpatient Clinic" },
+                          { value: "private-practice", label: "Private Practice" },
+                          { value: "university", label: "University" },
+                          { value: "other", label: "Other" }
+                        ].filter(opt => opt.value !== profile?.placeOfWork).map(opt => (
+                          <div
+                            key={opt.value}
+                            className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
+                            style={{ fontSize: '12px', color: '#223258' }}
+                            onClick={() => {
+                              setProfile((prev: any) => ({ 
+                                ...prev, 
+                                placeOfWork: opt.value,
+                                otherPlaceOfWork: opt.value === "other" ? "" : ""
+                              }));
+                              setShowPlaceOfWorkDropdown(false);
+                            }}
+                          >
+                            {opt.label}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {profile?.placeOfWork === "other" && (
+                    <div className="mt-2">
+                      <label className="block text-sm font-medium text-black mb-1">Specify Other Place of Work</label>
+                      <input
+                        type="text"
+                        name="otherPlaceOfWork"
+                        placeholder="Please specify your place of work"
+                        value={profile.otherPlaceOfWork || ""}
+                        onChange={e => setProfile((prev: any) => ({ ...prev, otherPlaceOfWork: e.target.value }))}
+                        className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[8px] text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent text-sm bg-white"
+                        style={{ fontSize: 14 }}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[#000000] mb-1 font-medium">Institution</label>
@@ -470,7 +611,7 @@ export default function ProfilePage() {
                       style={{ cursor: 'text', position: 'relative' }}
                     >
                       {(!specialtiesArray || specialtiesArray.length === 0) && (
-                        <span className="text-gray-400 text-sm select-none" style={{ fontSize: 11 }}>Select Specialties</span>
+                        <span className="text-gray-400 text-sm select-none font-medium">Select Specialties</span>
                       )}
                       {specialtiesArray.map((specialty: string) => (
                         <span
@@ -488,7 +629,16 @@ export default function ProfilePage() {
                                   : prev.specialties
                                     ? [prev.specialties]
                                     : [];
-                                return { ...prev, specialties: arr.filter((s: string) => s !== specialty) };
+                                const newSpecialties = arr.filter((s: string) => s !== specialty);
+                                
+                                // If removing "other", clear otherSpecialty
+                                // If "other" is not in remaining specialties, clear otherSpecialty
+                                const shouldClearOtherSpecialty = specialty === "other" || !newSpecialties.includes("other");
+                                return { 
+                                  ...prev, 
+                                  specialties: newSpecialties,
+                                  otherSpecialty: shouldClearOtherSpecialty ? "" : prev.otherSpecialty
+                                };
                               });
                             }}
                             className="ml-1 text-[#3771FE] hover:text-[#223258]"
@@ -518,7 +668,15 @@ export default function ProfilePage() {
                                   : prev.specialties
                                     ? [prev.specialties]
                                     : [];
-                                return { ...prev, specialties: [...arr, opt.value] };
+                                const newSpecialties = [...arr, opt.value];
+                                
+                                // If adding "other", keep otherSpecialty as is
+                                // If adding non-"other", clear otherSpecialty
+                                return { 
+                                  ...prev, 
+                                  specialties: newSpecialties,
+                                  otherSpecialty: opt.value === "other" ? (prev.otherSpecialty || "") : ""
+                                };
                               });
                               setShowSpecialtiesDropdown(false);
                             }}
