@@ -40,6 +40,7 @@ export default function Dashboard() {
   const suggestionTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const lastQueryRef = useRef<string>("")
   const lastWordRef = useRef<string>("")
+  const isRequestInProgressRef = useRef<boolean>(false)
 
   // Check if there's a meaningful change in the query
   const hasMeaningfulChange = (newQuery: string) => {
@@ -235,6 +236,13 @@ export default function Dashboard() {
     };
   }, []);
 
+  // Reset request lock when user changes or component unmounts
+  useEffect(() => {
+    return () => {
+      isRequestInProgressRef.current = false;
+    };
+  }, [user]);
+
   // Handle clicks outside the search component
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -252,9 +260,29 @@ export default function Dashboard() {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    // Prevent multiple simultaneous requests
+    if (isRequestInProgressRef.current || isLoading) {
+      logger.debug("[DASHBOARD] Request already in progress or loading, ignoring duplicate call");
+      return;
+    }
+    
     if (!query.trim() || !user) return
     
-    setIsLoading(true)
+    // Immediately lock everything - no more interactions possible
+    isRequestInProgressRef.current = true;
+    setIsLoading(true);
+    
+    // Disable the form immediately
+    const form = e.currentTarget as HTMLFormElement;
+    if (form) {
+      const inputs = form.querySelectorAll('input, textarea, button');
+      inputs.forEach((input: Element) => {
+        if (input instanceof HTMLElement) {
+          input.setAttribute('disabled', 'true');
+        }
+      });
+    }
+    
     logger.debug("[DASHBOARD] Creating new chat session for query:", query);
     
     try {
@@ -302,6 +330,8 @@ export default function Dashboard() {
     } catch (error) {
       logger.error("[DASHBOARD] Error creating chat session:", error);
       setIsLoading(false);
+      // Reset request lock on error
+      isRequestInProgressRef.current = false;
       alert("Failed to create chat. Please try again.");
     }
   }
@@ -344,8 +374,10 @@ export default function Dashboard() {
                       <div className="relative flex-1">
                         <textarea
                           value={query}
-                          className="w-full text-base md:text-[18px] text-[#223258] font-normal font-['DM_Sans'] outline-none resize-none min-h-[24px] whitespace-pre-wrap break-words"
+                          disabled={isLoading}
+                          className={`w-full text-base md:text-[18px] text-[#223258] font-normal font-['DM_Sans'] outline-none resize-none min-h-[24px] whitespace-pre-wrap break-words ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                           onChange={(e) => {
+                            if (isLoading) return; // Prevent changes while loading
                             setQuery(e.target.value);
                             // Auto-resize the textarea
                             const textarea = e.target;
@@ -356,10 +388,13 @@ export default function Dashboard() {
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                               e.preventDefault();
-                              handleSearch(e);
+                              if (!isLoading) {
+                                handleSearch(e);
+                              }
                             }
                           }}
                           onFocus={(e) => {
+                            if (isLoading) return; // Prevent focus while loading
                             if (query) setShowSuggestions(true);
                             // Resize on focus if there's content
                             const textarea = e.target;
@@ -391,7 +426,11 @@ export default function Dashboard() {
                           Acute
                         </span>
                       </label>
-                      <button type="submit" className="flex-shrink-0">
+                      <button 
+                        type="submit" 
+                        disabled={isLoading}
+                        className={`flex-shrink-0 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
                         {isLoading ? (
                           <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                         ) : (

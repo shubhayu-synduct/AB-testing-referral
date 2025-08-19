@@ -60,9 +60,11 @@ export async function fetchDrInfoSummary(
     const response = await fetch(DRINFO_API_URL, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "Accept": "text/event-stream"
+        'X-API-Key': 'test_key',        // API key
+        'X-User-ID': options?.userId || "anonymous_user",    // Required user ID
+        'Content-Type': 'application/json'
       },
+      
       body: JSON.stringify({
         query,
         userId: options?.userId || "anonymous_user",

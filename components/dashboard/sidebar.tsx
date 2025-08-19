@@ -261,7 +261,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 }`}
               >
                 <img src="/history.svg" alt="History" className="h-5 w-5" />
-                {isOpen && <span className="ml-3">History</span>}
+                {isOpen && <span className="ml-3">Library</span>}
               </Link>
               
               {/* <Link 

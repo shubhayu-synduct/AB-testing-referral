@@ -24,6 +24,10 @@ export default function ProfilePage() {
   const [showPlaceOfWorkDropdown, setShowPlaceOfWorkDropdown] = useState(false);
   const [showOccupationDropdown, setShowOccupationDropdown] = useState(false);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+  const [specialtiesSearchTerm, setSpecialtiesSearchTerm] = useState('');
+  const [countrySearchTerm, setCountrySearchTerm] = useState('');
+  const [occupationSearchTerm, setOccupationSearchTerm] = useState('');
+  const [placeOfWorkSearchTerm, setPlaceOfWorkSearchTerm] = useState('');
 
   // Occupation and Specialties options
   const occupationOptions = [
@@ -39,17 +43,39 @@ export default function ProfilePage() {
     { value: "other", label: "Other" },
   ];
   const specialtiesOptions = [
+    { value: "anesthesiology", label: "Anesthesiology" },
+    { value: "allergy-immunology", label: "Allergy & Immunology" },
     { value: "cardiology", label: "Cardiology" },
+    { value: "critical-care", label: "Critical Care" },
     { value: "dermatology", label: "Dermatology" },
+    { value: "emergency-medicine", label: "Emergency Medicine" },
     { value: "endocrinology", label: "Endocrinology" },
+    { value: "family-medicine", label: "Family Medicine" },
     { value: "gastroenterology", label: "Gastroenterology" },
+    { value: "geriatrics", label: "Geriatrics" },
     { value: "hematology", label: "Hematology" },
     { value: "infectious-disease", label: "Infectious Disease" },
+    { value: "internal-medicine", label: "Internal Medicine" },
+    { value: "microbiology", label: "Microbiology" },
     { value: "nephrology", label: "Nephrology" },
     { value: "neurology", label: "Neurology" },
+    { value: "nuclear-medicine", label: "Nuclear Medicine" },
+    { value: "obstetrics-gynecology", label: "Obstetrics and Gynecology" },
     { value: "oncology", label: "Oncology" },
+    { value: "ophthalmology", label: "Ophthalmology" },
+    { value: "orthopedics", label: "Orthopedics" },
+    { value: "otolaryngology", label: "Otolaryngology" },
+    { value: "palliative-care", label: "Palliative Care Medicine" },
+    { value: "pathology", label: "Pathology" },
+    { value: "pediatrics", label: "Pediatrics" },
+    { value: "psychiatry", label: "Psychiatry" },
     { value: "pulmonology", label: "Pulmonology" },
+    { value: "radiology", label: "Radiology" },
+    { value: "reproductive-endocrinology", label: "Reproductive Endocrinology & Infertility" },
     { value: "rheumatology", label: "Rheumatology" },
+    { value: "sports-medicine", label: "Sports Medicine" },
+    { value: "surgery", label: "Surgery" },
+    { value: "urology", label: "Urology" },
     { value: "other", label: "Other" },
   ];
 
@@ -88,15 +114,19 @@ export default function ProfilePage() {
     function handleClickOutside(event: MouseEvent) {
       if (specialtiesRef.current && event.target instanceof Node && !specialtiesRef.current.contains(event.target)) {
         setShowSpecialtiesDropdown(false);
+        setSpecialtiesSearchTerm('');
       }
       if (placeOfWorkRef.current && event.target instanceof Node && !placeOfWorkRef.current.contains(event.target)) {
         setShowPlaceOfWorkDropdown(false);
+        setPlaceOfWorkSearchTerm('');
       }
       if (occupationRef.current && event.target instanceof Node && !occupationRef.current.contains(event.target)) {
         setShowOccupationDropdown(false);
+        setOccupationSearchTerm('');
       }
       if (countryRef.current && event.target instanceof Node && !countryRef.current.contains(event.target)) {
         setShowCountryDropdown(false);
+        setCountrySearchTerm('');
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -267,6 +297,24 @@ export default function ProfilePage() {
                     </div>
                     {showCountryDropdown && (
                       <div className="absolute z-10 left-0 right-0 bg-white border border-[#B5C9FC] rounded-b-[8px] shadow-lg max-h-48 overflow-y-auto mt-1">
+                        {/* Search input for countries */}
+                        <div className="sticky top-0 bg-white border-b border-[#B5C9FC] p-2">
+                          <input
+                            type="text"
+                            placeholder="Search countries..."
+                            value={countrySearchTerm}
+                            className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[6px] text-sm text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent"
+                            onChange={(e) => {
+                              setCountrySearchTerm(e.target.value);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                setShowCountryDropdown(false);
+                              }
+                            }}
+                            autoFocus
+                          />
+                        </div>
                         {Object.entries({
                           "afghanistan": "Afghanistan",
                           "albania": "Albania",
@@ -462,14 +510,17 @@ export default function ProfilePage() {
                           "yemen": "Yemen",
                           "zambia": "Zambia",
                           "zimbabwe": "Zimbabwe"
-                        }).map(([value, label]) => (
+                        })
+                        .filter(([value, label]) => label.toLowerCase().includes(countrySearchTerm.toLowerCase()))
+                        .map(([value, label]) => (
                           <div
                             key={value}
                             className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
-                            style={{ fontSize: '12px', color: '#223258' }}
+                            style={{ fontSize: '14px', color: '#223258' }}
                             onClick={() => {
                               setProfile((prev: any) => ({ ...prev, country: value }));
                               setShowCountryDropdown(false);
+                              setCountrySearchTerm('');
                             }}
                           >
                             {label}
@@ -500,11 +551,32 @@ export default function ProfilePage() {
                     </div>
                     {showOccupationDropdown && (
                       <div className="absolute z-10 left-0 right-0 bg-white border border-[#B5C9FC] rounded-b-[8px] shadow-lg max-h-48 overflow-y-auto mt-1">
-                        {occupationOptions.filter(opt => opt.value !== profile?.occupation).map(opt => (
+                        {/* Search input for occupation */}
+                        <div className="sticky top-0 bg-white border-b border-[#B5C9FC] p-2">
+                          <input
+                            type="text"
+                            placeholder="Search occupation..."
+                            value={occupationSearchTerm}
+                            className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[6px] text-sm text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent"
+                            onChange={(e) => {
+                              setOccupationSearchTerm(e.target.value);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                setShowOccupationDropdown(false);
+                              }
+                            }}
+                            autoFocus
+                          />
+                        </div>
+                        {occupationOptions
+                          .filter(opt => opt.value !== profile?.occupation)
+                          .filter(opt => opt.label.toLowerCase().includes(occupationSearchTerm.toLowerCase()))
+                          .map(opt => (
                           <div
                             key={opt.value}
                             className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
-                            style={{ fontSize: '12px', color: '#223258' }}
+                            style={{ fontSize: '14px', color: '#223258' }}
                             onClick={() => {
                               setProfile((prev: any) => ({ 
                                 ...prev, 
@@ -512,6 +584,7 @@ export default function ProfilePage() {
                                 otherOccupation: opt.value === "other" ? "" : ""
                               }));
                               setShowOccupationDropdown(false);
+                              setOccupationSearchTerm('');
                             }}
                           >
                             {opt.label}
@@ -556,17 +629,38 @@ export default function ProfilePage() {
                     </div>
                     {showPlaceOfWorkDropdown && (
                       <div className="absolute z-10 left-0 right-0 bg-white border border-[#B5C9FC] rounded-b-[8px] shadow-lg max-h-48 overflow-y-auto mt-1">
+                        {/* Search input for place of work */}
+                        <div className="sticky top-0 bg-white border-b border-[#B5C9FC] p-2">
+                          <input
+                            type="text"
+                            placeholder="Search place of work..."
+                            value={placeOfWorkSearchTerm}
+                            className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[6px] text-sm text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent"
+                            onChange={(e) => {
+                              setPlaceOfWorkSearchTerm(e.target.value);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                setShowPlaceOfWorkDropdown(false);
+                              }
+                            }}
+                            autoFocus
+                          />
+                        </div>
                         {[
                           { value: "hospital-clinic", label: "Hospital/Clinic" },
                           { value: "outpatient-clinic", label: "Outpatient Clinic" },
                           { value: "private-practice", label: "Private Practice" },
                           { value: "university", label: "University" },
                           { value: "other", label: "Other" }
-                        ].filter(opt => opt.value !== profile?.placeOfWork).map(opt => (
+                        ]
+                        .filter(opt => opt.value !== profile?.placeOfWork)
+                        .filter(opt => opt.label.toLowerCase().includes(placeOfWorkSearchTerm.toLowerCase()))
+                        .map(opt => (
                           <div
                             key={opt.value}
                             className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
-                            style={{ fontSize: '12px', color: '#223258' }}
+                            style={{ fontSize: '14px', color: '#223258' }}
                             onClick={() => {
                               setProfile((prev: any) => ({ 
                                 ...prev, 
@@ -574,6 +668,7 @@ export default function ProfilePage() {
                                 otherPlaceOfWork: opt.value === "other" ? "" : ""
                               }));
                               setShowPlaceOfWorkDropdown(false);
+                              setPlaceOfWorkSearchTerm('');
                             }}
                           >
                             {opt.label}
@@ -657,7 +752,28 @@ export default function ProfilePage() {
                     </div>
                     {showSpecialtiesDropdown && (
                       <div className="absolute z-10 left-0 right-0 bg-white border border-[#B5C9FC] rounded-b-[8px] shadow-lg max-h-48 overflow-y-auto mt-1">
-                        {specialtiesOptions.filter(opt => !specialtiesArray.includes(opt.value)).map(opt => (
+                        {/* Search input for specialties */}
+                        <div className="sticky top-0 bg-white border-b border-[#B5C9FC] p-2">
+                          <input
+                            type="text"
+                            placeholder="Search specialties..."
+                            value={specialtiesSearchTerm}
+                            className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[6px] text-sm text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent"
+                            onChange={(e) => {
+                              setSpecialtiesSearchTerm(e.target.value);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                setShowSpecialtiesDropdown(false);
+                              }
+                            }}
+                            autoFocus
+                          />
+                        </div>
+                        {specialtiesOptions
+                          .filter(opt => !specialtiesArray.includes(opt.value))
+                          .filter(opt => opt.label.toLowerCase().includes(specialtiesSearchTerm.toLowerCase()))
+                          .map(opt => (
                           <div
                             key={opt.value}
                             className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer text-sm text-[#223258]"
@@ -679,6 +795,7 @@ export default function ProfilePage() {
                                 };
                               });
                               setShowSpecialtiesDropdown(false);
+                              setSpecialtiesSearchTerm('');
                             }}
                           >
                             {opt.label}

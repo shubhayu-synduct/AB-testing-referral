@@ -40,6 +40,8 @@ export default function Onboarding() {
   const [showPlaceOfWorkDropdown, setShowPlaceOfWorkDropdown] = useState(false)
   const [showCountryDropdown, setShowCountryDropdown] = useState(false)
   const [showSexDropdown, setShowSexDropdown] = useState(false)
+  const [specialtiesSearchTerm, setSpecialtiesSearchTerm] = useState('');
+  const [countrySearchTerm, setCountrySearchTerm] = useState('');
   const specialtiesRef = useRef<HTMLDivElement>(null)
   const experienceRef = useRef<HTMLDivElement>(null)
   const professionRef = useRef<HTMLDivElement>(null)
@@ -261,6 +263,7 @@ export default function Onboarding() {
     function handleClickOutside(event: MouseEvent) {
       if (specialtiesRef.current && event.target instanceof Node && !specialtiesRef.current.contains(event.target)) {
         setShowSpecialtiesDropdown(false);
+        setSpecialtiesSearchTerm('');
       }
       if (experienceRef.current && event.target instanceof Node && !experienceRef.current.contains(event.target)) {
         setShowExperienceDropdown(false);
@@ -273,6 +276,7 @@ export default function Onboarding() {
       }
       if (countryRef.current && event.target instanceof Node && !countryRef.current.contains(event.target)) {
         setShowCountryDropdown(false);
+        setCountrySearchTerm('');
       }
       if (sexRef.current && event.target instanceof Node && !sexRef.current.contains(event.target)) {
         setShowSexDropdown(false);
@@ -760,7 +764,7 @@ export default function Onboarding() {
                     </div>
                     {showProfessionDropdown && (
                       <div className="absolute z-10 left-0 right-0 bg-white border border-[#3771FE]/50 rounded-b-[5px] shadow-lg max-h-48 overflow-y-auto mt-1">
-                                                 {professionOptions.filter(opt => opt.value !== formData.occupation).map(opt => (
+                        {professionOptions.filter(opt => opt.value !== formData.occupation).map(opt => (
                            <div
                              key={opt.value}
                              className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
@@ -820,7 +824,7 @@ export default function Onboarding() {
                     </div>
                     {showExperienceDropdown && (
                       <div className="absolute z-10 left-0 right-0 bg-white border border-[#3771FE]/50 rounded-b-[5px] shadow-lg max-h-48 overflow-y-auto mt-1">
-                                                 {experienceOptions.filter(opt => opt.value !== formData.experience).map(opt => (
+                        {experienceOptions.filter(opt => opt.value !== formData.experience).map(opt => (
                            <div
                              key={opt.value}
                              className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
@@ -867,14 +871,14 @@ export default function Onboarding() {
                     </div>
                     {showPlaceOfWorkDropdown && (
                       <div className="absolute z-10 left-0 right-0 bg-white border border-[#3771FE]/50 rounded-b-[5px] shadow-lg max-h-48 overflow-y-auto mt-1">
-                                                 {placeOfWorkOptions.filter(opt => opt.value !== formData.placeOfWork).map(opt => (
+                        {placeOfWorkOptions.filter(opt => opt.value !== formData.placeOfWork).map(opt => (
                            <div
                              key={opt.value}
                              className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
                              style={{ fontSize: '12px', color: '#223258' }}
                              onClick={() => {
-                      setFormData(prev => ({
-                        ...prev,
+                               setFormData(prev => ({
+                                 ...prev,
                                  placeOfWork: opt.value,
                                  ...(opt.value === "other" ? { otherPlaceOfWork: "" } : {})
                                }));
@@ -967,7 +971,28 @@ export default function Onboarding() {
                   </div>
                   {showSpecialtiesDropdown && (
                     <div className="absolute z-10 left-0 right-0 bg-white border border-[#3771FE]/50 rounded-b-[5px] shadow-lg max-h-48 overflow-y-auto mt-1">
-                      {specialtiesOptions.filter(opt => !formData.specialties.includes(opt.value)).map(opt => (
+                      {/* Search input for specialties */}
+                      <div className="sticky top-0 bg-white border-b border-[#3771FE]/50 p-2">
+                        <input
+                          type="text"
+                          placeholder="Search specialties..."
+                          value={specialtiesSearchTerm}
+                          className="w-full px-3 py-2 border border-[#3771FE]/50 rounded-[6px] text-sm text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#3771FE] focus:border-transparent"
+                          onChange={(e) => {
+                            setSpecialtiesSearchTerm(e.target.value);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              setShowSpecialtiesDropdown(false);
+                            }
+                          }}
+                          autoFocus
+                        />
+                      </div>
+                      {specialtiesOptions
+                        .filter(opt => !formData.specialties.includes(opt.value))
+                        .filter(opt => opt.label.toLowerCase().includes(specialtiesSearchTerm.toLowerCase()))
+                        .map(opt => (
                         <div
                           key={opt.value}
                           className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
@@ -978,6 +1003,7 @@ export default function Onboarding() {
                               specialties: [...prev.specialties, opt.value]
                             }));
                             setShowSpecialtiesDropdown(false);
+                            setSpecialtiesSearchTerm('');
                           }}
                         >
                           {opt.label}
@@ -1042,7 +1068,27 @@ export default function Onboarding() {
                   </div>
                   {showCountryDropdown && (
                     <div className="absolute z-10 left-0 right-0 bg-white border border-[#3771FE]/50 rounded-b-[5px] shadow-lg max-h-48 overflow-y-auto mt-1">
-                      {Object.entries(countryOptions).map(([value, label]) => (
+                      {/* Search input for countries */}
+                      <div className="sticky top-0 bg-white border-b border-[#3771FE]/50 p-2">
+                        <input
+                          type="text"
+                          placeholder="Search countries..."
+                          value={countrySearchTerm}
+                          className="w-full px-3 py-2 border border-[#3771FE]/50 rounded-[6px] text-sm text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#3771FE] focus:border-transparent"
+                          onChange={(e) => {
+                            setCountrySearchTerm(e.target.value);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              setShowCountryDropdown(false);
+                            }
+                          }}
+                          autoFocus
+                        />
+                      </div>
+                      {Object.entries(countryOptions)
+                        .filter(([value, label]) => label.toLowerCase().includes(countrySearchTerm.toLowerCase()))
+                        .map(([value, label]) => (
                         <div
                           key={value}
                           className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
@@ -1053,6 +1099,7 @@ export default function Onboarding() {
                               country: value,
                             }));
                             setShowCountryDropdown(false);
+                            setCountrySearchTerm('');
                           }}
                         >
                           {label}

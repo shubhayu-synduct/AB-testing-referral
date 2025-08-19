@@ -3,14 +3,17 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useAuth } from '@/hooks/use-auth'
 import { getFirebaseFirestore } from '@/lib/firebase'
-import { collection, query, where, orderBy, getDocs, limit, startAfter, QueryDocumentSnapshot, DocumentData, deleteDoc, doc } from 'firebase/firestore'
+import { collection, query, where, orderBy, getDocs, limit, startAfter, QueryDocumentSnapshot, DocumentData, deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore'
 import Link from "next/link"
 import { format, isToday, isYesterday, formatDistanceToNow } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ChevronDown, FolderOpen, Calendar, Clock, Loader2, Trash2, Check, Download, Search, ArrowUpDown, X, Pin } from 'lucide-react'
+import { ChevronDown, FolderOpen, Calendar, Clock, Loader2, Trash2, Check, Download, Search, ArrowUpDown, X, Pin, ChevronRight } from 'lucide-react'
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
+import GuidelineSummaryModal from '@/components/guidelines/guideline-summary-modal'
+import GuidelineSummaryMobileModal from '@/components/guidelines/guideline-summary-mobile-modal'
+import { useIsMobile } from '@/components/ui/use-mobile'
 
 interface VisualAbstract {
   id: string
@@ -42,8 +45,23 @@ interface ChatSession {
 
 type SortOption = 'newest' | 'oldest' | 'alphabetical';
 
+interface SavedGuideline {
+  guidelineId: number;
+  guidelineTitle: string;
+  category: string;
+  url: string;
+  society: string;
+  lastUpdated: string;
+  savedAt: string;
+  lastAccessed: string;
+  notes: string;
+  pdf_saved: boolean;
+  link: string;
+}
+
 export default function LibraryPage() {
   const { user } = useAuth()
+  const isMobile = useIsMobile()
   const [visualAbstracts, setVisualAbstracts] = useState<VisualAbstract[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -53,7 +71,16 @@ export default function LibraryPage() {
   const [isNearBottom, setIsNearBottom] = useState(false)
   const [selectedAbstracts, setSelectedAbstracts] = useState<Set<string>>(new Set())
   const [isSelectMode, setIsSelectMode] = useState(false)
-  const [activeTab, setActiveTab] = useState<'visual-abstracts' | 'conversations'>('visual-abstracts')
+  const [activeTab, setActiveTab] = useState<'visual-abstracts' | 'conversations' | 'saved-guidelines'>('visual-abstracts')
+  
+  // Saved Guidelines State
+  const [savedGuidelines, setSavedGuidelines] = useState<SavedGuideline[]>([])
+  const [savedGuidelinesLoading, setSavedGuidelinesLoading] = useState(true)
+  const [savedGuidelinesError, setSavedGuidelinesError] = useState<string | null>(null)
+  
+  // Guideline AI Summary Modal State
+  const [selectedGuideline, setSelectedGuideline] = useState<SavedGuideline | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   
   // Chat History State
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([])
@@ -274,6 +301,36 @@ export default function LibraryPage() {
     fetchChatSessions()
   }, [user])
 
+  // Load Saved Guidelines
+  useEffect(() => {
+    if (!user) {
+      setSavedGuidelines([])
+      setSavedGuidelinesLoading(false)
+      return
+    }
+
+    const fetchSavedGuidelines = async () => {
+      setSavedGuidelinesLoading(true)
+      try {
+        const db = getFirebaseFirestore()
+        const userDoc = await getDoc(doc(db, "users", user.uid))
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data()
+          const bookmarks = userData.bookmarks || []
+          setSavedGuidelines(bookmarks)
+        }
+      } catch (err) {
+        console.error("Error fetching saved guidelines:", err)
+        setSavedGuidelinesError("Failed to load saved guidelines")
+      } finally {
+        setSavedGuidelinesLoading(false)
+      }
+    }
+
+    fetchSavedGuidelines()
+  }, [user])
+
   // Handle clicks outside the search component
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -490,7 +547,47 @@ export default function LibraryPage() {
     })
   }
 
+  // Guideline AI Summary Functions
+  const handleGuidelineClick = (guideline: SavedGuideline) => {
+    setSelectedGuideline(guideline)
+    setIsModalOpen(true)
+  }
 
+  const handleModalClose = () => {
+    setIsModalOpen(false)
+    setSelectedGuideline(null)
+  }
+
+  const removeBookmark = async (guideline: SavedGuideline) => {
+    if (!user) return
+    
+    try {
+      const db = getFirebaseFirestore()
+      const userRef = doc(db, "users", user.uid)
+      
+      // Get current bookmarks
+      const userDoc = await getDoc(userRef)
+      const currentBookmarks = userDoc.data()?.bookmarks || []
+      
+      // Remove the specific guideline
+      const updatedBookmarks = currentBookmarks.filter(
+        (bookmark: SavedGuideline) => bookmark.guidelineId !== guideline.guidelineId
+      )
+      
+      // Update user document
+      await updateDoc(userRef, {
+        bookmarks: updatedBookmarks
+      })
+      
+      // Update local state
+      setSavedGuidelines(updatedBookmarks)
+      
+      console.log('Bookmark removed successfully')
+    } catch (error) {
+      console.error('Error removing bookmark:', error)
+      alert('Failed to remove bookmark. Please try again.')
+    }
+  }
 
   const LoadingContent = () => {
     return (
@@ -499,7 +596,7 @@ export default function LibraryPage() {
         <div className="flex flex-col md:flex-row justify-center items-center mb-0 md:mb-[20px]">
           <div className="text-center mb-4 md:mb-0">
             <h1 className="hidden md:block text-[36px] font-semibold text-[#214498] mb-[4px] mt-0 font-['DM_Sans'] font-[600]">Library</h1>
-            <p className="hidden md:block text-gray-600 text-[16px] mt-0">Your past conversations and visuals</p>
+            <p className="hidden md:block text-gray-600 text-[16px] mt-0">Your past conversations, visuals, and saved guidelines</p>
           </div>
         </div>
 
@@ -527,6 +624,17 @@ export default function LibraryPage() {
               style={{ fontSize: '16px' }}
             >
               Conversations
+            </button>
+            <button
+              onClick={() => setActiveTab('saved-guidelines')}
+              className={`pb-2 px-1 text-base font-medium transition-colors ${
+                activeTab === 'saved-guidelines'
+                  ? 'text-[#214498] border-b-2 border-[#214498]'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+              style={{ fontSize: '16px' }}
+            >
+              Saved Guidelines
             </button>
           </div>
         </div>
@@ -551,6 +659,16 @@ export default function LibraryPage() {
             </div>
           </div>
         )}
+
+        {activeTab === 'saved-guidelines' && (
+          <div className="flex items-center justify-center h-32">
+            <div className="flex space-x-1">
+              <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -561,8 +679,8 @@ export default function LibraryPage() {
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-center items-center mb-0 md:mb-[20px]">
           <div className="text-center mb-4 md:mb-0">
-            <h1 className="hidden md:block text-[36px] font-semibold text-[#214498] mb-[4px] mt-0 font-['DM_Sans'] font-[600]">History</h1>
-            <p className="hidden md:block text-gray-600 text-[16px] mt-0">Your past conversations and visuals</p>
+            <h1 className="hidden md:block text-[36px] font-semibold text-[#214498] mb-[4px] mt-0 font-['DM_Sans'] font-[600]">Library</h1>
+            <p className="hidden md:block text-gray-600 text-[16px] mt-0">Your past conversations, visuals, and saved guidelines</p>
           </div>
         </div>
 
@@ -590,6 +708,17 @@ export default function LibraryPage() {
               style={{ fontSize: '16px' }}
             >
               Conversations
+            </button>
+            <button
+              onClick={() => setActiveTab('saved-guidelines')}
+              className={`pb-2 px-1 text-base font-medium transition-colors ${
+                activeTab === 'saved-guidelines'
+                  ? 'text-[#214498] border-b-2 border-[#214498]'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+              style={{ fontSize: '16px' }}
+            >
+              Saved Guidelines
             </button>
           </div>
         </div>
@@ -941,6 +1070,157 @@ export default function LibraryPage() {
             </div>
           </div>
         )}
+
+        {activeTab === 'saved-guidelines' && (
+          <div className="w-full">
+            {savedGuidelinesError && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+                {savedGuidelinesError}
+              </div>
+            )}
+
+            {savedGuidelinesLoading ? (
+              <div className="flex items-center justify-center h-32">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </div>
+            ) : !user ? (
+              <div className="p-4 text-center text-gray-500">
+                <p>Please log in to see your saved guidelines</p>
+              </div>
+            ) : savedGuidelines.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="h-24 w-24 rounded-full bg-[#E4ECFF] flex items-center justify-center mx-auto mb-4">
+                  <svg className="h-12 w-12 text-[#223258]/50" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-1 16H6c-.55 0-1-.45-1-1V6c0-.55.45-1 1-1h12c.55 0 1 .45 1 1v12c0 .55-.45 1-1 1z"/>
+                    <path d="M8 7h8v2H8zm0 4h8v2H8zm0 4h5v2H8z"/>
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-[#223258] mb-2">No saved guidelines yet</h3>
+                <p className="text-[#223258]/70 mb-4">Your bookmarked guidelines will appear here</p>
+                <Button 
+                  onClick={() => window.location.href = '/guidelines'}
+                  className="bg-[#223258] hover:bg-[#223258]/90 text-white"
+                >
+                  Browse Guidelines
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3 sm:space-y-4 p-3 sm:p-4" style={{ background: '#EEF3FF' }}>
+                {savedGuidelines.map((guideline, index) => (
+                  <div key={`saved-${guideline.guidelineId}-${index}`} className="border px-0 pb-2 sm:pb-4 pt-1 sm:pt-2" style={{ borderColor: '#A2BDFF', borderWidth: 1, borderStyle: 'solid', background: '#fff' }}>
+                    <div className="px-3 sm:px-6 py-2 sm:py-4">
+                      <div className="space-y-2 sm:space-y-3">
+                        {/* Title as a link */}
+                        <a 
+                          href={guideline.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="block"
+                          style={{
+                            fontFamily: 'DM Sans, sans-serif',
+                            color: '#214498',
+                            fontWeight: 500,
+                            fontSize: 'clamp(14px, 1.5vw, 16px)',
+                            background: 'none',
+                            border: 'none',
+                          }}
+                        >
+                          {guideline.guidelineTitle}
+                        </a>
+                        
+                        {/* Year and Publisher badges */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {/* Year badge */}
+                          <span 
+                            className="px-2 sm:px-3 py-1 text-xs sm:text-sm"
+                            style={{
+                              fontFamily: 'DM Sans, sans-serif',
+                              color: '#3771FE',
+                              background: 'rgba(148, 167, 214, 0.2)',
+                              fontWeight: 400,
+                              border: 'none',
+                              marginRight: 4,
+                            }}
+                          >
+                            {new Date(guideline.lastUpdated).getFullYear()}
+                          </span>
+                          
+                          {/* Publisher badge */}
+                          {guideline.society && (
+                            <span 
+                              className="px-2 sm:px-3 py-1 text-xs sm:text-sm break-words max-w-full"
+                              style={{
+                                fontFamily: 'DM Sans, sans-serif',
+                                color: '#3771FE',
+                                background: 'rgba(148, 167, 214, 0.2)',
+                                fontWeight: 400,
+                                border: 'none',
+                                display: 'inline-block',
+                                wordBreak: 'break-word'
+                              }}
+                            >
+                              {guideline.society}
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Remove Bookmark and Guideline AI Summary buttons */}
+                        <div className="flex flex-row items-center gap-3">
+                          <button 
+                            onClick={() => removeBookmark(guideline)}
+                            className="flex items-center gap-1 text-blue-500 hover:text-blue-600 transition-colors"
+                            style={{ fontSize: 'clamp(12px, 1.5vw, 14px)' }}
+                          >
+                            <svg className="w-4 h-4 sm:w-5 sm:h-5" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/>
+                            </svg>
+                            <span>Remove</span>
+                          </button>
+                          
+                          <div className="flex-grow"></div>
+                          
+                          {/* Guideline AI Summary Button */}
+                          <button 
+                            onClick={() => handleGuidelineClick(guideline)}
+                            disabled={!guideline.pdf_saved}
+                            className={`flex items-center gap-1 px-3 sm:px-4 py-1.5 sm:py-2 transition-colors text-xs sm:text-sm
+                            ${guideline.pdf_saved 
+                                ? '' 
+                                : 'cursor-not-allowed'}
+                            `}
+                            style={{
+                              background: guideline.pdf_saved ? '#01257C' : 'rgba(1, 37, 124, 0.5)',
+                              color: '#fff',
+                              fontFamily: 'DM Sans, sans-serif',
+                              fontWeight: 500,
+                              border: 'none',
+                              boxShadow: 'none',
+                              opacity: guideline.pdf_saved ? 1 : 0.5,
+                              minWidth: '10px',
+                              fontSize: 'clamp(12px, 1.5vw, 14px)'
+                            }}
+                          >
+                            {guideline.pdf_saved ? 'Guideline AI Summary' : 'Processing for AI Summary...'}
+                            {guideline.pdf_saved && (
+                              <span className="flex items-center ml-1 sm:ml-2">
+                                <ChevronRight size={14} className="sm:w-4 sm:h-4" style={{marginLeft: -10}} color="#fff" />
+                                <ChevronRight size={14} className="sm:w-4 sm:h-4" style={{marginLeft: -10}} color="#fff" />
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     )
   }
@@ -950,6 +1230,30 @@ export default function LibraryPage() {
       <div className="bg-[#F9FAFB] min-h-screen">
         {user && (loading ? <LoadingContent /> : <LibraryContent />)}
       </div>
+      {selectedGuideline && (
+        isMobile ? (
+          <GuidelineSummaryMobileModal
+            isOpen={isModalOpen}
+            onClose={handleModalClose}
+            guidelineId={selectedGuideline.guidelineId}
+            guidelineTitle={selectedGuideline.guidelineTitle}
+            year={new Date(selectedGuideline.lastUpdated).getFullYear().toString()}
+            link={selectedGuideline.link}
+            url={selectedGuideline.url}
+          />
+        ) : (
+          <GuidelineSummaryModal
+            isOpen={isModalOpen}
+            onClose={handleModalClose}
+            guidelineId={selectedGuideline.guidelineId}
+            guidelineTitle={selectedGuideline.guidelineTitle}
+            year={new Date(selectedGuideline.lastUpdated).getFullYear().toString()}
+            society={selectedGuideline.society}
+            link={selectedGuideline.link}
+            url={selectedGuideline.url}
+          />
+        )
+      )}
     </DashboardLayout>
   )
 }
