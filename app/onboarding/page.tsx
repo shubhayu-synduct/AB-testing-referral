@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { Check } from "lucide-react"
 import Image from "next/image"
 import { logger } from "@/lib/logger"
+import { handleUserSignup } from "@/lib/signup-integration"
 
 export default function Onboarding() {
   const router = useRouter()
@@ -188,6 +189,19 @@ export default function Onboarding() {
 
       // Update user document
       await updateDoc(doc(db, "users", user.uid), userProfileData)
+
+      // Add user to email automation system if not already added
+      try {
+        await handleUserSignup({
+          email: user.email || '',
+          userId: user.uid,
+          name: `${formData.firstName} ${formData.lastName}`
+        })
+        logger.info("Onboarding user added to email automation system")
+      } catch (automationError) {
+        logger.error("Failed to add onboarding user to email automation:", automationError)
+        // Don't fail the onboarding if email automation fails
+      }
 
       setRegistrationSuccess(true)
     } catch (err: any) {

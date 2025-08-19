@@ -12,6 +12,7 @@ import { getFirebaseFirestore } from "@/lib/firebase"
 import { doc, setDoc } from "firebase/firestore"
 import { VerificationModal } from "./verification-modal"
 import { logger } from "@/lib/logger"
+import { handleUserSignup, handleFirebaseAuthSignup } from "@/lib/signup-integration"
 
 // Google Icon SVG component
 const GoogleIcon = () => (
@@ -113,6 +114,19 @@ export function SignUpForm() {
         url: `${window.location.origin}/verify-email`,
         handleCodeInApp: true
       })
+
+      // Add user to email automation system
+      try {
+        await handleUserSignup({
+          email: userCredential.user.email || email,
+          userId: userCredential.user.uid,
+          name: email.split('@')[0] // Use email prefix as name
+        })
+        logger.info("User added to email automation system")
+      } catch (automationError) {
+        logger.error("Failed to add user to email automation:", automationError)
+        // Don't fail the signup if email automation fails
+      }
       
       // Show verification modal instead of redirecting
       setShowVerificationModal(true)
@@ -158,6 +172,15 @@ export function SignUpForm() {
           providerData: 'google',
           emailVerified: result.user.emailVerified
         })
+        
+        // Add user to email automation system
+        try {
+          await handleFirebaseAuthSignup(result.user)
+          logger.info("Google user added to email automation system")
+        } catch (automationError) {
+          logger.error("Failed to add Google user to email automation:", automationError)
+          // Don't fail the signup if email automation fails
+        }
         
         // AuthProvider will handle the redirect to onboarding
       }
@@ -209,6 +232,15 @@ export function SignUpForm() {
           providerData: 'microsoft',
           emailVerified: result.user.emailVerified
         })
+        
+        // Add user to email automation system
+        try {
+          await handleFirebaseAuthSignup(result.user)
+          logger.info("Microsoft user added to email automation system")
+        } catch (automationError) {
+          logger.error("Failed to add Microsoft user to email automation:", automationError)
+          // Don't fail the signup if email automation fails
+        }
         
         // AuthProvider will handle the redirect to onboarding
       }

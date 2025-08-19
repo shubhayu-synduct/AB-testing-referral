@@ -20,6 +20,7 @@ import { MovingBorder } from "@/components/ui/moving-border"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { logger } from '@/lib/logger'
+import { useDrinfoSummaryTour } from '@/components/TourContext'
 
 interface DrInfoSummaryProps {
   user: any;
@@ -1791,15 +1792,143 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }
   };
 
+  const tourContext = useDrinfoSummaryTour();
+  const [showTourPrompt, setShowTourPrompt] = useState(false);
+  
+  // Custom scroll function to scroll to bottom of answer and citation grid
+  const scrollToAnswerBottom = () => {
+    // First, scroll to the very bottom of the answer content
+    setTimeout(() => {
+      // Scroll to the very bottom of the content container
+      const contentRef = document.querySelector('.flex-1.overflow-y-auto');
+      if (contentRef) {
+        contentRef.scrollTop = contentRef.scrollHeight;
+      }
+      
+      // Also scroll the window to the bottom
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior: 'smooth'
+      });
+      
+      // Scroll to the follow-up question area to ensure we're at the very bottom
+      const followUpArea = document.querySelector('.follow-up-question-search');
+      if (followUpArea) {
+        followUpArea.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        });
+      }
+      
+      // Additional scroll to citation grid
+      const citationGrid = document.querySelector('.drinfo-citation-grid-step');
+      if (citationGrid) {
+        citationGrid.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        });
+      }
+    }, 100);
+  };
+
+  // Modified tour start function with 2-second delay
+  const startTourWithDelay = () => {
+    if (!tourContext) return;
+    
+    setShowTourPrompt(false);
+    scrollToAnswerBottom();
+    
+    // Delay tour start by 2 seconds to allow scrolling to complete
+    setTimeout(() => {
+      tourContext.startTour();
+    }, 2000);
+  };
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setShowTourPrompt(true);
+    }, 25000);
+    return () => clearTimeout(timeout);
+  }, []);
+
   return (
     <div className="p-2 sm:p-4 md:p-6 h-[100dvh] flex flex-col relative overflow-hidden">
+      {showTourPrompt && (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black bg-opacity-40">
+          <div 
+            className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center border"
+            style={{
+              borderRadius: "8px",
+              border: "1px solid #E4ECFF",
+              boxShadow: "0 4px 20px rgba(55, 113, 254, 0.15)",
+            }}
+          >
+            <h2 
+              className="text-lg font-semibold mb-2"
+              style={{
+                color: "#223258",
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: "600"
+              }}
+            >
+              Take a quick tour?
+            </h2>
+            <p 
+              className="mb-4"
+              style={{
+                color: "#223258",
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: "400"
+              }}
+            >
+              Would you like a quick tour of the answer and feedback features?
+            </p>
+            <div className="flex justify-center gap-4">
+              <button 
+                className="px-4 py-2 rounded transition-colors"
+                onClick={startTourWithDelay}
+                style={{
+                  backgroundColor: "#3771FE",
+                  color: "#fff",
+                  borderRadius: "6px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  padding: "8px 16px",
+                  border: "none",
+                  fontFamily: "DM Sans, sans-serif"
+                }}
+              >
+                Yes, show me
+              </button>
+              <button 
+                className="px-4 py-2 rounded transition-colors"
+                onClick={() => setShowTourPrompt(false)}
+                style={{
+                  backgroundColor: "#E4ECFF",
+                  color: "#3771FE",
+                  borderRadius: "6px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  padding: "8px 16px",
+                  border: "1px solid #3771FE",
+                  fontFamily: "DM Sans, sans-serif"
+                }}
+              >
+                No, thanks
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Top Bar with Share Button */}
       <div className="flex justify-between items-center mb-4 px-2 sm:px-4">
         <div className="flex-1"></div>
         <button
           onClick={handleShare}
           disabled={!sessionId || messages.length === 0}
-          className="flex items-center space-x-2 px-4 py-2 bg-white border border-[#C8C8C8] text-[#223258] rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+          className="flex items-center space-x-2 px-4 py-2 bg-white border border-[#C8C8C8] text-[#223258] rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium drinfo-share-step"
         >
                       <img src="/Share icon.svg" alt="Share" className="w-5 h-5" />
           <span className="hidden sm:inline">Share</span>
@@ -1907,7 +2036,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                   ) : (
                                     // Render text content as before
                                     <div
-                                      className="prose prose-slate prose-ul:text-black marker:text-black max-w-none text-base sm:text-base prose-h2:text-base prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold"
+                                      className="prose prose-slate prose-ul:text-black marker:text-black max-w-none text-base sm:text-base prose-h2:text-base prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold drinfo-answer-content"
                                       style={{ fontFamily: 'DM Sans, sans-serif' }}
                                       dangerouslySetInnerHTML={{
                                         __html:
@@ -1932,7 +2061,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                           // Send directly to backend without filling follow-up search bar
                                           handleSearchWithContent(infographicRequest, true, activeMode === 'instant' ? 'swift' : 'study', true);
                                         }}
-                                        className="w-auto px-6 py-3 sm:px-8 sm:py-4 border rounded-lg transition-all duration-200 hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+                                        className="w-auto px-6 py-3 sm:px-8 sm:py-4 border rounded-lg transition-all duration-200 hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 drinfo-visual-abstract-step"
                                         style={{ 
                                           borderColor: 'rgba(55, 113, 254, 0.5)', 
                                           fontFamily: 'DM Sans, sans-serif', 
@@ -2078,7 +2207,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                 <div ref={inputAnchorRef} style={{ marginBottom: '120px sm:140px' }} />
                 <div className="sticky bottom-0 bg-gray-50 pt-2 pb-4 z-10">
                   <div className="max-w-4xl mx-auto px-2 sm:px-4">
-                    <div className="relative w-full bg-white rounded border-2 border-[#3771fe44] shadow-[0px_0px_11px_#0000000c] p-3 md:p-4">
+                    <div className="relative w-full bg-white rounded border-2 border-[#3771fe44] shadow-[0px_0px_11px_#0000000c] p-3 md:p-4 follow-up-question-search">
                       <div className="relative">
                         <textarea
                           value={followUpQuestion}
