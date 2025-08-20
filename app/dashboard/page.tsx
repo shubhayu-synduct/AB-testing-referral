@@ -11,6 +11,7 @@ import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import { ArrowRight, X, Search } from "lucide-react"
 import { v4 as uuidv4 } from 'uuid'
 import { logger } from '@/lib/logger';
+import { track } from '@vercel/analytics';
 // Removed GoogleGenAI import - now using secure server-side API
 
 // Define the interface for the message structure
@@ -41,6 +42,15 @@ export default function Dashboard() {
   const lastQueryRef = useRef<string>("")
   const lastWordRef = useRef<string>("")
   const isRequestInProgressRef = useRef<boolean>(false)
+
+
+    // Track dashboard landing
+    useEffect(() => {
+      track('DashboardLanded', {
+        user: user ? 'authenticated' : 'unauthenticated',
+        timestamp: new Date().toISOString()
+      });
+    }, [user]);
 
   // Check if there's a meaningful change in the query
   const hasMeaningfulChange = (newQuery: string) => {
@@ -267,6 +277,12 @@ export default function Dashboard() {
     }
     
     if (!query.trim() || !user) return
+        // Track search query
+    track('SearchQuerySubmitted', {
+      queryLength: query.length,
+      mode: activeMode,
+      hasUser: !!user
+    })
     
     // Immediately lock everything - no more interactions possible
     isRequestInProgressRef.current = true;

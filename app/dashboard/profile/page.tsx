@@ -1,22 +1,30 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react";
+import { unstable_noStore as noStore } from 'next/cache';
 import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirebaseFirestore } from "@/lib/firebase";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { useAuth } from "@/hooks/use-auth";
+import { useSearchParams, useRouter } from "next/navigation";
+
 
 export default function ProfilePage() {
+  noStore(); // Disable static generation/prerendering
+  
   const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'subscription' | 'feedback'>('profile');
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('yearly');
+  const [currentSubscription, setCurrentSubscription] = useState<any>(null);
   const [showSpecialtiesDropdown, setShowSpecialtiesDropdown] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
   const specialtiesRef = useRef<HTMLDivElement>(null);
   const placeOfWorkRef = useRef<HTMLDivElement>(null);
   const occupationRef = useRef<HTMLDivElement>(null);
@@ -79,6 +87,28 @@ export default function ProfilePage() {
     { value: "other", label: "Other" },
   ];
 
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  useEffect(() => {
+    // Check if tab parameter is set in URL
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'subscription') {
+      setActiveTab('subscription');
+    }
+    
+    // Check if payment was cancelled
+    const statusParam = searchParams.get('status');
+    if (statusParam === 'cancelled') {
+      setError('Payment was cancelled. You can try again anytime or continue with the free plan.');
+      // Auto-hide the message after 5 seconds
+      const timer = setTimeout(() => {
+        setError('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     if (authLoading) return; // Wait for auth to finish
     if (!user) return; // Optionally redirect to login here
@@ -89,13 +119,19 @@ export default function ProfilePage() {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         // Convert country value to match dropdown format if needed
-        const country = docSnap.data().country || docSnap.data().profile?.country || 'united-states';
+        const country = docSnap.data().country || docSnap.data().profile || docSnap.data().profile?.country || 'united-states';
         const formattedCountry = country.toLowerCase().replace(/\s+/g, '-');
         
         setProfile({
           ...docSnap.data().profile || {},
           email: docSnap.data().email || user.email,
           country: formattedCountry
+        });
+
+        // Set current subscription data
+        setCurrentSubscription({
+          tier: docSnap.data().subscriptionTier || 'free',
+          subscription: docSnap.data().subscription || null
         });
       }
       setLoading(false);
@@ -145,6 +181,146 @@ export default function ProfilePage() {
 
   const handleSpecialtiesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setProfile((prev: any) => ({ ...prev, specialties: e.target.value.split(",").map((s) => s.trim()) }));
+  };
+
+  const getCurrentPlanDisplay = () => {
+    if (!currentSubscription) return 'Free';
+    
+    const { tier, subscription } = currentSubscription;
+    
+    if (tier === 'free' || !subscription) return 'Free';
+    if (tier === 'student') return 'Pro Student';
+    if (tier === 'clinician') return 'Pro Physician';
+    
+    return 'Free';
+  };
+
+  // Debug logging for subscription data
+  useEffect(() => {
+    if (currentSubscription) {
+      console.log('🔍 Current Subscription Data:', {
+        tier: currentSubscription.tier,
+        status: currentSubscription.subscription?.status,
+        cancelAtPeriodEnd: currentSubscription.subscription?.cancelAtPeriodEnd,
+        currentPeriodEnd: currentSubscription.subscription?.currentPeriodEnd,
+        interval: currentSubscription.subscription?.interval
+      });
+    }
+  }, [currentSubscription]);
+
+  const isCurrentPlan = (plan: string) => {
+    if (!currentSubscription) return plan === 'free';
+    return currentSubscription.tier === plan;
+  };
+
+  const isCurrentBillingInterval = (interval: string) => {
+    if (!currentSubscription?.subscription?.interval) return false;
+    return currentSubscription.subscription.interval === interval;
+  };
+
+  const handleTabChange = (tab: 'profile' | 'subscription' | 'feedback') => {
+    setActiveTab(tab);
+    router.push(`/dashboard/profile?tab=${tab}`);
+  };
+
+  const handlePlanSelect = async (plan: string, interval: string) => {
+    if (!user) {
+      setError('Please sign in to continue');
+      return;
+    }
+
+    if (plan === 'free') {
+      setError('Please select a paid plan');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      // Get the Firebase ID token
+      const idToken = await user.getIdToken();
+      
+      const response = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          plan: plan,
+          interval: interval,
+          idToken,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
+
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+    } catch (err: any) {
+      console.error('Payment error:', err);
+      setError(err.message || 'Failed to process payment');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!user) {
+      setError('Please sign in to continue');
+      return;
+    }
+
+    if (!currentSubscription?.subscription?.id) {
+      setError('No active subscription to cancel');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      // Get the Firebase ID token
+      const idToken = await user.getIdToken();
+      
+      const response = await fetch('/api/stripe/cancel-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subscriptionId: currentSubscription.subscription.id,
+          idToken,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to cancel subscription');
+      }
+
+      // Update local state to reflect cancellation
+      setCurrentSubscription((prev: any) => ({
+        ...prev,
+        subscription: {
+          ...prev.subscription,
+          status: 'canceled',
+          cancelAtPeriodEnd: true
+        }
+      }));
+
+      setSuccess(true);
+    } catch (err: any) {
+      console.error('Cancellation error:', err);
+      setError(err.message || 'Failed to cancel subscription');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -235,23 +411,21 @@ export default function ProfilePage() {
           <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'profile' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
-            onClick={() => setActiveTab('profile')}
+            onClick={() => handleTabChange('profile')}
           >
             Profile
           </button>
           <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'subscription' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
-            onClick={() => setActiveTab('subscription')}
-            disabled
+            onClick={() => handleTabChange('subscription')}
           >
             Subscription
           </button>
           <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'feedback' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
-            onClick={() => setActiveTab('feedback')}
-            disabled
+            onClick={() => handleTabChange('feedback')}
           >
             Feedback
           </button>
@@ -841,6 +1015,262 @@ export default function ProfilePage() {
                 Delete Profile
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Subscription Tab Content */}
+        {activeTab === 'subscription' && (
+          <div>
+            <h2 className="text-xl font-regular text-[#000000] mb-1">Subscription Plans</h2>
+            <p className="text-[#747474] text-sm mb-6">Choose your plan or upgrade your current subscription</p>
+            
+            {/* Current Plan Display */}
+            <div className="mb-6 p-4 bg-[#F4F7FF] border border-[#B5C9FC] rounded-[10px]">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-[#747474] mb-1">Current Plan</p>
+                  <p className="text-lg font-semibold text-[#223258]">{getCurrentPlanDisplay()}</p>
+                  {currentSubscription?.subscription?.currentPeriodEnd && (
+                    <p className="text-sm text-[#747474] mt-1">
+                      {currentSubscription?.subscription?.cancelAtPeriodEnd || currentSubscription?.subscription?.status === 'canceled' ? (
+                        `Cancels on ${new Date(currentSubscription.subscription.currentPeriodEnd).toLocaleDateString('en-US', { 
+                          day: 'numeric',
+                          month: 'long', 
+                          year: 'numeric' 
+                        })}`
+                      ) : (
+                        `Renews on ${new Date(currentSubscription.subscription.currentPeriodEnd).toLocaleDateString('en-US', { 
+                          day: 'numeric',
+                          month: 'long', 
+                          year: 'numeric' 
+                        })}`
+                      )}
+                    </p>
+                  )}
+                </div>
+                {(currentSubscription?.subscription?.status === 'active' || currentSubscription?.subscription?.cancelAtPeriodEnd) && (
+                  <div className="bg-[#17B26A] text-[#FFFFFF] text-xs px-3 py-1 rounded-full font-medium">
+                    Active
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Billing Toggle */}
+            <div className="flex justify-center mb-8">
+              <div className="bg-white border border-[#B5C9FC] rounded-[10px] p-1 inline-flex">
+                <button
+                  onClick={() => setBillingInterval('monthly')}
+                  className={`px-6 py-2 rounded-[8px] font-medium transition-colors ${
+                    billingInterval === 'monthly' 
+                      ? 'bg-[#3771FE] text-white' 
+                      : 'text-[#223258] hover:bg-[#F4F7FF]'
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setBillingInterval('yearly')}
+                  className={`px-6 py-2 rounded-[8px] font-medium transition-colors ${
+                    billingInterval === 'yearly' 
+                      ? 'bg-[#3771FE] text-white' 
+                      : 'text-[#223258] hover:bg-[#F4F7FF]'
+                  }`}
+                >
+                  Yearly
+                </button>
+              </div>
+            </div>
+            
+            {/* Single Row Subscription Plans */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Free Plan */}
+              <div className={`border rounded-[10px] p-6 ${
+                isCurrentPlan('free') 
+                  ? 'border-[#3771FE] bg-[#F4F7FF]' 
+                  : 'border-[#B5C9FC] bg-white'
+              }`}>
+                <h4 className="text-xl font-semibold text-[#000000] mb-2">Free</h4>
+                <p className="text-sm text-[#747474] mb-4">Discover evidence-based answers for everyday clinical questions</p>
+                <div className="text-2xl font-bold text-[#000000] mb-4 text-center">€0</div>
+                
+                {/* Button positioned above features */}
+                <div className="w-full py-3 px-4 rounded-[8px] font-medium border border-[#3771FE] text-[#3771FE] bg-white text-center mb-6">
+                  {isCurrentPlan('free') ? 'Current Plan' : 'Free Plan'}
+                </div>
+                
+                <ul className="text-sm text-[#000000] space-y-2">
+                  <li>• Evidence-based answers you can trust</li>
+                  <li>• Medical guidelines</li>
+                  <li>• Drug information</li>
+                  <li>• Benchmark-backed quality</li>
+                  <li>• Create Visual Abstracts</li>
+                  <li>• Limited Clinical Questions each month</li>
+                  <li>• Limited Visual Abstracts each month</li>
+                  <li>• Resets every month</li>
+                </ul>
+              </div>
+
+              {/* Premium Student Plan */}
+              <div className={`border rounded-[10px] p-6 relative ${
+                isCurrentPlan('student') && isCurrentBillingInterval(billingInterval)
+                  ? 'border-[#3771FE] bg-[#F4F7FF]' 
+                  : 'border-[#B5C9FC] bg-white'
+              }`}>
+                {/* Save Badge for Yearly */}
+                {billingInterval === 'yearly' && (
+                  <div className="absolute -top-3 right-4 bg-[#3771FE] text-white text-xs px-2 py-1 rounded-full font-medium">
+                    You save 20%
+                  </div>
+                )}
+                <h4 className="text-xl font-semibold text-[#000000] mb-2">Pro Student</h4>
+                <p className="text-sm text-[#747474] mb-4">Unlimited, guideline-backed answers with transparent citations</p>
+                <div className="flex items-baseline gap-1 mb-4 flex-nowrap justify-center">
+                  <span className="text-2xl font-bold text-[#000000]">
+                    {billingInterval === 'monthly' ? '€12.50' : '€9.92'}
+                  </span>
+                  <span className="text-sm text-[#000000] whitespace-nowrap">/ month</span>
+                  {billingInterval === 'yearly' && (
+                    <span className="text-[10px] text-[#747474] whitespace-nowrap">(billed yearly)</span>
+                  )}
+                </div>
+                
+                {/* Button positioned above description */}
+                <button
+                  onClick={isCurrentPlan('student') && isCurrentBillingInterval(billingInterval) ? undefined : () => handlePlanSelect('student', billingInterval)}
+                  className={`w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-4 ${
+                    isCurrentPlan('student') && isCurrentBillingInterval(billingInterval)
+                      ? 'border border-[#3771FE] text-[#3771FE] bg-white cursor-not-allowed'
+                      : 'bg-[#3771FE] text-white hover:bg-[#2A5CDB]'
+                  }`}
+                  disabled={isCurrentPlan('student') && isCurrentBillingInterval(billingInterval)}
+                >
+                  {isCurrentPlan('student') && isCurrentBillingInterval(billingInterval) ? 'Current Plan' : 'Get Pro Student!'}
+                </button>
+                
+                <ul className="text-sm text-[#000000] space-y-2">
+                  <li>• Unlimited Clinical Questions</li>
+                  <li>• Unlimited Visual Abstracts</li>
+                  <li>• Everything in Free</li>
+                </ul>
+              </div>
+
+              {/* Premium Physician Plan */}
+              <div className={`border rounded-[10px] p-6 relative ${
+                isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval)
+                  ? 'border-[#3771FE] bg-[#F4F7FF]' 
+                  : 'border-[#B5C9FC] bg-white'
+              }`}>
+                {/* Save Badge for Yearly */}
+                {billingInterval === 'yearly' && (
+                  <div className="absolute -top-3 right-4 bg-[#3771FE] text-white text-xs px-2 py-1 rounded-full font-medium">
+                    You save 17%
+                  </div>
+                )}
+                <h4 className="text-xl font-semibold text-[#000000] mb-2">Pro Physician</h4>
+                <p className="text-sm text-[#747474] mb-4">Unlimited, guideline-backed answers with transparent citations</p>
+                <div className="flex items-baseline gap-1 mb-4 flex-nowrap justify-center">
+                  <span className="text-2xl font-bold text-[#000000]">
+                    {billingInterval === 'monthly' ? '€19.90' : '€16.58'}
+                  </span>
+                  <span className="text-sm text-[#000000] whitespace-nowrap">/ month</span>
+                  {billingInterval === 'yearly' && (
+                    <span className="text-[10px] text-[#747474] whitespace-nowrap">(billed yearly)</span>
+                  )}
+                </div>
+                
+                {/* Button positioned above description */}
+                <button
+                  onClick={isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval) ? undefined : () => handlePlanSelect('clinician', billingInterval)}
+                  className={`w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-4 ${
+                    isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval)
+                      ? 'border border-[#3771FE] text-[#3771FE] bg-white cursor-not-allowed'
+                      : 'bg-[#3771FE] text-white hover:bg-[#2A5CDB]'
+                  }`}
+                  disabled={isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval)}
+                >
+                  {isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval) ? 'Current Plan' : 'Get Pro Physician!'}
+                </button>
+                
+                <ul className="text-sm text-[#000000] space-y-2">
+                  <li>• Unlimited Clinical Questions</li>
+                  <li>• Unlimited Visual Abstracts</li>
+                  <li>• Everything in Free</li>
+                  <li>• Early-bird discount available</li>
+                </ul>
+              </div>
+
+              {/* Enterprise Plan */}
+              <div className="border rounded-[10px] p-6 border-[#B5C9FC] bg-white">
+                <h4 className="text-xl font-semibold text-[#000000] mb-2">Enterprise</h4>
+                <p className="text-sm text-[#747474] mb-4">Governed, evidence-based assistance at organizational scale</p>
+                <div className="text-lg font-bold text-[#000000] mb-4 text-center">Custom pricing</div>
+                
+                {/* Button positioned above features */}
+                <button
+                  onClick={() => window.location.href = 'mailto:info@synduct.com?subject=Enterprise Plan Inquiry'}
+                  className="w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-6 bg-[#3771FE] text-white hover:bg-[#2A5CDB]"
+                >
+                  Contact us!
+                </button>
+                
+                <ul className="text-sm text-[#000000] space-y-2">
+                  <li>• Everything in Premium</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Cancel Subscription Button */}
+            {(() => {
+              const shouldShowCancel = currentSubscription?.subscription?.status === 'active' && 
+                                     !currentSubscription?.subscription?.cancelAtPeriodEnd && 
+                                     currentSubscription?.subscription?.status !== 'canceled';
+              
+              console.log('🔍 Cancel Button Debug:', {
+                status: currentSubscription?.subscription?.status,
+                cancelAtPeriodEnd: currentSubscription?.subscription?.cancelAtPeriodEnd,
+                shouldShowCancel,
+                subscription: currentSubscription?.subscription
+              });
+              
+              return shouldShowCancel ? (
+                <div className="flex justify-end mt-8 mb-4">
+                  <button
+                    type="button"
+                    onClick={handleCancelSubscription}
+                    className="bg-[#F4F7FF] border border-[#B5C9FC] text-[#747474] font-regular px-6 py-2 rounded-[8px] transition-colors text-base hover:bg-[#E8F0FF] hover:text-[#223258] min-w-[140px]"
+                  >
+                    Cancel Subscription
+                  </button>
+                </div>
+              ) : null;
+            })()}
+
+            {/* Error Message */}
+            {error && (
+              <div className="fixed top-4 right-4 z-50 max-w-sm">
+                <div className="bg-white border border-[#C8C8C8] rounded-lg shadow-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <svg className="w-5 h-5 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-[#223258] font-['DM_Sans']">{error}</p>
+                    </div>
+                    <button
+                      onClick={() => setError('')}
+                      className="flex-shrink-0 text-[#223258]/70 hover:text-[#223258] transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

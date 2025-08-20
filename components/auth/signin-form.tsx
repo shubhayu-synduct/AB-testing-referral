@@ -10,6 +10,7 @@ import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth"
 import { doc, getDoc } from "firebase/firestore"
 import { getFirebaseAuth, getFirebaseFirestore, getGoogleProvider, getMicrosoftProvider } from "@/lib/firebase"
 import { logger } from "@/lib/logger"
+import { track } from "@vercel/analytics"
 
 // Google Icon SVG component
 const GoogleIcon = () => (
@@ -96,6 +97,11 @@ export function SignInForm() {
     e.preventDefault()
     setError("")
     setLoading(true)
+    // Track sign-in attempt
+    track('SignInAttempted', {
+      method: 'email',
+      email: email ? 'provided' : 'not_provided'
+    })
 
     try {
       const { getFirebaseAuth } = await import("@/lib/firebase")
@@ -120,6 +126,11 @@ export function SignInForm() {
   const handleGoogleSignIn = async () => {
     setError("")
     setLoading(true)
+        // Track Google sign-in attempt
+    track('SignInAttempted', {
+          method: 'google',
+          provider: 'google'
+        })
     
     try {
       const auth = await getFirebaseAuth()
@@ -151,6 +162,13 @@ export function SignInForm() {
   const handleMicrosoftSignIn = async () => {
     setError("")
     setLoading(true)
+
+    // Track Microsoft sign-in attempt
+    track('SignInAttempted', {
+          method: 'microsoft',
+          provider: 'microsoft'
+        })
+
     
     try {
       const auth = await getFirebaseAuth()

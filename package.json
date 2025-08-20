@@ -11,6 +11,7 @@
   "dependencies": {
     "@ai-sdk/openai": "latest",
     "@fontsource/dm-sans": "^5.2.5",
+    "@google-cloud/firestore": "^7.11.3",
     "@google/genai": "^1.10.0",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "1.2.2",
@@ -77,6 +78,7 @@
     "remark-gfm": "^4.0.1",
     "resend": "^4.5.1",
     "sonner": "^1.7.1",
+    "stripe": "^18.4.0",
     "tailwind-merge": "^2.5.5",
     "tailwind-scrollbar-hide": "^4.0.0",
     "tailwindcss-animate": "^1.0.7",

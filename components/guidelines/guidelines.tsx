@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { getFirebaseFirestore } from '@/lib/firebase'
 import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore'
 import { logger } from '@/lib/logger'
+import { track } from '@vercel/analytics'
 
 interface Guideline {
   id: number;
@@ -138,6 +139,14 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
 
     fetchUserProfile();
   }, [user]);
+
+  useEffect(() => {
+    track('GuidelinesPageVisited', {
+      user: user ? 'authenticated' : 'unauthenticated',
+      userCountry: userCountry || 'unknown',
+      timestamp: new Date().toISOString()
+    });
+  }, [user, userCountry]);
 
   const fetchInitialGuidelines = async (country: string, specialties: string[], otherSpecialty: string) => {
     try {

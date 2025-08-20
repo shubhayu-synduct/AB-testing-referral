@@ -329,7 +329,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                   <div className="p-2">
                     {/* Profile Settings */}
                     <button
-                      className="flex items-center w-full px-3 py-2 rounded-[8px] bg-[#E4ECFF] text-[#223258] font-semibold mb-1"
+                      className="flex items-center w-full px-3 py-2 rounded-[8px] text-[#223258] hover:bg-[#E4ECFF] font-semibold mb-1"
                       onClick={() => {
                         router.push("/dashboard/profile");
                         if (window.innerWidth < 768) {
@@ -341,6 +341,22 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                       <svg className="mr-3 h-5 w-5" fill="none" stroke="#223258" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                       Profile Settings
                     </button>
+                    
+                    {/* Upgrade Plan */}
+                    <button
+                      className="flex items-center w-full px-3 py-2 text-[#223258] hover:bg-[#E4ECFF] rounded-[8px] mb-1 font-semibold"
+                      onClick={() => {
+                        router.push("/dashboard/profile?tab=subscription");
+                        if (window.innerWidth < 768) {
+                          setIsOpen(false);
+                          setIsProfileOpen(false);
+                        }
+                      }}
+                    >
+                      <svg className="mr-3 h-5 w-5" fill="none" stroke="#223258" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                      Upgrade Plan
+                    </button>
+                    
                     {/* Sign Out */}
                     <button
                       onClick={handleSignOut}

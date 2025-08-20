@@ -12,6 +12,7 @@ import { getFirebaseFirestore } from "@/lib/firebase"
 import { doc, setDoc } from "firebase/firestore"
 import { VerificationModal } from "./verification-modal"
 import { logger } from "@/lib/logger"
+import { track } from '@vercel/analytics'
 
 // Google Icon SVG component
 const GoogleIcon = () => (
@@ -96,6 +97,10 @@ export function SignUpForm() {
     e.preventDefault()
     setError("")
     setLoading(true)
+    track('SignUpAttempted', {
+      method: 'email',
+      email: email ? 'provided' : 'not_provided'
+    })
 
     try {
       const { getFirebaseAuth } = await import("@/lib/firebase")
@@ -127,6 +132,10 @@ export function SignUpForm() {
   const handleGoogleSignUp = async () => {
     setError("")
     setLoading(true)
+    track('SignUpAttempted', {
+      method: 'google',
+      provider: 'google'
+    })
     
     try {
       const { signInWithPopup } = await import("firebase/auth")
@@ -178,6 +187,10 @@ export function SignUpForm() {
   const handleMicrosoftSignUp = async () => {
     setError("")
     setLoading(true)
+    track('SignUpAttempted', {
+      method: 'microsoft',
+      provider: 'microsoft'
+    })
     
     try {
       const { signInWithPopup } = await import("firebase/auth")
