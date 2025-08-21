@@ -705,82 +705,12 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[#000000] mb-1 font-medium">Occupation</label>
-                  <div className="relative" ref={occupationRef}>
-                    <div
-                      className={`w-full min-h-[40px] px-2 py-1 border border-[#B5C9FC] rounded-[8px] bg-white flex items-center justify-between gap-1 focus-within:ring-2 focus-within:ring-[#B5C9FC] focus-within:border-transparent`}
-                      tabIndex={0}
-                      onClick={() => setShowOccupationDropdown(true)}
-                      style={{ cursor: 'text', position: 'relative' }}
-                    >
-                      {!profile?.occupation && (
-                        <span className="text-gray-400 select-none font-medium">Select Occupation</span>
-                      )}
-                      {profile?.occupation && (
-                        <span className="text-[#223258] select-none font-medium">
-                          {profile.occupation === "other" ? "Other" : profile.occupation.split("-").map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}
-                        </span>
-                      )}
-                      {/* Remove down arrow symbol */}
-                    </div>
-                    {showOccupationDropdown && (
-                      <div className="absolute z-10 left-0 right-0 bg-white border border-[#B5C9FC] rounded-b-[8px] shadow-lg max-h-48 overflow-y-auto mt-1">
-                        {/* Search input for occupation */}
-                        <div className="sticky top-0 bg-white border-b border-[#B5C9FC] p-2">
-                          <input
-                            type="text"
-                            placeholder="Search occupation..."
-                            value={occupationSearchTerm}
-                            className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[6px] text-sm text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent"
-                            onChange={(e) => {
-                              setOccupationSearchTerm(e.target.value);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Escape') {
-                                setShowOccupationDropdown(false);
-                              }
-                            }}
-                            autoFocus
-                          />
-                        </div>
-                        {occupationOptions
-                          .filter(opt => opt.value !== profile?.occupation)
-                          .filter(opt => opt.label.toLowerCase().includes(occupationSearchTerm.toLowerCase()))
-                          .map(opt => (
-                          <div
-                            key={opt.value}
-                            className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
-                            style={{ fontSize: '14px', color: '#223258' }}
-                            onClick={() => {
-                              setProfile((prev: any) => ({ 
-                                ...prev, 
-                                occupation: opt.value,
-                                otherOccupation: opt.value === "other" ? "" : ""
-                              }));
-                              setShowOccupationDropdown(false);
-                              setOccupationSearchTerm('');
-                            }}
-                          >
-                            {opt.label}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {profile?.occupation === "other" && (
-                    <div className="mt-2">
-                      <label className="block text-sm font-medium text-black mb-1">Specify Other Occupation</label>
-                      <input
-                        type="text"
-                        name="otherOccupation"
-                        placeholder="Please specify your occupation"
-                        value={profile.otherOccupation || ""}
-                        onChange={e => setProfile((prev: any) => ({ ...prev, otherOccupation: e.target.value }))}
-                        className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[8px] text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent text-sm bg-white"
-                        style={{ fontSize: 14 }}
-                      />
-                    </div>
-                  )}
+                  <label className="block text-[#000000] mb-1 font-medium">Profession</label>
+                  <input 
+                    value={profile?.occupation ? (profile.occupation === "other" ? profile.otherOccupation || "Other" : profile.occupation.split("-").map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")) : "Select Occupation"} 
+                    disabled 
+                    className="w-full border border-[#B5C9FC] rounded-[8px] px-4 py-2 bg-white text-[#223258] font-medium outline-none cursor-not-allowed opacity-60" 
+                  />
                 </div>
                 <div>
                   <label className="block text-[#000000] mb-1 font-medium">Place of Work</label>
@@ -1145,7 +1075,7 @@ export default function ProfilePage() {
                   }`}
                   disabled={isCurrentPlan('student') && isCurrentBillingInterval(billingInterval)}
                 >
-                  {isCurrentPlan('student') && isCurrentBillingInterval(billingInterval) ? 'Current Plan' : 'Get Pro Student!'}
+                  {isCurrentPlan('student') && isCurrentBillingInterval(billingInterval) ? 'Current Plan' : 'Get Pro Student'}
                 </button>
                 
                 <ul className="text-sm text-[#000000] space-y-2">
@@ -1189,7 +1119,7 @@ export default function ProfilePage() {
                   }`}
                   disabled={isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval)}
                 >
-                  {isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval) ? 'Current Plan' : 'Get Pro Physician!'}
+                  {isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval) ? 'Current Plan' : 'Get Pro Physician'}
                 </button>
                 
                 <ul className="text-sm text-[#000000] space-y-2">
@@ -1211,7 +1141,7 @@ export default function ProfilePage() {
                   onClick={() => window.location.href = 'mailto:info@synduct.com?subject=Enterprise Plan Inquiry'}
                   className="w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-6 bg-[#3771FE] text-white hover:bg-[#2A5CDB]"
                 >
-                  Contact us!
+                  Contact us
                 </button>
                 
                 <ul className="text-sm text-[#000000] space-y-2">

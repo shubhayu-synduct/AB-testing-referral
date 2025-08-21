@@ -437,8 +437,12 @@ export default function DrugInformationPage() {
                   <tr>
                     <td colSpan={2} className="text-center py-12">
                       <div className="flex justify-center items-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#214498]"></div>
-                        <span className="ml-3 text-[#263969] font-['DM_Sans']">Loading drugs...</span>
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        </div>
+                        {/* <span className="ml-3 text-[#263969] font-['DM_Sans']">Loading drugs</span> */}
                       </div>
                     </td>
                   </tr>

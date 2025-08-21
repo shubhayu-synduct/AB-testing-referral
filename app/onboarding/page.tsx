@@ -17,8 +17,6 @@ export default function Onboarding() {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
-    yearOfBirth: "",
-    gender: "",
     occupation: "",
     otherOccupation: "",
     placeOfWork: "",
@@ -27,19 +25,18 @@ export default function Onboarding() {
     institution: "",
     specialties: [] as string[],
     otherSpecialty: "",
-    address: "",
     country: ""
   })
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
+  const [autoFilledNames, setAutoFilledNames] = useState({ firstName: false, lastName: false })
 
   const [showSpecialtiesDropdown, setShowSpecialtiesDropdown] = useState(false)
   const [showExperienceDropdown, setShowExperienceDropdown] = useState(false)
   const [showProfessionDropdown, setShowProfessionDropdown] = useState(false)
   const [showPlaceOfWorkDropdown, setShowPlaceOfWorkDropdown] = useState(false)
   const [showCountryDropdown, setShowCountryDropdown] = useState(false)
-  const [showSexDropdown, setShowSexDropdown] = useState(false)
   const [specialtiesSearchTerm, setSpecialtiesSearchTerm] = useState('');
   const [countrySearchTerm, setCountrySearchTerm] = useState('');
   const specialtiesRef = useRef<HTMLDivElement>(null)
@@ -47,7 +44,6 @@ export default function Onboarding() {
   const professionRef = useRef<HTMLDivElement>(null)
   const placeOfWorkRef = useRef<HTMLDivElement>(null)
   const countryRef = useRef<HTMLDivElement>(null)
-  const sexRef = useRef<HTMLDivElement>(null)
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -56,7 +52,7 @@ export default function Onboarding() {
     }
   }, [user, authLoading])
 
-  // Check email verification - be lenient for OAuth providers
+  // Check email verification and auto-fill names from OAuth providers
   useEffect(() => {
     if (!authLoading && user) {
       // Check if user signed in via OAuth providers (they should be trusted)
@@ -70,6 +66,31 @@ export default function Onboarding() {
         isOAuthUser,
         providers: user.providerData.map(p => p.providerId)
       })
+      
+      // Auto-fill names from OAuth display name if available
+      if (isOAuthUser && user.displayName && !formData.firstName && !formData.lastName) {
+        const displayName = user.displayName.trim();
+        const nameParts = displayName.split(' ');
+        
+        if (nameParts.length >= 2) {
+          const firstName = nameParts[0];
+          const lastName = nameParts.slice(1).join(' '); // Handle multiple last names
+          
+          setFormData(prev => ({
+            ...prev,
+            firstName,
+            lastName
+          }));
+          setAutoFilledNames({ firstName: true, lastName: true });
+        } else if (nameParts.length === 1) {
+          // Only first name available
+          setFormData(prev => ({
+            ...prev,
+            firstName: nameParts[0]
+          }));
+          setAutoFilledNames({ firstName: true, lastName: false });
+        }
+      }
       
       // Note: We no longer block access for unverified emails
       // Instead, we'll show a reminder within the onboarding flow
@@ -87,7 +108,6 @@ export default function Onboarding() {
   const validateRequiredFields = () => {
     const requiredFields = {
       firstName: "First Name",
-      lastName: "Last Name",
       occupation: "Occupation",
       experience: "Experience",
       placeOfWork: "Place of Work",
@@ -104,20 +124,6 @@ export default function Onboarding() {
         hasErrors = true
       }
     })
-
-    // Age validation: only if year of birth is provided
-    if (formData.yearOfBirth) {
-      const dob = new Date(formData.yearOfBirth)
-      const today = new Date()
-      const age = today.getFullYear() - dob.getFullYear()
-      const m = today.getMonth() - dob.getMonth()
-      const d = today.getDate() - dob.getDate()
-      let is18 = age > 18 || (age === 18 && (m > 0 || (m === 0 && d >= 0)))
-      if (!is18) {
-        errors.yearOfBirth = "You must be at least 18 years old to register."
-        hasErrors = true
-      }
-    }
 
     // Additional validation for "other" fields
     if (formData.occupation === "other" && !formData.otherOccupation) {
@@ -165,18 +171,15 @@ export default function Onboarding() {
         onboardingCompleted: true,
         updatedAt: new Date().toISOString(),
         // Add additional profile fields
-        displayName: `${formData.firstName} ${formData.lastName}`,
+        displayName: formData.lastName ? `${formData.firstName} ${formData.lastName}` : formData.firstName,
         firstName: formData.firstName,
-        lastName: formData.lastName,
+        lastName: formData.lastName || "",
         country: formData.country,
         profile: {
           firstName: formData.firstName,
-          lastName: formData.lastName,
+          lastName: formData.lastName || "",
           country: formData.country,
           email: user.email,
-          address: formData.address,
-          yearOfBirth: formData.yearOfBirth,
-          gender: formData.gender,
           occupation: formData.occupation === "other" ? formData.otherOccupation : formData.occupation,
           placeOfWork: formData.placeOfWork === "other" ? formData.otherPlaceOfWork : formData.placeOfWork,
           experience: formData.experience,
@@ -278,9 +281,7 @@ export default function Onboarding() {
         setShowCountryDropdown(false);
         setCountrySearchTerm('');
       }
-      if (sexRef.current && event.target instanceof Node && !sexRef.current.contains(event.target)) {
-        setShowSexDropdown(false);
-      }
+
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -352,11 +353,7 @@ export default function Onboarding() {
     { value: "other", label: "Other" },
   ];
 
-  const sexOptions = [
-    { value: "male", label: "Male" },
-    { value: "female", label: "Female" },
-    { value: "other", label: "Other" },
-  ];
+
 
   const countryOptions: Record<string, string> = {
     "afghanistan": "Afghanistan",
@@ -650,9 +647,18 @@ export default function Onboarding() {
         <div className="bg-[#F4F7FF] border border-[#3771FE]/50 px-4 sm:px-6 md:px-8 py-4 sm:py-5 rounded-[5px]">
           {/* Single Step: Customer Information Form */}
           <div className="space-y-3 sm:space-y-4">
+              {/* Personalized Experience Message */}
+              <div className="text-center mb-2">
+                <p className="text-gray-500 text-xs" style={{ fontFamily: 'DM Sans', fontWeight: 400 }}>
+                  Please fill in these fields to get a personalized, tailor-made experience
+                </p>
+              </div>
+              
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>First Name <span className="text-black">*</span></label>
+                  <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>
+                    First Name <span className="text-black">*</span>
+                  </label>
                   <input
                     type="text"
                     name="firstName"
@@ -666,11 +672,13 @@ export default function Onboarding() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>Last Name <span className="text-black">*</span></label>
+                  <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>
+                    Last Name
+                  </label>
                   <input
                     type="text"
                     name="lastName"
-                    placeholder="Last Name"
+                    placeholder="Last Name (Optional)"
                     value={formData.lastName}
                     onChange={handleInputChange}
                     className={`px-3 py-2 sm:py-2.5 border ${fieldErrors.lastName ? 'border-red-500' : 'border-[#3771FE]/50'} rounded-[5px] text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full bg-white placeholder-text custom-dropdown-selected custom-dropdown-field`}
@@ -681,66 +689,7 @@ export default function Onboarding() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>Date of Birth</label>
-                  <input
-                    type="date"
-                    name="yearOfBirth"
-                    placeholder="Year of Birth"
-                    max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
-                    value={formData.yearOfBirth}
-                    onChange={handleInputChange}
-                    className={`px-3 py-2 sm:py-2.5 border ${fieldErrors.yearOfBirth ? 'border-red-500' : 'border-[#3771FE]/50'} rounded-[5px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm w-full bg-white ${!formData.yearOfBirth ? 'text-gray-400' : 'text-[#223258]'} placeholder-text`}
-                  />
-                  {fieldErrors.yearOfBirth && (
-                    <p className="text-red-500 text-xs mt-1">{fieldErrors.yearOfBirth}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>Sex</label>
-                  <div className="relative" ref={sexRef}>
-                    <div
-                      className={`w-full min-h-[40px] px-2 py-1 border ${fieldErrors.gender ? 'border-red-500' : 'border-[#3771FE]/50'} rounded-[5px] bg-white flex items-center justify-between gap-1 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent placeholder-text`}
-                      tabIndex={0}
-                      onClick={() => setShowSexDropdown(true)}
-                      style={{ cursor: 'text', position: 'relative' }}
-                    >
-                      {formData.gender === "" && (
-                        <span className="text-gray-400 select-none" style={{ fontSize: '12px', color: '#9ca3af' }}>Select Sex</span>
-                      )}
-                      {formData.gender !== "" && (
-                        <span className="text-[#223258] select-none" style={{ fontSize: '12px' }}>
-                          {formData.gender.charAt(0).toUpperCase() + formData.gender.slice(1)}
-                        </span>
-                      )}
-                    </div>
-                    {showSexDropdown && (
-                      <div className="absolute z-10 left-0 right-0 bg-white border border-[#3771FE]/50 rounded-b-[5px] shadow-lg max-h-48 overflow-y-auto mt-1">
-                        {sexOptions.filter(opt => opt.value !== formData.gender).map(opt => (
-                          <div
-                            key={opt.value}
-                            className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
-                            style={{ fontSize: '12px', color: '#223258' }}
-                            onClick={() => {
-                              setFormData(prev => ({
-                                ...prev,
-                                gender: opt.value
-                              }));
-                              setShowSexDropdown(false);
-                            }}
-                          >
-                            {opt.label}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {fieldErrors.gender && (
-                    <p className="text-red-500 text-xs mt-1">{fieldErrors.gender}</p>
-                  )}
-                </div>
-              </div>
+
 
               {/* Profession and Years of Experience in one row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
@@ -1033,20 +982,7 @@ export default function Onboarding() {
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>Address (Street, City, Postal Code)</label>
-                <input
-                  type="text"
-                  name="address"
-                  placeholder="Address (Street, City, Postal Code)"
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 sm:py-2.5 border ${fieldErrors.address ? 'border-red-500' : 'border-[#3771FE]/50'} rounded-[5px] text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white placeholder-text custom-dropdown-selected`}
-                />
-                {fieldErrors.address && (
-                  <p className="text-red-500 text-xs mt-1">{fieldErrors.address}</p>
-                )}
-              </div>
+
 
               <div>
                 <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>Country <span className="text-black">*</span></label>
@@ -1131,9 +1067,9 @@ export default function Onboarding() {
 
               <button
                 onClick={handleCompleteRegistration}
-                disabled={!formData.country || !formData.firstName || !formData.lastName || !formData.specialties.length || !formData.experience || !formData.placeOfWork || !formData.occupation || !termsAgreed}
+                disabled={!formData.country || !formData.firstName || !formData.specialties.length || !formData.experience || !formData.placeOfWork || !formData.occupation || !termsAgreed}
                 className={`w-full py-2 sm:py-2.5 px-4 rounded-[5px] font-dm-sans font-medium transition-colors duration-200 text-sm ${
-                  formData.country && formData.firstName && formData.lastName && formData.specialties.length && formData.experience && formData.placeOfWork && formData.occupation && termsAgreed
+                  formData.country && formData.firstName && formData.specialties.length && formData.experience && formData.placeOfWork && formData.occupation && termsAgreed
                     ? 'bg-[#C6D7FF]/50 text-[#3771FE] border border-[#3771FE]/50 hover:bg-[#C6D7FF]/60'
                     : 'bg-[#C6D7FF]/50 text-[#3771FE] border border-[#3771FE]/50 cursor-not-allowed opacity-50'
                 }`}

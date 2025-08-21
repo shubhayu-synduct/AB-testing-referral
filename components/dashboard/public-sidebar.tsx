@@ -28,6 +28,12 @@ export function PublicSidebar({ isOpen, setIsOpen }: PublicSidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const sidebarRef = useRef<HTMLElement>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // Ensure component is mounted before rendering
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Add click outside handler
   useEffect(() => {
@@ -51,6 +57,11 @@ export function PublicSidebar({ isOpen, setIsOpen }: PublicSidebarProps) {
 
   const isActive = (path: string) => {
     return pathname === path
+  }
+
+  // Don't render until mounted to prevent hydration mismatch
+  if (!mounted) {
+    return null
   }
 
   return (

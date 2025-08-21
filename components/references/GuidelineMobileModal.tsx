@@ -463,7 +463,11 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
               <div>
                 {isLoading ? (
                   <div className="flex flex-col justify-center items-center h-40">
-                    <div className="animate-spin rounded-full h-10 sm:h-12 w-10 sm:w-12 border-t-2 border-b-2 border-[#3771FE] mb-3 sm:mb-4"></div>
+                    <div className="flex space-x-1 justify-center mb-4">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
                     <div className="text-sm sm:text-base text-gray-500" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                       Generating AI Summary for this Guideline ...
                     </div>

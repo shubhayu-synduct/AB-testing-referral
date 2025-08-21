@@ -448,7 +448,11 @@ export default function Dashboard() {
                         className={`flex-shrink-0 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         {isLoading ? (
-                          <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <div className="flex space-x-1">
+                            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                          </div>
                         ) : (
                           <img src="search.svg" alt="Search" width={30} height={30} />
                         )}

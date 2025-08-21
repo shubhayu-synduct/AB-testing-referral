@@ -1811,8 +1811,11 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         {isChatLoading ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="flex flex-col items-center space-y-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="text-blue-600 font-medium">Loading ...</span>
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
             </div>
           </div>
         ) : (
@@ -1832,7 +1835,12 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                     <div key={msg.id} className="mb-4">
                       {msg.type === 'user' ? (
                         <div className="p-3 sm:p-4 border rounded-5px" style={{ borderColor: 'rgba(55, 113, 254, 0.5)', fontFamily: 'DM Sans, sans-serif', fontWeight: 500, fontSize: '16px sm:text-[18px]', color: '#223258', backgroundColor: '#E4ECFF' }}>
-                          <p className="m-0">{msg.content}</p>
+                          <p className="m-0">
+                            {msg.content.includes('::::::') 
+                              ? 'Create a visual abstract for this answer' 
+                              : msg.content
+                            }
+                          </p>
                         </div>
                       ) : (
                         <>
@@ -1928,7 +1936,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                     <div className="mt-4 sm:mt-6">
                                       <button
                                         onClick={() => {
-                                          const infographicRequest = `Create a visual abstract for this answer: ${msg.content}`;
+                                          const infographicRequest = `Create a visual abstract for this answer::::::${msg.content}`;
                                           // Send directly to backend without filling follow-up search bar
                                           handleSearchWithContent(infographicRequest, true, activeMode === 'instant' ? 'swift' : 'study', true);
                                         }}
