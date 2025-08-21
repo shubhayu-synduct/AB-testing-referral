@@ -422,13 +422,13 @@ export default function ProfilePage() {
           >
             Subscription
           </button>
-          <button
+          {/* <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'feedback' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
             onClick={() => handleTabChange('feedback')}
           >
             Feedback
-          </button>
+          </button> */}
         </div>
 
         {/* Profile Tab Content */}
@@ -1021,7 +1021,7 @@ export default function ProfilePage() {
                   : 'border-[#B5C9FC] bg-white'
               }`}>
                 <h4 className="text-xl font-semibold text-[#000000] mb-2">Free</h4>
-                <p className="text-sm text-[#747474] mb-4">Discover evidence-based answers for everyday clinical questions</p>
+                <p className="text-sm text-[#747474] mb-4">Evidence-based answers for everyday clinical questions</p>
                 <div className="text-2xl font-bold text-[#000000] mb-4 text-center">€0</div>
                 
                 {/* Button positioned above features */}
@@ -1029,16 +1029,16 @@ export default function ProfilePage() {
                   {isCurrentPlan('free') ? 'Current Plan' : 'Free Plan'}
                 </div>
                 
-                <ul className="text-sm text-[#000000] space-y-2">
-                  <li>• Evidence-based answers you can trust</li>
-                  <li>• Medical guidelines</li>
-                  <li>• Drug information</li>
-                  <li>• Benchmark-backed quality</li>
-                  <li>• Create Visual Abstracts</li>
-                  <li>• Limited Clinical Questions each month</li>
-                  <li>• Limited Visual Abstracts each month</li>
-                  <li>• Resets every month</li>
+                <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
+                  <li>Evidence-based answers you can trust</li>
+                  <li>Medical guidelines</li>
+                  <li>Drug information</li>
+                  <li>Benchmark-backed quality answers</li>
+                  <li>30 Clinical questions / month</li>
+                  <li>5 AI Visual Abstracts / month</li>
+                  <li>Limits reset every month</li> 
                 </ul>
+                <p className="text-xs text-gray-600 italic mt-2">*Fair-use rate limits may apply</p>
               </div>
 
               {/* Premium Student Plan */}
@@ -1059,9 +1059,9 @@ export default function ProfilePage() {
                   <span className="text-2xl font-bold text-[#000000]">
                     {billingInterval === 'monthly' ? '€12.50' : '€9.92'}
                   </span>
-                  <span className="text-sm text-[#000000] whitespace-nowrap">/ month</span>
+                  <span className="text-sm text-[#000000] whitespace-nowrap">/ mo</span>
                   {billingInterval === 'yearly' && (
-                    <span className="text-[10px] text-[#747474] whitespace-nowrap">(billed yearly)</span>
+                    <span className="text-[10px] text-[#747474] whitespace-nowrap">(€119 billed yearly)</span>
                   )}
                 </div>
                 
@@ -1078,11 +1078,12 @@ export default function ProfilePage() {
                   {isCurrentPlan('student') && isCurrentBillingInterval(billingInterval) ? 'Current Plan' : 'Get Pro Student'}
                 </button>
                 
-                <ul className="text-sm text-[#000000] space-y-2">
-                  <li>• Unlimited Clinical Questions</li>
-                  <li>• Unlimited Visual Abstracts</li>
-                  <li>• Everything in Free</li>
+                <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
+                  <li>Unlimited Clinical Questions</li>
+                  <li>Unlimited Visual Abstracts</li>
+                  <li>Everything in Free</li>
                 </ul>
+                <p className="text-xs text-gray-600 italic mt-2">*Fair-use rate limits may apply</p>
               </div>
 
               {/* Premium Physician Plan */}
@@ -1103,9 +1104,9 @@ export default function ProfilePage() {
                   <span className="text-2xl font-bold text-[#000000]">
                     {billingInterval === 'monthly' ? '€19.90' : '€16.58'}
                   </span>
-                  <span className="text-sm text-[#000000] whitespace-nowrap">/ month</span>
+                  <span className="text-sm text-[#000000] whitespace-nowrap">/ mo</span>
                   {billingInterval === 'yearly' && (
-                    <span className="text-[10px] text-[#747474] whitespace-nowrap">(billed yearly)</span>
+                    <span className="text-[10px] text-[#747474] whitespace-nowrap">(€199 billed yearly)</span>
                   )}
                 </div>
                 
@@ -1122,12 +1123,15 @@ export default function ProfilePage() {
                   {isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval) ? 'Current Plan' : 'Get Pro Physician'}
                 </button>
                 
-                <ul className="text-sm text-[#000000] space-y-2">
-                  <li>• Unlimited Clinical Questions</li>
-                  <li>• Unlimited Visual Abstracts</li>
-                  <li>• Everything in Free</li>
-                  <li>• Early-bird discount available</li>
+                <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
+                  <li>Unlimited Clinical Questions</li>
+                  <li>Unlimited Visual Abstracts</li>
+                  <li>Everything in Free</li>
+                  {billingInterval === 'yearly' && (
+                    <li><span className="font-bold text-[#000000]">Early-bird discount available till the end of the year (€159 billed yearly)</span></li>
+                  )}
                 </ul>
+                <p className="text-xs text-gray-600 italic mt-2">*Fair-use rate limits may apply</p>
               </div>
 
               {/* Enterprise Plan */}
@@ -1141,12 +1145,12 @@ export default function ProfilePage() {
                   onClick={() => window.location.href = 'mailto:info@synduct.com?subject=Enterprise Plan Inquiry'}
                   className="w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-6 bg-[#3771FE] text-white hover:bg-[#2A5CDB]"
                 >
-                  Contact us
+                  Contact Sales
                 </button>
                 
-                <ul className="text-sm text-[#000000] space-y-2">
-                  <li>• Everything in Premium</li>
-                </ul>
+                {/* <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
+                  <li>Everything in Pro</li>
+                </ul> */}
               </div>
             </div>
 

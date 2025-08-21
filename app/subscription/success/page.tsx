@@ -89,7 +89,7 @@ const SubscriptionSuccessContent = () => {
                 onClick={handleContinue}
                 className="w-full bg-[#3771FE] text-white py-3 px-4 rounded-lg font-medium hover:bg-[#2B5CD9] transition-colors font-['DM_Sans']"
               >
-                Continue to Dashboard
+                Continue to DR.INFO
               </button>
             </div>
           </div>

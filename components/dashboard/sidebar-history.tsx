@@ -72,7 +72,7 @@ export function SidebarHistory() {
             pinned: data.pinned || false // Include the pinned state from Firebase
           }
           
-          console.log('Session data from Firebase:', doc.id, sessionData)
+          // console.log('Session data from Firebase:', doc.id, sessionData)
           sessions.push(sessionData)
         })
         setChatSessions(sessions)
