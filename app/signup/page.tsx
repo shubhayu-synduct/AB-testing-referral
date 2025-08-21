@@ -4,6 +4,7 @@ import type React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { SignUpForm } from "@/components/auth/signup-form"
+import { CookieConsentBanner } from "@/components/CookieConsentBanner"
 
 export default function SignUp() {
   return (
@@ -51,6 +52,9 @@ export default function SignUp() {
           </div>
         </div>
       </div>
+
+      {/* Cookie Consent Banner - Overlay Modal */}
+      <CookieConsentBanner />
     </div>
   )
 }

@@ -29,3 +29,4 @@ next-env.d.ts
 test-loading.html
 loading-icon.tsx
 *.DS_Store
+app/cookie-test

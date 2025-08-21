@@ -1836,7 +1836,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                       {msg.type === 'user' ? (
                         <div className="p-3 sm:p-4 border rounded-5px" style={{ borderColor: 'rgba(55, 113, 254, 0.5)', fontFamily: 'DM Sans, sans-serif', fontWeight: 500, fontSize: '16px sm:text-[18px]', color: '#223258', backgroundColor: '#E4ECFF' }}>
                           <p className="m-0">
-                            {msg.content.includes('::::::') 
+                            {msg.content.includes('Create a visual abstract for this answer::::::') 
                               ? 'Create a visual abstract for this answer' 
                               : msg.content
                             }

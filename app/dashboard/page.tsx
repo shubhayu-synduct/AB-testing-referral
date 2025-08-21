@@ -12,6 +12,7 @@ import { ArrowRight, X, Search } from "lucide-react"
 import { v4 as uuidv4 } from 'uuid'
 import { logger } from '@/lib/logger';
 import { track } from '@vercel/analytics';
+import { CookieConsentBanner } from "@/components/CookieConsentBanner";
 // Removed GoogleGenAI import - now using secure server-side API
 
 // Define the interface for the message structure
@@ -37,6 +38,7 @@ export default function Dashboard() {
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = useState(false)
+  const [showCookieBanner, setShowCookieBanner] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const suggestionTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const lastQueryRef = useRef<string>("")
@@ -228,6 +230,78 @@ export default function Dashboard() {
     fetchPreviousQueries();
   }, [user]);
 
+  // Check Firebase for cookie consent status
+  useEffect(() => {
+    if (!user) return;
+
+    const checkCookieConsent = async () => {
+      try {
+        const db = getFirebaseFirestore();
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        console.log("Checking cookie consent for user:", user.uid);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const cookieConsent = userData.cookieConsent;
+          
+          console.log("User document exists, cookieConsent:", cookieConsent);
+          console.log("User data:", userData);
+          
+          // Check if user has given necessary or all consent
+          if (cookieConsent && (cookieConsent.consentType === 'necessary' || cookieConsent.consentType === 'all')) {
+            console.log("User has valid consent, hiding banner");
+            setShowCookieBanner(false);
+          } else {
+            console.log("User has no valid consent, showing banner");
+            setShowCookieBanner(true);
+          }
+          
+          // Debug: Log the state change
+          console.log("Setting showCookieBanner to:", true);
+        } else {
+          console.log("User document doesn't exist, showing banner");
+          // User document doesn't exist, show cookie banner
+          setShowCookieBanner(true);
+        }
+      } catch (err) {
+        console.error("Error checking cookie consent:", err);
+        logger.error("Error checking cookie consent:", err);
+        // On error, show cookie banner as fallback
+        setShowCookieBanner(true);
+      }
+    };
+
+    checkCookieConsent();
+  }, [user]);
+
+  // Function to update Firebase with cookie consent
+  const updateFirebaseConsent = async (consentData: any) => {
+    if (!user) return;
+    
+    try {
+      const db = getFirebaseFirestore();
+      const userDocRef = doc(db, "users", user.uid);
+      
+      // Update or create user document with cookie consent
+      await setDoc(userDocRef, {
+        cookieConsent: {
+          ...consentData,
+          updatedAt: Date.now()
+        }
+      }, { merge: true });
+      
+      logger.debug("Cookie consent updated in Firebase:", consentData);
+      
+      // Hide the banner after successful Firebase update
+      setShowCookieBanner(false);
+    } catch (err) {
+      logger.error("Error updating Firebase with cookie consent:", err);
+      // Keep banner visible if Firebase update fails
+    }
+  };
+
   // Add event listeners for user activity
   useEffect(() => {
     const handleUserActivity = () => {
@@ -374,6 +448,9 @@ export default function Dashboard() {
     setShowSuggestions(false);
   };
 
+  // Debug: Log the current state before rendering
+  console.log("Dashboard render - showCookieBanner state:", showCookieBanner);
+  
   return (
     <DashboardLayout>
       <div className="flex flex-col min-h-[calc(100vh-56px)] md:min-h-screen">
@@ -489,6 +566,9 @@ export default function Dashboard() {
           </Link>
         </div>
       </div>
+      
+      {/* Cookie Consent Banner - Show based on Firebase status */}
+      {showCookieBanner && <CookieConsentBanner onConsentUpdate={updateFirebaseConsent} forceShow={true} />}
     </DashboardLayout>
   )
 }

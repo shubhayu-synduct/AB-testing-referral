@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { Check } from "lucide-react"
 import Image from "next/image"
 import { logger } from "@/lib/logger"
+import { CookieConsentBanner } from "@/components/CookieConsentBanner"
 
 export default function Onboarding() {
   const router = useRouter()
@@ -31,6 +32,7 @@ export default function Onboarding() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
   const [autoFilledNames, setAutoFilledNames] = useState({ firstName: false, lastName: false })
+  const [cookieConsent, setCookieConsent] = useState<any>(null)
 
   const [showSpecialtiesDropdown, setShowSpecialtiesDropdown] = useState(false)
   const [showExperienceDropdown, setShowExperienceDropdown] = useState(false)
@@ -90,6 +92,20 @@ export default function Onboarding() {
           }));
           setAutoFilledNames({ firstName: true, lastName: false });
         }
+      }
+      
+      // Extract cookie consent from localStorage
+      try {
+        const savedCookieConsent = localStorage.getItem('drinfo-cookie-consent');
+        if (savedCookieConsent) {
+          const parsed = JSON.parse(savedCookieConsent);
+          setCookieConsent(parsed);
+          logger.debug("Extracted cookie consent from localStorage:", parsed);
+        } else {
+          logger.debug("No cookie consent found in localStorage");
+        }
+      } catch (error) {
+        logger.error("Error parsing cookie consent from localStorage:", error);
       }
       
       // Note: We no longer block access for unverified emails
@@ -175,6 +191,15 @@ export default function Onboarding() {
         firstName: formData.firstName,
         lastName: formData.lastName || "",
         country: formData.country,
+        // Add cookie consent data
+        cookieConsent: cookieConsent || {
+          necessary: true,
+          analytics: false,
+          marketing: false,
+          functional: false,
+          consentedAt: new Date().toISOString(),
+          consentType: 'none' // 'none', 'necessary', 'all', 'custom'
+        },
         profile: {
           firstName: formData.firstName,
           lastName: formData.lastName || "",
@@ -1079,6 +1104,10 @@ export default function Onboarding() {
             </div>
           </div>
         </div>
+
+        {/* Cookie Consent Banner - Only shows when no consent is found */}
+        <CookieConsentBanner />
+        
       </div>
 
   )
