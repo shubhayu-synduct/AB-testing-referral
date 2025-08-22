@@ -364,6 +364,24 @@ export default function ProfilePage() {
       const auth = await getFirebaseAuth();
       const user = auth.currentUser;
       if (user) {
+        // Send delete confirmation email first
+        try {
+          await fetch('/api/send-delete-email', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userName: user.displayName || user.email?.split('@')[0] || 'User',
+              userEmail: user.email,
+              deletionReason: 'User requested account deletion'
+            }),
+          });
+        } catch (emailError) {
+          console.warn('Failed to send delete email:', emailError);
+          // Don't fail the deletion if email fails
+        }
+
         const db = getFirebaseFirestore();
         const docRef = doc(db, "users", user.uid);
         

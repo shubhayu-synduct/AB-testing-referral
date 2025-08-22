@@ -31,54 +31,113 @@ const RATE_LIMIT = {
 // Store all 7 email templates in an object
 const emailTemplates = {
   1: {
-    subject: "Welcome to Dr.Info – Fast, Evidence-Based Answers at Your Fingertips",
+    subject: "Welcome to DR.INFO 2025 – Fast, Evidence-Based Answers at Your Fingertips",
     html: `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Welcome to Dr.Info</title>
+        <title>Welcome to DR.INFO 2025</title>
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { padding: 30px; background: #f9f9f9; }
-          .button { display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; padding: 20px; color: #666; font-size: 14px; }
-          .unsubscribe { text-align: center; padding: 10px; color: #999; font-size: 12px; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #223258; background-color: #f8fafc; }
+          .email-container { max-width: 600px; margin: 0 auto; background-color: white; }
+          .header-section { padding: 24px 20px; background-color: white; text-align: center; border-bottom: 2px solid rgba(55, 113, 254, 0.1); }
+          .logo { max-width: 180px; height: auto; display: block; margin: 0 auto 16px; }
+          .main-content { padding: 0 20px 24px; }
+          .card { border: 2px solid rgba(55, 113, 254, 0.5); border-radius: 12px; padding: 24px; background-color: #F4F7FF; margin-bottom: 24px; }
+          .greeting { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #223258; }
+          .intro-text { font-size: 16px; margin-bottom: 16px; line-height: 1.7; color: #223258; }
+          .card-title { font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 8px; color: #223258; }
+          .card-subtitle { font-size: 18px; font-style: italic; text-align: center; margin-bottom: 24px; color: #223258; }
+          .section-title { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #223258; }
+          .section-text { font-size: 16px; color: #000000; margin-bottom: 16px; line-height: 1.6; }
+          .feature-list { list-style-type: disc; padding-left: 20px; margin-bottom: 16px; }
+          .feature-list li { margin-bottom: 8px; font-size: 16px; color: #000000; }
+          .button { display: inline-block; background: #3771FE; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; text-align: center; }
+          .footer-section { border-top: 1px solid rgba(55, 113, 254, 0.5); padding-top: 20px; margin-top: 32px; text-align: center; }
+          .footer-text { font-size: 16px; font-weight: 600; color: #223258; }
+          .unsubscribe { text-align: center; padding: 10px; color: #666; font-size: 12px; }
+          .unsubscribe a { color: #3771FE; text-decoration: underline; }
+          
+          @media only screen and (max-width: 600px) {
+            .email-container { margin: 0; }
+            .header-section { padding: 20px 16px; }
+            .main-content { padding: 0 16px 20px; }
+            .card { padding: 20px; margin-bottom: 20px; }
+            .card-title { font-size: 20px; }
+            .card-subtitle { font-size: 16px; }
+            .section-title { font-size: 16px; }
+            .section-text { font-size: 15px; }
+            .feature-list { padding-left: 16px; }
+            .feature-list li { font-size: 15px; }
+            .greeting { font-size: 16px; }
+            .intro-text { font-size: 15px; }
+            .footer-text { font-size: 15px; }
+          }
+          
+          @media only screen and (max-width: 480px) {
+            .header-section { padding: 16px 12px; }
+            .main-content { padding: 0 12px 16px; }
+            .card { padding: 16px; }
+            .card-title { font-size: 18px; }
+            .card-subtitle { font-size: 15px; }
+            .section-title { font-size: 15px; }
+            .section-text { font-size: 14px; }
+            .feature-list li { font-size: 14px; }
+            .greeting { font-size: 15px; }
+            .intro-text { font-size: 14px; }
+            .footer-text { font-size: 14px; }
+          }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>Welcome to Dr.Info</h1>
-          <p>Your AI-Powered Medical Assistant</p>
-        </div>
-        <div class="content">
-          <h2>You've just joined a growing community of healthcare professionals who are getting faster, more accurate answers to their clinical questions.</h2>
-          <p>Dr.Info combines the latest medical research with advanced AI to provide you with evidence-based answers in seconds, not hours.</p>
-          <p><strong>What you can do right now:</strong></p>
-          <ul>
-            <li>Ask complex medical questions and get instant answers</li>
-            <li>Access the latest clinical guidelines and research</li>
-            <li>Generate detailed medical reports and summaries</li>
-            <li>Get drug information and interaction alerts</li>
-          </ul>
-          <a href="https://drinfo.ai" class="button">Start Using Dr.Info Now</a>
-          <p>We're excited to see how Dr.Info helps you provide better care to your patients.</p>
-          <p>Best regards,<br>The Dr.Info Team</p>
-        </div>
-        <div class="footer">
-          <p>© 2024 Dr.Info. All rights reserved.</p>
-        </div>
-        <div class="unsubscribe">
-          <p><a href="{{unsubscribe_url}}">Unsubscribe</a> | <a href="{{preferences_url}}">Email Preferences</a></p>
+        <div class="email-container">
+          <div class="header-section">
+            <img src="https://app.drinfo.ai/login-logo.png" alt="DR.INFO Logo" class="logo" />
+            <h1 class="card-title">Welcome to DR.INFO 2025</h1>
+            <p class="card-subtitle">Your AI-Powered Medical Assistant</p>
+          </div>
+          
+          <div class="main-content">
+            <div class="card">
+              <p class="greeting">Dear Healthcare Professional,</p>
+              <p class="intro-text">You've just joined a growing community of healthcare professionals who are getting faster, more accurate answers to their clinical questions.</p>
+              <p class="intro-text">DR.INFO combines the latest medical research with advanced AI to provide you with evidence-based answers in seconds, not hours.</p>
+              
+              <div style="margin-bottom: 24px;">
+                <h2 class="section-title">What you can do right now:</h2>
+                <ul class="feature-list">
+                  <li>Ask complex medical questions and get instant answers</li>
+                  <li>Access the latest clinical guidelines and research</li>
+                  <li>Generate detailed medical reports and summaries</li>
+                  <li>Get drug information and interaction alerts</li>
+                </ul>
+              </div>
+              
+              <div style="text-align: center;">
+                <a href="https://app.drinfo.ai" class="button">Start Using DR.INFO Now</a>
+              </div>
+              
+              <p class="intro-text">We're excited to see how DR.INFO helps you provide better care to your patients.</p>
+              <p class="footer-text">Best regards,<br>The DR.INFO Team</p>
+            </div>
+          </div>
+          
+          <div class="footer-section">
+            <p class="footer-text">© 2025 DR.INFO by Synduct. All rights reserved.</p>
+            <div class="unsubscribe">
+              <p><a href="{{unsubscribe_url}}">Unsubscribe</a> | <a href="{{preferences_url}}">Email Preferences</a></p>
+            </div>
+          </div>
         </div>
       </body>
       </html>
     `,
   },
   2: {
-    subject: "How to Ask Smarter Questions in Dr.Info",
+    subject: "How to Ask Smarter Questions in DR.INFO 2025",
     html: `
       <!DOCTYPE html>
       <html>
@@ -87,50 +146,104 @@ const emailTemplates = {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Get More Precise Answers with Better Prompts</title>
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { padding: 30px; background: #f9f9f9; }
-          .button { display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; padding: 20px; color: #666; font-size: 14px; }
-          .tip { background: #e3f2fd; padding: 15px; border-left: 4px solid #2196f3; margin: 20px 0; }
-          .unsubscribe { text-align: center; padding: 10px; color: #999; font-size: 12px; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #223258; background-color: #f8fafc; }
+          .email-container { max-width: 600px; margin: 0 auto; background-color: white; }
+          .header-section { padding: 24px 20px; background-color: white; text-align: center; border-bottom: 2px solid rgba(55, 113, 254, 0.1); }
+          .logo { max-width: 180px; height: auto; display: block; margin: 0 auto 16px; }
+          .main-content { padding: 0 20px 24px; }
+          .card { border: 2px solid rgba(55, 113, 254, 0.5); border-radius: 12px; padding: 24px; background-color: #F4F7FF; margin-bottom: 24px; }
+          .greeting { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #223258; }
+          .intro-text { font-size: 16px; margin-bottom: 16px; line-height: 1.7; color: #223258; }
+          .card-title { font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 8px; color: #223258; }
+          .card-subtitle { font-size: 18px; font-style: italic; text-align: center; margin-bottom: 24px; color: #223258; }
+          .section-title { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #223258; }
+          .section-text { font-size: 16px; color: #000000; margin-bottom: 16px; line-height: 1.6; }
+          .tip { background: rgba(55, 113, 254, 0.1); padding: 20px; border-left: 4px solid #3771FE; margin: 20px 0; border-radius: 8px; }
+          .tip h3 { color: #3771FE; margin-bottom: 12px; }
+          .tip strong { color: #223258; }
+          .button { display: inline-block; background: #3771FE; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; text-align: center; }
+          .footer-section { border-top: 1px solid rgba(55, 113, 254, 0.5); padding-top: 20px; margin-top: 32px; text-align: center; }
+          .footer-text { font-size: 16px; font-weight: 600; color: #223258; }
+          .unsubscribe { text-align: center; padding: 10px; color: #666; font-size: 12px; }
+          .unsubscribe a { color: #3771FE; text-decoration: underline; }
+          
+          @media only screen and (max-width: 600px) {
+            .email-container { margin: 0; }
+            .header-section { padding: 20px 16px; }
+            .main-content { padding: 0 16px 20px; }
+            .card { padding: 20px; margin-bottom: 20px; }
+            .card-title { font-size: 20px; }
+            .card-subtitle { font-size: 16px; }
+            .section-title { font-size: 16px; }
+            .section-text { font-size: 15px; }
+            .tip { padding: 16px; }
+            .greeting { font-size: 16px; }
+            .intro-text { font-size: 15px; }
+            .footer-text { font-size: 15px; }
+          }
+          
+          @media only screen and (max-width: 480px) {
+            .header-section { padding: 16px 12px; }
+            .main-content { padding: 0 12px 16px; }
+            .card { padding: 16px; }
+            .card-title { font-size: 18px; }
+            .card-subtitle { font-size: 15px; }
+            .section-title { font-size: 15px; }
+            .section-text { font-size: 14px; }
+            .tip { padding: 12px; }
+            .greeting { font-size: 15px; }
+            .intro-text { font-size: 14px; }
+            .footer-text { font-size: 14px; }
+          }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>Get More Precise Answers with Better Prompts</h1>
-        </div>
-        <div class="content">
-          <h2>The secret to getting the best out of Dr.Info? It starts with how you ask.</h2>
-          <p>Just like in medicine, the quality of your question determines the quality of your answer. Here are some pro tips to get the most accurate responses:</p>
-          
-          <div class="tip">
-            <h3>💡 Pro Tip: Be Specific</h3>
-            <p><strong>Instead of:</strong> "What about diabetes?"<br>
-            <strong>Try:</strong> "What are the latest treatment guidelines for type 2 diabetes in adults with cardiovascular disease?"</p>
+        <div class="email-container">
+          <div class="header-section">
+            <img src="https://app.drinfo.ai/login-logo.png" alt="DR.INFO Logo" class="logo" />
+            <h1 class="card-title">Get More Precise Answers with Better Prompts</h1>
+            <p class="card-subtitle">Master the Art of Questioning in DR.INFO</p>
           </div>
           
-          <div class="tip">
-            <h3>💡 Pro Tip: Include Context</h3>
-            <p><strong>Instead of:</strong> "Side effects of metformin"<br>
-            <strong>Try:</strong> "What are the common side effects of metformin in elderly patients with renal impairment?"</p>
+          <div class="main-content">
+            <div class="card">
+              <p class="greeting">Dear Healthcare Professional,</p>
+              <p class="intro-text">The secret to getting the best out of DR.INFO? It starts with how you ask.</p>
+              <p class="intro-text">Just like in medicine, the quality of your question determines the quality of your answer. Here are some pro tips to get the most accurate responses:</p>
+              
+              <div class="tip">
+                <h3>💡 Pro Tip: Be Specific</h3>
+                <p><strong>Instead of:</strong> "What about diabetes?"<br>
+                <strong>Try:</strong> "What are the latest treatment guidelines for type 2 diabetes in adults with cardiovascular disease?"</p>
+              </div>
+              
+              <div class="tip">
+                <h3>💡 Pro Tip: Include Context</h3>
+                <p><strong>Instead of:</strong> "Side effects of metformin"<br>
+                <strong>Try:</strong> "What are the common side effects of metformin in elderly patients with renal impairment?"</p>
+              </div>
+              
+              <div class="tip">
+                <h3>💡 Pro Tip: Ask for Evidence</h3>
+                <p><strong>Instead of:</strong> "Is this treatment effective?"<br>
+                <strong>Try:</strong> "What is the evidence base for using SGLT2 inhibitors in heart failure patients?"</p>
+              </div>
+              
+              <div style="text-align: center;">
+                <a href="https://app.drinfo.ai" class="button">Try a Smarter Prompt Now</a>
+              </div>
+              
+              <p class="intro-text">Remember: The more specific and detailed your question, the more precise and actionable your answer will be.</p>
+            </div>
           </div>
           
-          <div class="tip">
-            <h3>💡 Pro Tip: Ask for Evidence</h3>
-            <p><strong>Instead of:</strong> "Is this treatment effective?"<br>
-            <strong>Try:</strong> "What is the evidence base for using SGLT2 inhibitors in heart failure patients?"</p>
+          <div class="footer-section">
+            <p class="footer-text">© 2025 DR.INFO by Synduct. All rights reserved.</p>
+            <div class="unsubscribe">
+              <p><a href="{{unsubscribe_url}}">Unsubscribe</a> | <a href="{{preferences_url}}">Email Preferences</a></p>
+            </div>
           </div>
-          
-          <a href="https://drinfo.ai" class="button">Try a Smarter Prompt Now</a>
-          
-          <p>Remember: The more specific and detailed your question, the more precise and actionable your answer will be.</p>
-        </div>
-        <div class="footer">
-          <p>© 2024 Dr.Info. All rights reserved.</p>
-        </div>
-        <div class="unsubscribe">
-          <p><a href="{{unsubscribe_url}}">Unsubscribe</a> | <a href="{{preferences_url}}">Email Preferences</a></p>
         </div>
       </body>
       </html>
@@ -146,112 +259,222 @@ const emailTemplates = {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Your Medical Question. Now in One Powerful Image.</title>
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { padding: 30px; background: #f9f9f9; }
-          .button { display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; padding: 20px; color: #666; font-size: 14px; }
-          .feature { background: #f0f8ff; padding: 20px; border-radius: 8px; margin: 20px 0; }
-          .unsubscribe { text-align: center; padding: 10px; color: #999; font-size: 12px; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #223258; background-color: #f8fafc; }
+          .email-container { max-width: 600px; margin: 0 auto; background-color: white; }
+          .header-section { padding: 24px 20px; background-color: white; text-align: center; border-bottom: 2px solid rgba(55, 113, 254, 0.1); }
+          .logo { max-width: 180px; height: auto; display: block; margin: 0 auto 16px; }
+          .main-content { padding: 0 20px 24px; }
+          .card { border: 2px solid rgba(55, 113, 254, 0.5); border-radius: 12px; padding: 24px; background-color: #F4F7FF; margin-bottom: 24px; }
+          .greeting { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #223258; }
+          .intro-text { font-size: 16px; margin-bottom: 16px; line-height: 1.7; color: #223258; }
+          .card-title { font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 8px; color: #223258; }
+          .card-subtitle { font-size: 18px; font-style: italic; text-align: center; margin-bottom: 24px; color: #223258; }
+          .section-title { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #223258; }
+          .section-text { font-size: 16px; color: #000000; margin-bottom: 16px; line-height: 1.6; }
+          .feature { background: rgba(55, 113, 254, 0.1); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3771FE; }
+          .feature h3 { color: #3771FE; margin-bottom: 12px; }
+          .feature-list { list-style-type: disc; padding-left: 20px; margin-bottom: 16px; }
+          .feature-list li { margin-bottom: 8px; font-size: 16px; color: #000000; }
+          .button { display: inline-block; background: #3771FE; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; text-align: center; }
+          .footer-section { border-top: 1px solid rgba(55, 113, 254, 0.5); padding-top: 20px; margin-top: 32px; text-align: center; }
+          .footer-text { font-size: 16px; font-weight: 600; color: #223258; }
+          .unsubscribe { text-align: center; padding: 10px; color: #666; font-size: 12px; }
+          .unsubscribe a { color: #3771FE; text-decoration: underline; }
+          
+          @media only screen and (max-width: 600px) {
+            .email-container { margin: 0; }
+            .header-section { padding: 20px 16px; }
+            .main-content { padding: 0 16px 20px; }
+            .card { padding: 20px; margin-bottom: 20px; }
+            .card-title { font-size: 20px; }
+            .card-subtitle { font-size: 16px; }
+            .section-title { font-size: 16px; }
+            .section-text { font-size: 15px; }
+            .feature { padding: 16px; }
+            .greeting { font-size: 16px; }
+            .intro-text { font-size: 15px; }
+            .footer-text { font-size: 15px; }
+          }
+          
+          @media only screen and (max-width: 480px) {
+            .header-section { padding: 16px 12px; }
+            .main-content { padding: 0 12px 16px; }
+            .card { padding: 16px; }
+            .card-title { font-size: 18px; }
+            .card-subtitle { font-size: 15px; }
+            .section-title { font-size: 15px; }
+            .section-text { font-size: 14px; }
+            .feature { padding: 12px; }
+            .greeting { font-size: 15px; }
+            .intro-text { font-size: 14px; }
+            .footer-text { font-size: 14px; }
+          }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>Your Medical Question. Now in One Powerful Image.</h1>
-        </div>
-        <div class="content">
-          <h2>Ever wished you could see the answer to a complex question?</h2>
-          <p>We're excited to introduce <strong>Visual Abstracts</strong> - a revolutionary new feature that transforms your medical queries into clear, comprehensive visual summaries.</p>
-          
-          <div class="feature">
-            <h3>🎯 What are Visual Abstracts?</h3>
-            <p>Visual Abstracts are AI-generated diagrams that break down complex medical concepts into easy-to-understand visual representations. Perfect for:</p>
-            <ul>
-              <li>Understanding treatment pathways</li>
-              <li>Visualizing drug mechanisms</li>
-              <li>Explaining procedures to patients</li>
-              <li>Creating educational materials</li>
-            </ul>
+        <div class="email-container">
+          <div class="header-section">
+            <img src="https://app.drinfo.ai/login-logo.png" alt="DR.INFO Logo" class="logo" />
+            <h1 class="card-title">Your Medical Question. Now in One Powerful Image.</h1>
+            <p class="card-subtitle">Introducing Visual Abstracts in DR.INFO 2025</p>
           </div>
           
-          <div class="feature">
-            <h3>⚡ How it Works</h3>
-            <p>Simply ask any medical question, and Dr.Info will generate both a detailed text response AND a visual abstract that captures the key points in an easy-to-scan format.</p>
+          <div class="main-content">
+            <div class="card">
+              <p class="greeting">Dear Healthcare Professional,</p>
+              <p class="intro-text">Ever wished you could see the answer to a complex question?</p>
+              <p class="intro-text">We're excited to introduce <strong>Visual Abstracts</strong> - a revolutionary new feature that transforms your medical queries into clear, comprehensive visual summaries.</p>
+              
+              <div class="feature">
+                <h3>🎯 What are Visual Abstracts?</h3>
+                <p>Visual Abstracts are AI-generated diagrams that break down complex medical concepts into easy-to-understand visual representations. Perfect for:</p>
+                <ul class="feature-list">
+                  <li>Understanding treatment pathways</li>
+                  <li>Visualizing drug mechanisms</li>
+                  <li>Explaining procedures to patients</li>
+                  <li>Creating educational materials</li>
+                </ul>
+              </div>
+              
+              <div class="feature">
+                <h3>⚡ How it Works</h3>
+                <p>Simply ask any medical question, and DR.INFO will generate both a detailed text response AND a visual abstract that captures the key points in an easy-to-scan format.</p>
+              </div>
+              
+              <div style="text-align: center;">
+                <a href="https://app.drinfo.ai" class="button">Generate Your First Visual Abstract</a>
+              </div>
+              
+              <p class="intro-text"><strong>Available now for all users!</strong> Try asking questions like:</p>
+              <ul class="feature-list">
+                <li>"Show me the mechanism of action of ACE inhibitors"</li>
+                <li>"Create a visual of the treatment algorithm for hypertension"</li>
+                <li>"Explain the pathophysiology of diabetes with a diagram"</li>
+              </ul>
+            </div>
           </div>
           
-          <a href="https://drinfo.ai" class="button">Generate Your First Visual Abstract</a>
-          
-          <p><strong>Available now for all users!</strong> Try asking questions like:</p>
-          <ul>
-            <li>"Show me the mechanism of action of ACE inhibitors"</li>
-            <li>"Create a visual of the treatment algorithm for hypertension"</li>
-            <li>"Explain the pathophysiology of diabetes with a diagram"</li>
-          </ul>
-        </div>
-        <div class="footer">
-          <p>© 2024 Dr.Info. All rights reserved.</p>
-        </div>
-        <div class="unsubscribe">
-          <p><a href="{{unsubscribe_url}}">Unsubscribe</a> | <a href="{{preferences_url}}">Email Preferences</a></p>
+          <div class="footer-section">
+            <p class="footer-text">© 2025 DR.INFO by Synduct. All rights reserved.</p>
+            <div class="unsubscribe">
+              <p><a href="{{unsubscribe_url}}">Unsubscribe</a> | <a href="{{preferences_url}}">Email Preferences</a></p>
+            </div>
+          </div>
         </div>
       </body>
       </html>
     `,
   },
   4: {
-    subject: "Case Study: Dr.Info in Real Life",
+    subject: "Case Study: DR.INFO 2025 in Real Life",
     html: `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Dr.Info in Action</title>
+        <title>DR.INFO in Action</title>
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { padding: 30px; background: #f9f9f9; }
-          .button { display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; padding: 20px; color: #666; font-size: 14px; }
-          .case-study { background: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107; }
-          .unsubscribe { text-align: center; padding: 10px; color: #999; font-size: 12px; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #223258; background-color: #f8fafc; }
+          .email-container { max-width: 600px; margin: 0 auto; background-color: white; }
+          .header-section { padding: 24px 20px; background-color: white; text-align: center; border-bottom: 2px solid rgba(55, 113, 254, 0.1); }
+          .logo { max-width: 180px; height: auto; display: block; margin: 0 auto 16px; }
+          .main-content { padding: 0 20px 24px; }
+          .card { border: 2px solid rgba(55, 113, 254, 0.5); border-radius: 12px; padding: 24px; background-color: #F4F7FF; margin-bottom: 24px; }
+          .greeting { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #223258; }
+          .intro-text { font-size: 16px; margin-bottom: 16px; line-height: 1.7; color: #223258; }
+          .card-title { font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 8px; color: #223258; }
+          .card-subtitle { font-size: 18px; font-style: italic; text-align: center; margin-bottom: 24px; color: #223258; }
+          .section-title { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #223258; }
+          .section-text { font-size: 16px; color: #000000; margin-bottom: 16px; line-height: 1.6; }
+          .case-study { background: rgba(55, 113, 254, 0.1); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3771FE; }
+          .case-study h3 { color: #3771FE; margin-bottom: 12px; }
+          .case-study strong { color: #223258; }
+          .case-study ul { list-style-type: disc; padding-left: 20px; margin-bottom: 16px; }
+          .case-study li { margin-bottom: 8px; font-size: 16px; color: #000000; }
+          .button { display: inline-block; background: #3771FE; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; text-align: center; }
+          .footer-section { border-top: 1px solid rgba(55, 113, 254, 0.5); padding-top: 20px; margin-top: 32px; text-align: center; }
+          .footer-text { font-size: 16px; font-weight: 600; color: #223258; }
+          .unsubscribe { text-align: center; padding: 10px; color: #666; font-size: 12px; }
+          .unsubscribe a { color: #3771FE; text-decoration: underline; }
+          
+          @media only screen and (max-width: 600px) {
+            .email-container { margin: 0; }
+            .header-section { padding: 20px 16px; }
+            .main-content { padding: 0 16px 20px; }
+            .card { padding: 20px; margin-bottom: 20px; }
+            .card-title { font-size: 20px; }
+            .card-subtitle { font-size: 16px; }
+            .section-title { font-size: 16px; }
+            .section-text { font-size: 15px; }
+            .case-study { padding: 16px; }
+            .greeting { font-size: 16px; }
+            .intro-text { font-size: 15px; }
+            .footer-text { font-size: 15px; }
+          }
+          
+          @media only screen and (max-width: 480px) {
+            .header-section { padding: 16px 12px; }
+            .main-content { padding: 0 12px 16px; }
+            .card { padding: 16px; }
+            .card-title { font-size: 18px; }
+            .card-subtitle { font-size: 15px; }
+            .section-title { font-size: 15px; }
+            .section-text { font-size: 14px; }
+            .case-study { padding: 12px; }
+            .greeting { font-size: 15px; }
+            .intro-text { font-size: 14px; }
+            .footer-text { font-size: 14px; }
+          }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>Dr.Info in Action</h1>
-        </div>
-        <div class="content">
-          <h2>See how Dr.Info helped in a real-life high-stakes case</h2>
-          
-          <div class="case-study">
-            <h3>🏥 Real Case Study: Emergency Department</h3>
-            <p><strong>Scenario:</strong> A 65-year-old patient presents with chest pain and multiple comorbidities including diabetes, hypertension, and chronic kidney disease.</p>
-            
-            <p><strong>The Challenge:</strong> The attending physician needed to quickly assess the patient's risk factors, determine appropriate diagnostic tests, and consider drug interactions with the patient's current medications.</p>
-            
-            <p><strong>How Dr.Info Helped:</strong></p>
-            <ul>
-              <li>Provided instant access to the latest chest pain evaluation guidelines</li>
-              <li>Generated a comprehensive drug interaction report for the patient's medications</li>
-              <li>Created a visual abstract showing the diagnostic algorithm</li>
-              <li>Identified specific considerations for patients with CKD</li>
-            </ul>
-            
-            <p><strong>Result:</strong> The physician was able to make an informed decision in minutes rather than hours, potentially saving the patient's life.</p>
+        <div class="email-container">
+          <div class="header-section">
+            <img src="https://app.drinfo.ai/login-logo.png" alt="DR.INFO Logo" class="logo" />
+            <h1 class="card-title">DR.INFO in Action</h1>
+            <p class="card-subtitle">See How DR.INFO Helped in a Real-Life High-Stakes Case</p>
           </div>
           
-          <p>This is just one example of how Dr.Info is helping healthcare professionals make better decisions faster.</p>
+          <div class="main-content">
+            <div class="card">
+              <p class="greeting">Dear Healthcare Professional,</p>
+              
+              <div class="case-study">
+                <h3>🏥 Real Case Study: Emergency Department</h3>
+                <p><strong>Scenario:</strong> A 65-year-old patient presents with chest pain and multiple comorbidities including diabetes, hypertension, and chronic kidney disease.</p>
+                
+                <p><strong>The Challenge:</strong> The attending physician needed to quickly assess the patient's risk factors, determine appropriate diagnostic tests, and consider drug interactions with the patient's current medications.</p>
+                
+                <p><strong>How DR.INFO Helped:</strong></p>
+                <ul>
+                  <li>Provided instant access to the latest chest pain evaluation guidelines</li>
+                  <li>Generated a comprehensive drug interaction report for the patient's medications</li>
+                  <li>Created a visual abstract showing the diagnostic algorithm</li>
+                  <li>Identified specific considerations for patients with CKD</li>
+                </ul>
+                
+                <p><strong>Result:</strong> The physician was able to make an informed decision in minutes rather than hours, potentially saving the patient's life.</p>
+              </div>
+              
+              <p class="intro-text">This is just one example of how DR.INFO is helping healthcare professionals make better decisions faster.</p>
+              
+              <div style="text-align: center;">
+                <a href="https://app.drinfo.ai" class="button">Read More Case Studies</a>
+              </div>
+              
+              <p class="intro-text"><strong>Your turn:</strong> What challenging case could DR.INFO help you with today?</p>
+            </div>
+          </div>
           
-          <a href="https://drinfo.ai" class="button">Read More Case Studies</a>
-          
-          <p><strong>Your turn:</strong> What challenging case could Dr.Info help you with today?</p>
-        </div>
-        <div class="footer">
-          <p>© 2024 Dr.Info. All rights reserved.</p>
-        </div>
-        <div class="unsubscribe">
-          <p><a href="{{unsubscribe_url}}">Unsubscribe</a> | <a href="{{preferences_url}}">Email Preferences</a></p>
+          <div class="footer-section">
+            <p class="footer-text">© 2025 DR.INFO by Synduct. All rights reserved.</p>
+            <div class="unsubscribe">
+              <p><a href="{{unsubscribe_url}}">Unsubscribe</a> | <a href="{{preferences_url}}">Email Preferences</a></p>
+            </div>
+          </div>
         </div>
       </body>
       </html>
@@ -267,61 +490,118 @@ const emailTemplates = {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Full Transparency</title>
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { padding: 30px; background: #f9f9f9; }
-          .button { display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; padding: 20px; color: #666; font-size: 14px; }
-          .transparency { background: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4caf50; }
-          .unsubscribe { text-align: center; padding: 10px; color: #999; font-size: 12px; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #223258; background-color: #f8fafc; }
+          .email-container { max-width: 600px; margin: 0 auto; background-color: white; }
+          .header-section { padding: 24px 20px; background-color: white; text-align: center; border-bottom: 2px solid rgba(55, 113, 254, 0.1); }
+          .logo { max-width: 180px; height: auto; display: block; margin: 0 auto 16px; }
+          .main-content { padding: 0 20px 24px; }
+          .card { border: 2px solid rgba(55, 113, 254, 0.5); border-radius: 12px; padding: 24px; background-color: #F4F7FF; margin-bottom: 24px; }
+          .greeting { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #223258; }
+          .intro-text { font-size: 16px; margin-bottom: 16px; line-height: 1.7; color: #223258; }
+          .card-title { font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 8px; color: #223258; }
+          .card-subtitle { font-size: 18px; font-style: italic; text-align: center; margin-bottom: 24px; color: #223258; }
+          .section-title { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #223258; }
+          .section-text { font-size: 16px; color: #000000; margin-bottom: 16px; line-height: 1.6; }
+          .transparency { background: rgba(55, 113, 254, 0.1); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3771FE; }
+          .transparency h3 { color: #3771FE; margin-bottom: 12px; }
+          .transparency strong { color: #223258; }
+          .transparency ul { list-style-type: disc; padding-left: 20px; margin-bottom: 16px; }
+          .transparency li { margin-bottom: 8px; font-size: 16px; color: #000000; }
+          .feature-list { list-style-type: disc; padding-left: 20px; margin-bottom: 16px; }
+          .feature-list li { margin-bottom: 8px; font-size: 16px; color: #000000; }
+          .button { display: inline-block; background: #3771FE; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; text-align: center; }
+          .footer-section { border-top: 1px solid rgba(55, 113, 254, 0.5); padding-top: 20px; margin-top: 32px; text-align: center; }
+          .footer-text { font-size: 16px; font-weight: 600; color: #223258; }
+          .unsubscribe { text-align: center; padding: 10px; color: #666; font-size: 12px; }
+          .unsubscribe a { color: #3771FE; text-decoration: underline; }
+          
+          @media only screen and (max-width: 600px) {
+            .email-container { margin: 0; }
+            .header-section { padding: 20px 16px; }
+            .main-content { padding: 0 16px 20px; }
+            .card { padding: 20px; margin-bottom: 20px; }
+            .card-title { font-size: 20px; }
+            .card-subtitle { font-size: 16px; }
+            .section-title { font-size: 16px; }
+            .section-text { font-size: 15px; }
+            .transparency { padding: 16px; }
+            .greeting { font-size: 16px; }
+            .intro-text { font-size: 15px; }
+            .footer-text { font-size: 15px; }
+          }
+          
+          @media only screen and (max-width: 480px) {
+            .header-section { padding: 16px 12px; }
+            .main-content { padding: 0 12px 16px; }
+            .card { padding: 16px; }
+            .card-title { font-size: 18px; }
+            .card-subtitle { font-size: 15px; }
+            .section-title { font-size: 15px; }
+            .section-text { font-size: 14px; }
+            .transparency { padding: 12px; }
+            .greeting { font-size: 15px; }
+            .intro-text { font-size: 14px; }
+            .footer-text { font-size: 14px; }
+          }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>Full Transparency</h1>
-        </div>
-        <div class="content">
-          <h2>Every answer is backed by real medical sources</h2>
-          <p>In medicine, trust is everything. That's why Dr.Info provides complete transparency about where every piece of information comes from.</p>
-          
-          <div class="transparency">
-            <h3>🔍 Our Sources Include:</h3>
-            <ul>
-              <li><strong>Peer-reviewed journals:</strong> PubMed, JAMA, NEJM, Lancet</li>
-              <li><strong>Clinical guidelines:</strong> AHA, ACC, ADA, ACP</li>
-              <li><strong>Drug databases:</strong> FDA, WHO, Micromedex</li>
-              <li><strong>Medical textbooks:</strong> Harrison's, UpToDate, DynaMed</li>
-              <li><strong>Clinical trials:</strong> ClinicalTrials.gov, Cochrane</li>
-            </ul>
+        <div class="email-container">
+          <div class="header-section">
+            <img src="https://app.drinfo.ai/login-logo.png" alt="DR.INFO Logo" class="logo" />
+            <h1 class="card-title">Full Transparency</h1>
+            <p class="card-subtitle">Every Answer is Backed by Real Medical Sources</p>
           </div>
           
-          <h3>📚 How Source Transparency Works</h3>
-          <p>Every time Dr.Info provides an answer, you'll see:</p>
-          <ul>
-            <li>Direct links to the original sources</li>
-            <li>Publication dates and authors</li>
-            <li>Study methodologies and limitations</li>
-            <li>Confidence levels for each claim</li>
-          </ul>
+          <div class="main-content">
+            <div class="card">
+              <p class="greeting">Dear Healthcare Professional,</p>
+              <p class="intro-text">In medicine, trust is everything. That's why DR.INFO provides complete transparency about where every piece of information comes from.</p>
+              
+              <div class="transparency">
+                <h3>🔍 Our Sources Include:</h3>
+                <ul>
+                  <li><strong>Peer-reviewed journals:</strong> PubMed, JAMA, NEJM, Lancet</li>
+                  <li><strong>Clinical guidelines:</strong> AHA, ACC, ADA, ACP</li>
+                  <li><strong>Drug databases:</strong> FDA, WHO, Micromedex</li>
+                  <li><strong>Medical textbooks:</strong> Harrison's, UpToDate, DynaMed</li>
+                  <li><strong>Clinical trials:</strong> ClinicalTrials.gov, Cochrane</li>
+                </ul>
+              </div>
+              
+              <h3 class="section-title">📚 How Source Transparency Works</h3>
+              <p class="section-text">Every time DR.INFO provides an answer, you'll see:</p>
+              <ul class="feature-list">
+                <li>Direct links to the original sources</li>
+                <li>Publication dates and authors</li>
+                <li>Study methodologies and limitations</li>
+                <li>Confidence levels for each claim</li>
+              </ul>
+              
+              <p class="intro-text">This means you can always verify the information and make informed decisions based on the latest evidence.</p>
+              
+              <div style="text-align: center;">
+                <a href="https://app.drinfo.ai" class="button">See the Sources</a>
+              </div>
+              
+              <p class="intro-text"><strong>No black boxes.</strong> No hidden algorithms. Just transparent, evidence-based medicine.</p>
+            </div>
+          </div>
           
-          <p>This means you can always verify the information and make informed decisions based on the latest evidence.</p>
-          
-          <a href="https://drinfo.ai" class="button">See the Sources</a>
-          
-          <p><strong>No black boxes.</strong> No hidden algorithms. Just transparent, evidence-based medicine.</p>
-        </div>
-        <div class="footer">
-          <p>© 2024 Dr.Info. All rights reserved.</p>
-        </div>
-        <div class="unsubscribe">
-          <p><a href="{{unsubscribe_url}}">Unsubscribe</a> | <a href="{{preferences_url}}">Email Preferences</a></p>
+          <div class="footer-section">
+            <p class="footer-text">© 2025 DR.INFO by Synduct. All rights reserved.</p>
+            <div class="unsubscribe">
+              <p><a href="{{unsubscribe_url}}">Unsubscribe</a> | <a href="{{preferences_url}}">Email Preferences</a></p>
+            </div>
+          </div>
         </div>
       </body>
       </html>
     `,
   },
   6: {
-    subject: "All the Ways Dr.Info Works for You — At a Glance",
+    subject: "All the Ways DR.INFO 2025 Works for You — At a Glance",
     html: `
       <!DOCTYPE html>
       <html>
@@ -330,69 +610,124 @@ const emailTemplates = {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Your Clinical Assistant</title>
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { padding: 30px; background: #f9f9f9; }
-          .button { display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; padding: 20px; color: #666; font-size: 14px; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #223258; background-color: #f8fafc; }
+          .email-container { max-width: 600px; margin: 0 auto; background-color: white; }
+          .header-section { padding: 24px 20px; background-color: white; text-align: center; border-bottom: 2px solid rgba(55, 113, 254, 0.1); }
+          .logo { max-width: 180px; height: auto; display: block; margin: 0 auto 16px; }
+          .main-content { padding: 0 20px 24px; }
+          .card { border: 2px solid rgba(55, 113, 254, 0.5); border-radius: 12px; padding: 24px; background-color: #F4F7FF; margin-bottom: 24px; }
+          .greeting { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #223258; }
+          .intro-text { font-size: 16px; margin-bottom: 16px; line-height: 1.7; color: #223258; }
+          .card-title { font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 8px; color: #223258; }
+          .card-subtitle { font-size: 18px; font-style: italic; text-align: center; margin-bottom: 24px; color: #223258; }
+          .section-title { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #223258; }
+          .section-text { font-size: 16px; color: #000000; margin-bottom: 16px; line-height: 1.6; }
           .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
-          .feature { background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd; }
-          .unsubscribe { text-align: center; padding: 10px; color: #999; font-size: 12px; }
+          .feature { background: white; padding: 15px; border-radius: 8px; border: 1px solid rgba(55, 113, 254, 0.3); box-shadow: 0 2px 4px rgba(55, 113, 254, 0.1); }
+          .feature h3 { color: #3771FE; margin-bottom: 8px; }
+          .feature p { font-size: 14px; color: #000000; }
+          .feature-list { list-style-type: disc; padding-left: 20px; margin-bottom: 16px; }
+          .feature-list li { margin-bottom: 8px; font-size: 16px; color: #000000; }
+          .feature-list strong { color: #223258; }
+          .button { display: inline-block; background: #3771FE; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; text-align: center; }
+          .footer-section { border-top: 1px solid rgba(55, 113, 254, 0.5); padding-top: 20px; margin-top: 32px; text-align: center; }
+          .footer-text { font-size: 16px; font-weight: 600; color: #223258; }
+          .unsubscribe { text-align: center; padding: 10px; color: #666; font-size: 12px; }
+          .unsubscribe a { color: #3771FE; text-decoration: underline; }
+          
+          @media only screen and (max-width: 600px) {
+            .email-container { margin: 0; }
+            .header-section { padding: 20px 16px; }
+            .main-content { padding: 0 16px 20px; }
+            .card { padding: 20px; margin-bottom: 20px; }
+            .card-title { font-size: 20px; }
+            .card-subtitle { font-size: 16px; }
+            .section-title { font-size: 16px; }
+            .section-text { font-size: 15px; }
+            .feature-grid { grid-template-columns: 1fr; gap: 12px; }
+            .greeting { font-size: 16px; }
+            .intro-text { font-size: 15px; }
+            .footer-text { font-size: 15px; }
+          }
+          
+          @media only screen and (max-width: 480px) {
+            .header-section { padding: 16px 12px; }
+            .main-content { padding: 0 12px 16px; }
+            .card { padding: 16px; }
+            .card-title { font-size: 18px; }
+            .card-subtitle { font-size: 15px; }
+            .section-title { font-size: 15px; }
+            .section-text { font-size: 14px; }
+            .greeting { font-size: 15px; }
+            .intro-text { font-size: 14px; }
+            .footer-text { font-size: 14px; }
+          }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>Your Clinical Assistant</h1>
-        </div>
-        <div class="content">
-          <h2>Here's everything Dr.Info can do for you</h2>
-          <p>From quick lookups to complex case analysis, Dr.Info is your comprehensive medical AI assistant.</p>
+        <div class="email-container">
+          <div class="header-section">
+            <img src="https://app.drinfo.ai/login-logo.png" alt="DR.INFO Logo" class="logo" />
+            <h1 class="card-title">Your Clinical Assistant</h1>
+            <p class="card-subtitle">Here's Everything DR.INFO Can Do for You</p>
+          </div>
           
-          <div class="feature-grid">
-            <div class="feature">
-              <h3>🔍 Quick Diagnostics</h3>
-              <p>Get instant differential diagnoses based on symptoms and patient history</p>
-            </div>
-            <div class="feature">
-              <h3>💊 Drug Information</h3>
-              <p>Comprehensive drug data, interactions, and dosing guidelines</p>
-            </div>
-            <div class="feature">
-              <h3>📊 Visual Abstracts</h3>
-              <p>Generate clear visual representations of complex medical concepts</p>
-            </div>
-            <div class="feature">
-              <h3>📋 Clinical Guidelines</h3>
-              <p>Access the latest treatment protocols and best practices</p>
-            </div>
-            <div class="feature">
-              <h3>🔬 Research Summaries</h3>
-              <p>Get concise summaries of the latest medical research</p>
-            </div>
-            <div class="feature">
-              <h3>📝 Report Generation</h3>
-              <p>Create detailed medical reports and documentation</p>
+          <div class="main-content">
+            <div class="card">
+              <p class="greeting">Dear Healthcare Professional,</p>
+              <p class="intro-text">From quick lookups to complex case analysis, DR.INFO is your comprehensive medical AI assistant.</p>
+              
+              <div class="feature-grid">
+                <div class="feature">
+                  <h3>🔍 Quick Diagnostics</h3>
+                  <p>Get instant differential diagnoses based on symptoms and patient history</p>
+                </div>
+                <div class="feature">
+                  <h3>💊 Drug Information</h3>
+                  <p>Comprehensive drug data, interactions, and dosing guidelines</p>
+                </div>
+                <div class="feature">
+                  <h3>📊 Visual Abstracts</h3>
+                  <p>Generate clear visual representations of complex medical concepts</p>
+                </div>
+                <div class="feature">
+                  <h3>📋 Clinical Guidelines</h3>
+                  <p>Access the latest treatment protocols and best practices</p>
+                </div>
+                <div class="feature">
+                  <h3>🔬 Research Summaries</h3>
+                  <p>Get concise summaries of the latest medical research</p>
+                </div>
+                <div class="feature">
+                  <h3>📝 Report Generation</h3>
+                  <p>Create detailed medical reports and documentation</p>
+                </div>
+              </div>
+              
+              <h3 class="section-title">🎯 Perfect For:</h3>
+              <ul class="feature-list">
+                <li><strong>Physicians:</strong> Quick clinical decision support</li>
+                <li><strong>Nurses:</strong> Patient education and care planning</li>
+                <li><strong>Pharmacists:</strong> Drug consultation and safety checks</li>
+                <li><strong>Students:</strong> Learning and exam preparation</li>
+                <li><strong>Researchers:</strong> Literature review and data analysis</li>
+              </ul>
+              
+              <div style="text-align: center;">
+                <a href="https://app.drinfo.ai" class="button">Put DR.INFO to Work</a>
+              </div>
+              
+              <p class="intro-text">Ready to see how DR.INFO can transform your clinical workflow?</p>
             </div>
           </div>
           
-          <h3>🎯 Perfect For:</h3>
-          <ul>
-            <li><strong>Physicians:</strong> Quick clinical decision support</li>
-            <li><strong>Nurses:</strong> Patient education and care planning</li>
-            <li><strong>Pharmacists:</strong> Drug consultation and safety checks</li>
-            <li><strong>Students:</strong> Learning and exam preparation</li>
-            <li><strong>Researchers:</strong> Literature review and data analysis</li>
-          </ul>
-          
-          <a href="https://drinfo.ai" class="button">Put Dr.Info to Work</a>
-          
-          <p>Ready to see how Dr.Info can transform your clinical workflow?</p>
-        </div>
-        <div class="footer">
-          <p>© 2024 Dr.Info. All rights reserved.</p>
-        </div>
-        <div class="unsubscribe">
-          <p><a href="{{unsubscribe_url}}">Unsubscribe</a> | <a href="{{preferences_url}}">Email Preferences</a></p>
+          <div class="footer-section">
+            <p class="footer-text">© 2025 DR.INFO by Synduct. All rights reserved.</p>
+            <div class="unsubscribe">
+              <p><a href="{{unsubscribe_url}}">Unsubscribe</a> | <a href="{{preferences_url}}">Email Preferences</a></p>
+            </div>
+          </div>
         </div>
       </body>
       </html>
@@ -408,59 +743,121 @@ const emailTemplates = {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Upgrade to Premium</title>
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { padding: 30px; background: #f9f9f9; }
-          .button { display: inline-block; background: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
-          .footer { text-align: center; padding: 20px; color: #666; font-size: 14px; }
-          .urgent { background: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0; border: 2px solid #ffc107; }
-          .premium-features { background: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0; }
-          .unsubscribe { text-align: center; padding: 10px; color: #999; font-size: 12px; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #223258; background-color: #f8fafc; }
+          .email-container { max-width: 600px; margin: 0 auto; background-color: white; }
+          .header-section { padding: 24px 20px; background-color: white; text-align: center; border-bottom: 2px solid rgba(55, 113, 254, 0.1); }
+          .logo { max-width: 180px; height: auto; display: block; margin: 0 auto 16px; }
+          .main-content { padding: 0 20px 24px; }
+          .card { border: 2px solid rgba(55, 113, 254, 0.5); border-radius: 12px; padding: 24px; background-color: #F4F7FF; margin-bottom: 24px; }
+          .greeting { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #223258; }
+          .intro-text { font-size: 16px; margin-bottom: 16px; line-height: 1.7; color: #223258; }
+          .card-title { font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 8px; color: #223258; }
+          .card-subtitle { font-size: 18px; font-style: italic; text-align: center; margin-bottom: 24px; color: #223258; }
+          .section-title { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #223258; }
+          .section-text { font-size: 16px; color: #000000; margin-bottom: 16px; line-height: 1.6; }
+          .urgent { background: rgba(55, 113, 254, 0.1); padding: 20px; border-radius: 8px; margin: 20px 0; border: 2px solid #3771FE; }
+          .urgent h2 { color: #3771FE; margin-bottom: 12px; }
+          .premium-features { background: rgba(55, 113, 254, 0.1); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3771FE; }
+          .premium-features h3 { color: #3771FE; margin-bottom: 12px; }
+          .premium-features strong { color: #223258; }
+          .premium-features ul { list-style-type: disc; padding-left: 20px; margin-bottom: 16px; }
+          .premium-features li { margin-bottom: 8px; font-size: 16px; color: #000000; }
+          .feature-list { list-style-type: disc; padding-left: 20px; margin-bottom: 16px; }
+          .feature-list li { margin-bottom: 8px; font-size: 16px; color: #000000; }
+          .button { display: inline-block; background: #3771FE; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; text-align: center; }
+          .footer-section { border-top: 1px solid rgba(55, 113, 254, 0.5); padding-top: 20px; margin-top: 32px; text-align: center; }
+          .footer-text { font-size: 16px; font-weight: 600; color: #223258; }
+          .unsubscribe { text-align: center; padding: 10px; color: #666; font-size: 12px; }
+          .unsubscribe a { color: #3771FE; text-decoration: underline; }
+          
+          @media only screen and (max-width: 600px) {
+            .email-container { margin: 0; }
+            .header-section { padding: 20px 16px; }
+            .main-content { padding: 0 16px 20px; }
+            .card { padding: 20px; margin-bottom: 20px; }
+            .card-title { font-size: 20px; }
+            .card-subtitle { font-size: 16px; }
+            .section-title { font-size: 16px; }
+            .section-text { font-size: 15px; }
+            .urgent { padding: 16px; }
+            .premium-features { padding: 16px; }
+            .greeting { font-size: 16px; }
+            .intro-text { font-size: 15px; }
+            .footer-text { font-size: 15px; }
+          }
+          
+          @media only screen and (max-width: 480px) {
+            .header-section { padding: 16px 12px; }
+            .main-content { padding: 0 12px 16px; }
+            .card { padding: 16px; }
+            .card-title { font-size: 18px; }
+            .card-subtitle { font-size: 15px; }
+            .section-title { font-size: 15px; }
+            .section-text { font-size: 14px; }
+            .urgent { padding: 12px; }
+            .premium-features { padding: 12px; }
+            .greeting { font-size: 15px; }
+            .intro-text { font-size: 14px; }
+            .footer-text { font-size: 14px; }
+          }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>Upgrade to Premium</h1>
-        </div>
-        <div class="content">
-          <div class="urgent">
-            <h2>⏰ Your early access ends today!</h2>
-            <p>Don't lose access to the advanced features that are helping healthcare professionals save time and improve patient care.</p>
+        <div class="email-container">
+          <div class="header-section">
+            <img src="https://app.drinfo.ai/login-logo.png" alt="DR.INFO Logo" class="logo" />
+            <h1 class="card-title">Upgrade to Premium</h1>
+            <p class="card-subtitle">Unlock Unlimited Visual Abstracts and More</p>
           </div>
           
-          <h2>Unlock unlimited Visual Abstracts and more with Premium</h2>
-          
-          <div class="premium-features">
-            <h3>🚀 Premium Features:</h3>
-            <ul>
-              <li><strong>Unlimited Visual Abstracts:</strong> Generate as many visual summaries as you need</li>
-              <li><strong>Advanced Analytics:</strong> Track your usage patterns and insights</li>
-              <li><strong>Priority Support:</strong> Get help when you need it most</li>
-              <li><strong>Custom Templates:</strong> Save and reuse your favorite prompts</li>
-              <li><strong>Bulk Operations:</strong> Process multiple queries at once</li>
-              <li><strong>API Access:</strong> Integrate Dr.Info into your existing workflows</li>
-            </ul>
+          <div class="main-content">
+            <div class="card">
+              <p class="greeting">Dear Healthcare Professional,</p>
+              
+              <div class="urgent">
+                <h2>⏰ Your early access ends today!</h2>
+                <p>Don't lose access to the advanced features that are helping healthcare professionals save time and improve patient care.</p>
+              </div>
+              
+              <h2 class="section-title">Unlock unlimited Visual Abstracts and more with Premium</h2>
+              
+              <div class="premium-features">
+                <h3>🚀 Premium Features:</h3>
+                <ul>
+                  <li><strong>Unlimited Visual Abstracts:</strong> Generate as many visual summaries as you need</li>
+                  <li><strong>Advanced Analytics:</strong> Track your usage patterns and insights</li>
+                  <li><strong>Priority Support:</strong> Get help when you need it most</li>
+                  <li><strong>Custom Templates:</strong> Save and reuse your favorite prompts</li>
+                  <li><strong>Bulk Operations:</strong> Process multiple queries at once</li>
+                  <li><strong>API Access:</strong> Integrate DR.INFO into your existing workflows</li>
+                </ul>
+              </div>
+              
+              <h3 class="section-title">💡 What You'll Miss:</h3>
+              <ul class="feature-list">
+                <li>Visual Abstract generation (limited to 5 per month)</li>
+                <li>Advanced search capabilities</li>
+                <li>Priority processing</li>
+                <li>Custom integrations</li>
+              </ul>
+              
+              <div style="text-align: center;">
+                <a href="https://app.drinfo.ai" class="button">Go Premium Now</a>
+              </div>
+              
+              <p class="intro-text"><strong>Special Offer:</strong> Upgrade today and get 20% off your first year!</p>
+              
+              <p class="intro-text">Thank you for being part of the DR.INFO community. We're excited to continue helping you provide better care to your patients.</p>
+            </div>
           </div>
           
-          <h3>💡 What You'll Miss:</h3>
-          <ul>
-            <li>Visual Abstract generation (limited to 5 per month)</li>
-            <li>Advanced search capabilities</li>
-            <li>Priority processing</li>
-            <li>Custom integrations</li>
-          </ul>
-          
-          <a href="https://drinfo.ai" class="button">Go Premium Now</a>
-          
-          <p><strong>Special Offer:</strong> Upgrade today and get 20% off your first year!</p>
-          
-          <p>Thank you for being part of the Dr.Info community. We're excited to continue helping you provide better care to your patients.</p>
-        </div>
-        <div class="footer">
-          <p>© 2024 Dr.Info. All rights reserved.</p>
-        </div>
-        <div class="unsubscribe">
-          <p><a href="{{unsubscribe_url}}">Unsubscribe</a> | <a href="{{preferences_url}}">Email Preferences</a></p>
+          <div class="footer-section">
+            <p class="footer-text">© 2025 DR.INFO by Synduct. All rights reserved.</p>
+            <div class="unsubscribe">
+              <p><a href="{{unsubscribe_url}}">Unsubscribe</a> | <a href="{{preferences_url}}">Email Preferences</a></p>
+            </div>
+          </div>
         </div>
       </body>
       </html>
