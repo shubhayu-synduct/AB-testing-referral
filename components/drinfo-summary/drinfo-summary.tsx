@@ -1847,11 +1847,20 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
   };
 
   useEffect(() => {
+    // Check if tour should be shown based on saved preferences
+    if (tourContext && tourContext.shouldShowTour) {
+      const shouldShow = tourContext.shouldShowTour();
+      if (!shouldShow) {
+        setShowTourPrompt(false);
+        return;
+      }
+    }
+
     const timeout = setTimeout(() => {
       setShowTourPrompt(true);
     }, 25000);
     return () => clearTimeout(timeout);
-  }, []);
+  }, [tourContext]);
 
   return (
     <div className="p-2 sm:p-4 md:p-6 h-[100dvh] flex flex-col relative overflow-hidden">
@@ -1904,7 +1913,13 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
               </button>
               <button 
                 className="px-4 py-2 rounded transition-colors"
-                onClick={() => setShowTourPrompt(false)}
+                onClick={() => { 
+                  setShowTourPrompt(false); 
+                  // Save preference as skipped when user clicks "No, thanks"
+                  if (tourContext && tourContext.saveTourPreference) {
+                    tourContext.saveTourPreference('skipped');
+                  }
+                }}
                 style={{
                   backgroundColor: "#E4ECFF",
                   color: "#3771FE",

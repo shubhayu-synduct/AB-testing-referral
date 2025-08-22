@@ -367,14 +367,14 @@ const emailTemplates = {
     `,
   },
   4: {
-    subject: "Case Study: DR.INFO 2025 in Real Life",
+    subject: "Dr. Marta: \"Confidence. That's the real impact of Dr.Info.\"",
     html: `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>DR.INFO in Action</title>
+        <title>How a Pain Specialist Uses Dr.Info</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #223258; background-color: #f8fafc; }
@@ -382,20 +382,23 @@ const emailTemplates = {
           .header-section { padding: 24px 20px; background-color: white; text-align: center; border-bottom: 2px solid rgba(55, 113, 254, 0.1); }
           .logo { max-width: 180px; height: auto; display: block; margin: 0 auto 16px; }
           .main-content { padding: 0 20px 24px; }
-          .card { border: 2px solid rgba(55, 113, 254, 0.5); border-radius: 12px; padding: 24px; background-color: #F4F7FF; margin-bottom: 24px; }
+          .card { border: 1px solid rgba(55, 113, 254, 0.2); border-radius: 12px; padding: 24px; background-color: white; margin-bottom: 24px; }
           .greeting { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #223258; }
           .intro-text { font-size: 16px; margin-bottom: 16px; line-height: 1.7; color: #223258; }
           .card-title { font-size: 22px; font-weight: bold; text-align: center; margin-bottom: 8px; color: #223258; }
           .card-subtitle { font-size: 18px; font-style: italic; text-align: center; margin-bottom: 24px; color: #223258; }
           .section-title { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #223258; }
-          .section-text { font-size: 16px; color: #000000; margin-bottom: 16px; line-height: 1.6; }
-          .case-study { background: rgba(55, 113, 254, 0.1); padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3771FE; }
-          .case-study h3 { color: #3771FE; margin-bottom: 12px; }
-          .case-study strong { color: #223258; }
-          .case-study ul { list-style-type: disc; padding-left: 20px; margin-bottom: 16px; }
-          .case-study li { margin-bottom: 8px; font-size: 16px; color: #000000; }
+          .section-text { font-size: 16px; color: #223258; margin-bottom: 16px; line-height: 1.6; }
+          .quote { padding: 20px; margin: 20px 0; font-style: italic; }
+          .quote strong { color: #223258; font-weight: 600; }
+          .use-cases { padding: 20px; margin: 20px 0; }
+          .use-cases h3 { color: #223258; margin-bottom: 12px; font-weight: 600; }
+          .use-cases ul { list-style-type: disc; padding-left: 20px; margin-bottom: 16px; }
+          .use-cases li { margin-bottom: 8px; font-size: 16px; color: #223258; }
+          .why-matters { padding: 20px; margin: 20px 0; }
+          .why-matters h3 { color: #223258; margin-bottom: 12px; font-weight: 600; }
           .button { display: inline-block; background: #3771FE; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; margin: 20px 0; font-weight: 600; text-align: center; }
-          .footer-section { border-top: 1px solid rgba(55, 113, 254, 0.5); padding-top: 20px; margin-top: 32px; text-align: center; }
+          .footer-section { border-top: 1px solid rgba(55, 113, 254, 0.2); padding-top: 20px; margin-top: 32px; text-align: center; }
           .footer-text { font-size: 16px; font-weight: 600; color: #223258; }
           .unsubscribe { text-align: center; padding: 10px; color: #666; font-size: 12px; }
           .unsubscribe a { color: #3771FE; text-decoration: underline; }
@@ -409,7 +412,7 @@ const emailTemplates = {
             .card-subtitle { font-size: 16px; }
             .section-title { font-size: 16px; }
             .section-text { font-size: 15px; }
-            .case-study { padding: 16px; }
+            .quote, .use-cases, .why-matters { padding: 16px; }
             .greeting { font-size: 16px; }
             .intro-text { font-size: 15px; }
             .footer-text { font-size: 15px; }
@@ -423,7 +426,7 @@ const emailTemplates = {
             .card-subtitle { font-size: 15px; }
             .section-title { font-size: 15px; }
             .section-text { font-size: 14px; }
-            .case-study { padding: 12px; }
+            .quote, .use-cases, .why-matters { padding: 12px; }
             .greeting { font-size: 15px; }
             .intro-text { font-size: 14px; }
             .footer-text { font-size: 14px; }
@@ -434,38 +437,52 @@ const emailTemplates = {
         <div class="email-container">
           <div class="header-section">
             <img src="https://app.drinfo.ai/login-logo.png" alt="DR.INFO Logo" class="logo" />
-            <h1 class="card-title">DR.INFO in Action</h1>
-            <p class="card-subtitle">See How DR.INFO Helped in a Real-Life High-Stakes Case</p>
+            <h1 class="card-title">How a Pain Specialist Uses Dr.Info—From OR to Office</h1>
+            <p class="card-subtitle">Real Stories from Real Clinicians</p>
           </div>
           
           <div class="main-content">
             <div class="card">
               <p class="greeting">Dear Healthcare Professional,</p>
               
-              <div class="case-study">
-                <h3>🏥 Real Case Study: Emergency Department</h3>
-                <p><strong>Scenario:</strong> A 65-year-old patient presents with chest pain and multiple comorbidities including diabetes, hypertension, and chronic kidney disease.</p>
-                
-                <p><strong>The Challenge:</strong> The attending physician needed to quickly assess the patient's risk factors, determine appropriate diagnostic tests, and consider drug interactions with the patient's current medications.</p>
-                
-                <p><strong>How DR.INFO Helped:</strong></p>
-                <ul>
-                  <li>Provided instant access to the latest chest pain evaluation guidelines</li>
-                  <li>Generated a comprehensive drug interaction report for the patient's medications</li>
-                  <li>Created a visual abstract showing the diagnostic algorithm</li>
-                  <li>Identified specific considerations for patients with CKD</li>
-                </ul>
-                
-                <p><strong>Result:</strong> The physician was able to make an informed decision in minutes rather than hours, potentially saving the patient's life.</p>
+              <p class="intro-text">For Dr. Marta Isidoro, anesthesiologist and chronic pain specialist, speed and safety aren't optional, they're essential.</p>
+              
+              <div class="quote">
+                <p><strong>"Being an anesthesiologist means thinking fast. Having Dr.Info on hand is like having a medical book with you every minute, one that actually answers your questions."</strong></p>
               </div>
               
-              <p class="intro-text">This is just one example of how DR.INFO is helping healthcare professionals make better decisions faster.</p>
+              <p class="intro-text">She's one of many clinicians who've integrated Dr.Info into daily practice. Here's how she uses it across different settings:</p>
+              
+              <div class="use-cases">
+                <h3>In the OR:</h3>
+                <p>To clarify less common conditions, drug interactions, and anesthetic implications, on the spot.</p>
+                
+                <h3>In chronic pain consultations:</h3>
+                <p>To quickly review guidelines and save valuable minutes during complex cases.</p>
+                
+                <h3>In academic work:</h3>
+                <p>To speed up paper prep and literature review.</p>
+                
+                <h3>In day-to-day practice:</h3>
+                <p>To stay sharp on conditions outside her usual scope.</p>
+              </div>
+              
+              <p class="intro-text">But for Dr. Marta, the biggest shift wasn't just speed. It was confidence.</p>
+              
+              <div class="quote">
+                <p><strong>"I deliver my work differently now. I trust the answers. And I know where they come from."</strong></p>
+              </div>
+              
+              <div class="why-matters">
+                <h3>Why it matters:</h3>
+                <p>In high-stakes specialties like anesthesiology and pain medicine, certainty and efficiency go hand-in-hand. Dr.Info helps you work faster, but more importantly, it helps you work smarter and safer.</p>
+              </div>
               
               <div style="text-align: center;">
-                <a href="https://app.drinfo.ai" class="button">Read More Case Studies</a>
+                <a href="https://app.drinfo.ai" class="button">Explore How Dr.Info Fits Into Your Specialty</a>
               </div>
               
-              <p class="intro-text"><strong>Your turn:</strong> What challenging case could DR.INFO help you with today?</p>
+              <p class="intro-text">Ready to experience the same confidence boost in your practice?</p>
             </div>
           </div>
           

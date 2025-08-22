@@ -56,13 +56,22 @@ export default function Dashboard() {
   const tourContext = useTour()
   const [showTourPrompt, setShowTourPrompt] = useState(false)
 
-  // Show tour prompt after 5 seconds
+  // Show tour prompt after 5 seconds, but only if user hasn't completed/skipped before
   useEffect(() => {
+    // Check if tour should be shown based on saved preferences
+    if (tourContext && tourContext.shouldShowTour) {
+      const shouldShow = tourContext.shouldShowTour();
+      if (!shouldShow) {
+        setShowTourPrompt(false);
+        return;
+      }
+    }
+
     const timeout = setTimeout(() => {
       setShowTourPrompt(true);
     }, 5000);
     return () => clearTimeout(timeout);
-  }, []);
+  }, [tourContext]);
 
   // Check if there's a meaningful change in the query
   const hasMeaningfulChange = (newQuery: string) => {
@@ -544,8 +553,8 @@ export default function Dashboard() {
                 className="px-4 py-2 rounded transition-colors"
                 onClick={() => { 
                   setShowTourPrompt(false); 
-                  if (tourContext && typeof tourContext === 'object' && 'startTour' in tourContext) {
-                    (tourContext as any).startTour();
+                  if (tourContext && tourContext.startTour) {
+                    tourContext.startTour();
                   }
                 }}
                 style={{
@@ -563,7 +572,13 @@ export default function Dashboard() {
               </button>
               <button 
                 className="px-4 py-2 rounded transition-colors"
-                onClick={() => setShowTourPrompt(false)}
+                onClick={() => { 
+                  setShowTourPrompt(false); 
+                  // Save preference as skipped when user clicks "No, thanks"
+                  if (tourContext && tourContext.saveTourPreference) {
+                    tourContext.saveTourPreference('skipped');
+                  }
+                }}
                 style={{
                   backgroundColor: "#E4ECFF",
                   color: "#3771FE",

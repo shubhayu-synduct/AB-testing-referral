@@ -7,7 +7,25 @@ import steps, { guidelineTourSteps, drugTourSteps, drinfoSummaryTourSteps } from
 // Dynamically import Joyride to prevent SSR issues
 const Joyride = dynamic(() => import("react-joyride-next"), { ssr: false });
 
-const TourContext = createContext({});
+const TourContext = createContext<{
+  startTour: () => void;
+  stopTour: () => void;
+  run: boolean;
+  forceStartTour: () => void;
+  checkTourPreference: () => boolean;
+  resetTourPreference: () => void;
+  shouldShowTour: () => boolean;
+  saveTourPreference: (status: 'completed' | 'skipped') => void;
+}>({
+  startTour: () => {},
+  stopTour: () => {},
+  run: false,
+  forceStartTour: () => {},
+  checkTourPreference: () => false,
+  resetTourPreference: () => {},
+  shouldShowTour: () => false,
+  saveTourPreference: () => {},
+});
 
 export function useTour() {
   return useContext(TourContext);
@@ -17,7 +35,35 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
 
+  // Check localStorage for tour preference
+  const checkTourPreference = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const preference = localStorage.getItem('dashboard-tour-completed');
+      return preference === 'completed' || preference === 'skipped';
+    }
+    return false;
+  }, []);
+
+  // Save tour preference
+  const saveTourPreference = useCallback((status: 'completed' | 'skipped') => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('dashboard-tour-completed', status);
+    }
+  }, []);
+
   const startTour = useCallback(() => {
+    // Check if user has already completed or skipped the tour
+    if (checkTourPreference()) {
+      console.log('Tour already completed or skipped, not starting');
+      return;
+    }
+    
+    setStepIndex(0);
+    setRun(true);
+  }, [checkTourPreference]);
+
+  const forceStartTour = useCallback(() => {
+    // Force start tour regardless of preference
     setStepIndex(0);
     setRun(true);
   }, []);
@@ -28,7 +74,12 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
 
   const handleJoyrideCallback = (data: any) => {
     const { status, index, type, action } = data;
-    if (["finished", "skipped"].includes(status)) {
+    
+    if (status === "finished") {
+      saveTourPreference('completed');
+      setRun(false);
+    } else if (status === "skipped") {
+      saveTourPreference('skipped');
       setRun(false);
     } else if (type === "step:after") {
       if (action === "prev") {
@@ -38,6 +89,16 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
       }
     }
   };
+
+  const resetTourPreference = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('dashboard-tour-completed');
+    }
+  }, []);
+
+  const shouldShowTour = useCallback(() => {
+    return !checkTourPreference();
+  }, [checkTourPreference]);
 
   // Hard prevention of Joyride scrolling
   useEffect(() => {
@@ -138,7 +199,7 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
   }, [shouldDisableScrolling]);
 
   return (
-    <TourContext.Provider value={{ startTour, stopTour, run }}>
+    <TourContext.Provider value={{ startTour, stopTour, run, forceStartTour, checkTourPreference, resetTourPreference, shouldShowTour, saveTourPreference }}>
       <Joyride
         steps={steps}
         run={run}
@@ -383,6 +444,11 @@ const DrinfoSummaryTourContext = createContext<{
   nextStep: () => void;
   prevStep: () => void;
   handleBackButton: () => void;
+  checkTourPreference: () => boolean;
+  forceStartTour: () => void;
+  resetTourPreference: () => void;
+  shouldShowTour: () => boolean;
+  saveTourPreference: (status: 'completed' | 'skipped') => void;
 } | undefined>(undefined);
 
 export function useDrinfoSummaryTour() {
@@ -393,7 +459,35 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
   const [run, setRun] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
 
+  // Check localStorage for tour preference
+  const checkTourPreference = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const preference = localStorage.getItem('drinfo-summary-tour-completed');
+      return preference === 'completed' || preference === 'skipped';
+    }
+    return false;
+  }, []);
+
+  // Save tour preference
+  const saveTourPreference = useCallback((status: 'completed' | 'skipped') => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('drinfo-summary-tour-completed', status);
+    }
+  }, []);
+
   const startTour = useCallback(() => {
+    // Check if user has already completed or skipped the tour
+    if (checkTourPreference()) {
+      console.log('DrinfoSummary tour already completed or skipped, not starting');
+      return;
+    }
+    
+    setStepIndex(0);
+    setRun(true);
+  }, [checkTourPreference]);
+
+  const forceStartTour = useCallback(() => {
+    // Force start tour regardless of preference
     setStepIndex(0);
     setRun(true);
   }, []);
@@ -406,11 +500,21 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
   
   const prevStep = useCallback(() => setStepIndex(idx => Math.max(0, idx - 1)), []);
 
+  const resetTourPreference = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('drinfo-summary-tour-completed');
+    }
+  }, []);
+
   const handleJoyrideCallback = (data: any) => {
     const { status, index, type, action } = data;
     console.log('DrinfoSummaryTour callback:', { status, index, type, action });
     
-    if (["finished", "skipped"].includes(status)) {
+    if (status === "finished") {
+      saveTourPreference('completed');
+      setRun(false);
+    } else if (status === "skipped") {
+      saveTourPreference('skipped');
       setRun(false);
     } else if (type === "step:after") {
       if (action === "prev") {
@@ -529,8 +633,25 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
     }
   }, [shouldDisableScrolling]);
 
+  const shouldShowTour = useCallback(() => {
+    return !checkTourPreference();
+  }, [checkTourPreference]);
+
   return (
-    <DrinfoSummaryTourContext.Provider value={{ startTour, stopTour, run, setStepIndex, nextStep, prevStep, handleBackButton }}>
+    <DrinfoSummaryTourContext.Provider value={{ 
+      startTour, 
+      stopTour, 
+      run, 
+      setStepIndex, 
+      nextStep, 
+      prevStep, 
+      handleBackButton,
+      checkTourPreference,
+      forceStartTour,
+      resetTourPreference,
+      shouldShowTour,
+      saveTourPreference
+    }}>
       <Joyride
         steps={drinfoSummaryTourSteps as any}
         run={run}
