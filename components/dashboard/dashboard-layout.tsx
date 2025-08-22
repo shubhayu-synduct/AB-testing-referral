@@ -42,18 +42,18 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         const userDocRef = doc(db, "users", user.uid);
         const userDoc = await getDoc(userDocRef);
         
-        console.log("Checking cookie consent for user:", user.uid);
+        // console.log("Checking cookie consent for user:", user.uid);
         
         if (userDoc.exists()) {
           const userData = userDoc.data();
           const cookieConsent = userData.cookieConsent;
           
-          console.log("User document exists, cookieConsent:", cookieConsent);
-          console.log("User data:", userData);
+          // console.log("User document exists, cookieConsent:", cookieConsent);
+          // console.log("User data:", userData);
           
           // Check if user has given necessary or all consent
           if (cookieConsent && (cookieConsent.consentType === 'necessary' || cookieConsent.consentType === 'all')) {
-            console.log("User has valid consent, hiding banner");
+            // console.log("User has valid consent, hiding banner");
             setShowCookieBanner(false);
           } else {
             console.log("User has no valid consent, showing banner");
@@ -61,7 +61,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           }
           
           // Debug: Log the state change
-          console.log("Setting showCookieBanner to:", true);
+          // console.log("Setting showCookieBanner to:", true);
         } else {
           console.log("User document doesn't exist, showing banner");
           // User document doesn't exist, show cookie banner
@@ -77,6 +77,47 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
     checkCookieConsent();
   }, [user]);
+
+  // Check user profession and redirect non-medical users to waitlist
+  useEffect(() => {
+    if (!user) return;
+
+    const checkUserProfession = async () => {
+      try {
+        const db = getFirebaseFirestore();
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const profile = userData?.profile || userData;
+          
+          // Check if user has completed onboarding and has a profession
+          if (userData?.onboardingCompleted && profile?.occupation) {
+            // Define medical professions (these are allowed access)
+            const medicalProfessions = [
+              'Physician', 'Medical fellow', 'Medical consultant', 
+              'Medical intern/resident', 'Medical student', 'Dentist'
+            ];
+            
+            const isMedicalProfessional = medicalProfessions.includes(profile.occupation);
+            
+            // If NOT a medical professional, redirect to waitlist
+            if (!isMedicalProfessional) {
+              console.log('Non-medical user detected, redirecting to waitlist');
+              router.push('/waitlist');
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error checking user profession:", err);
+        logger.error("Error checking user profession:", err);
+        // On error, allow access (fail-safe)
+      }
+    };
+
+    checkUserProfession();
+  }, [user, router]);
 
   // TEMPORARILY DISABLE COMPETING REDIRECT - AuthProvider handles this
   // useEffect(() => {

@@ -27,7 +27,7 @@ export default function SignIn() {
                 lineHeight: '1.2'
               }}
             >
-              Welcome Back!
+              Welcome!
             </p>
           </div>
         </div>

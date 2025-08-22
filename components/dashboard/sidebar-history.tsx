@@ -145,8 +145,8 @@ export function SidebarHistory() {
   const pinnedSessions = chatSessions.filter(session => session.pinned === true)
   const unpinnedSessions = chatSessions.filter(session => session.pinned !== true)
   
-  console.log('Pinned sessions:', pinnedSessions.length, pinnedSessions.map(s => ({ id: s.id, title: s.title, pinned: s.pinned })))
-  console.log('Unpinned sessions:', unpinnedSessions.length)
+  // console.log('Pinned sessions:', pinnedSessions.length, pinnedSessions.map(s => ({ id: s.id, title: s.title, pinned: s.pinned })))
+  // console.log('Unpinned sessions:', unpinnedSessions.length)
   
   // Add pinned sessions to a special "Pinned" group
   if (pinnedSessions.length > 0) {

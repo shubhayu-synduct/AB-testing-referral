@@ -34,6 +34,8 @@ export default function Onboarding() {
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
   const [autoFilledNames, setAutoFilledNames] = useState({ firstName: false, lastName: false })
   const [cookieConsent, setCookieConsent] = useState<any>(null)
+  const [isMedicalProfessional, setIsMedicalProfessional] = useState(false)
+  const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const [showSpecialtiesDropdown, setShowSpecialtiesDropdown] = useState(false)
   const [showExperienceDropdown, setShowExperienceDropdown] = useState(false)
@@ -114,6 +116,26 @@ export default function Onboarding() {
     }
   }, [user, authLoading])
 
+  // Handle redirect to waitlist after 5-second delay
+  useEffect(() => {
+    if (redirectTimeoutRef.current) {
+      clearTimeout(redirectTimeoutRef.current);
+    }
+
+    if (registrationSuccess && !isMedicalProfessional) {
+      redirectTimeoutRef.current = setTimeout(() => {
+        logger.info("5-second delay completed, redirecting non-medical user to waitlist")
+        router.push('/waitlist')
+      }, 5000) // 5 seconds delay to ensure Firebase data is saved
+    }
+
+    return () => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+    };
+  }, [registrationSuccess, isMedicalProfessional, router]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
@@ -182,6 +204,18 @@ export default function Onboarding() {
         throw new Error("Firestore not initialized")
       }
 
+      // Check if user is medical professional
+      const isMedicalProfessional = [
+        'Physician',
+        'Medical fellow', 
+        'Medical consultant', 
+        'Medical intern/resident', 
+        'Medical student',
+        'Dentist'
+      ].includes(formData.occupation)
+      
+      setIsMedicalProfessional(isMedicalProfessional)
+
       // Create user profile data
       const userProfileData = {
         email: user.email,
@@ -233,7 +267,17 @@ export default function Onboarding() {
         // Don't fail the onboarding if email automation fails
       }
 
+      // Set registration success first for all users
       setRegistrationSuccess(true)
+      
+      // Set flag to redirect non-medical users after 5-second delay
+      if (!isMedicalProfessional) {
+        // The redirect is now handled by the useEffect hook with 5-second delay
+        logger.info("Non-medical user registered, will redirect to waitlist after 5 seconds")
+      } else {
+        logger.info("Medical professional registered successfully")
+      }
+
     } catch (err: any) {
       logger.error("Error during onboarding:", err)
       setError(err.message || "An error occurred during onboarding")
@@ -372,15 +416,15 @@ export default function Onboarding() {
   ];
 
   const professionOptions = [
-    { value: "physician", label: "Physician" },
-    { value: "fellow", label: "Fellow" },
-    { value: "consultant", label: "Consultant" },
-    { value: "intern-resident", label: "Intern/Resident" },
-    { value: "student", label: "Student" },
-    { value: "pharmacist", label: "Pharmacist" },
-    { value: "advanced-practice-nurse", label: "Advanced Practice Nurse" },
-    { value: "dentist", label: "Dentist" },
-    { value: "medical-librarian", label: "Medical Librarian" },
+    { value: "Physician", label: "Physician" },
+    { value: "Medical fellow", label: "Medical Fellow" },
+    { value: "Medical consultant", label: "Medical Consultant" },
+    { value: "Medical intern/resident", label: "Medical Intern/Resident" },
+    { value: "Medical student", label: "Medical Student" },
+    { value: "Pharmacist", label: "Pharmacist" },
+    { value: "Advanced practice nurse", label: "Advanced Practice Nurse" },
+    { value: "Dentist", label: "Dentist" },
+    { value: "Medical librarian", label: "Medical Librarian" },
     { value: "other", label: "Other" },
   ];
 
@@ -602,7 +646,12 @@ export default function Onboarding() {
     )
   }
 
-  if (registrationSuccess) {
+  if (registrationSuccess && !isMedicalProfessional) {
+    router.push('/waitlist')
+    return null
+  }
+
+  if (registrationSuccess && isMedicalProfessional) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6 pb-8">
         <div className="w-full max-w-sm">

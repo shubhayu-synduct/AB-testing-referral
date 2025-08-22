@@ -45,12 +45,12 @@ export default function Dashboard() {
 
 
     // Track dashboard landing
-    useEffect(() => {
-      track('DashboardLanded', {
-        user: user ? 'authenticated' : 'unauthenticated',
-        timestamp: new Date().toISOString()
-      });
-    }, [user]);
+    // useEffect(() => {
+    //   track('DashboardLanded', {
+    //     user: user ? 'authenticated' : 'unauthenticated',
+    //     timestamp: new Date().toISOString()
+    //   });
+    // }, [user]);
   
   // Tour functionality
   const tourContext = useTour()
