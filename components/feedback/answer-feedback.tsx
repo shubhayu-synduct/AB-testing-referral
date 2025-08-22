@@ -241,7 +241,7 @@ export default function AnswerFeedback({
   };
 
   return (
-    <div className="mt-4 max-w-[684px]">
+    <div className="mt-4 max-w-[684px] drinfo-feedback-step">
       {/* Top row: Helpful, Not helpful, Copy */}
       <div ref={buttonContainerRef} className="flex flex-row items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
         <div className="relative h-8 sm:h-10 w-24 sm:w-32 overflow-hidden bg-transparent p-[1px] rounded-lg">

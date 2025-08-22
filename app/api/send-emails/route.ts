@@ -987,7 +987,6 @@ export async function GET() {
         if (
           nextEmailDay >= 1 &&
           nextEmailDay <= 7
-          // Removed the daysSinceSignup restriction to make it more permissive
         ) {
           const template = emailTemplates[nextEmailDay as keyof typeof emailTemplates];
 
@@ -1022,7 +1021,7 @@ export async function GET() {
               emailDay: nextEmailDay,
               lastEmailSent: admin.firestore.Timestamp.fromDate(new Date()),
               totalEmailsSent: (user.totalEmailsSent || 0) + 1,
-              emailAutomationStatus: 'active', // Ensure status remains active
+              emailAutomationStatus: nextEmailDay === 7 ? 'completed' : 'active', // Mark as completed after day 7
               updatedAt: admin.firestore.Timestamp.fromDate(new Date())
             });
 
@@ -1045,6 +1044,10 @@ export async function GET() {
               day: nextEmailDay 
             });
           }
+        } else if (user.emailDay >= 7) {
+          // User has completed the 7-day sequence
+          skippedUsers++;
+          console.log(`User ${user.email} has completed email sequence (day ${user.emailDay})`);
         } else {
           skippedUsers++;
         }
