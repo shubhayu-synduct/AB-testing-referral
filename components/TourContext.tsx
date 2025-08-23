@@ -16,6 +16,7 @@ const TourContext = createContext<{
   resetTourPreference: () => void;
   shouldShowTour: () => boolean;
   saveTourPreference: (status: 'completed' | 'skipped') => void;
+  isTourActive: () => boolean; // Add this method
 }>({
   startTour: () => {},
   stopTour: () => {},
@@ -25,6 +26,7 @@ const TourContext = createContext<{
   resetTourPreference: () => {},
   shouldShowTour: () => false,
   saveTourPreference: () => {},
+  isTourActive: () => false, // Add this method
 });
 
 export function useTour() {
@@ -97,58 +99,67 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const shouldShowTour = useCallback(() => {
-    return !checkTourPreference();
-  }, [checkTourPreference]);
+    // Don't show tour if it's already completed/skipped OR if a tour is currently running
+    return !checkTourPreference() && !run;
+  }, [checkTourPreference, run]);
 
   // Hard prevention of Joyride scrolling
   useEffect(() => {
     if (run) {
-      // Prevent Joyride from scrolling by overriding scroll methods
-      const originalScrollIntoView = Element.prototype.scrollIntoView;
-      const originalScrollTo = window.scrollTo;
-      
-      // Override scrollIntoView to prevent Joyride from using it
-      Element.prototype.scrollIntoView = function(options) {
-        // Only allow scrolling if it's not Joyride trying to scroll
-        if (!options || typeof options === 'object') {
-          return; // Block Joyride's scrollIntoView calls
-        }
-        return originalScrollIntoView.call(this, options);
-      };
-      
-      // Override window.scrollTo to prevent Joyride from using it
-      window.scrollTo = function(options) {
-        // Block Joyride's window.scrollTo calls
-        return;
-      };
-      
-      // Also prevent scroll on the content container
-      const contentRef = document.querySelector('.flex-1.overflow-y-auto');
-      let originalScrollTop: any = null;
-      if (contentRef) {
-        originalScrollTop = Object.getOwnPropertyDescriptor(contentRef, 'scrollTop');
-        Object.defineProperty(contentRef, 'scrollTop', {
-          get: function() {
-            return originalScrollTop.get.call(this);
-          },
-          set: function(value) {
-            // Only allow setting if it's not Joyride trying to scroll
-            if (run) {
-              return; // Block Joyride's scrollTop changes
-            }
-            return originalScrollTop.set.call(this, value);
+      try {
+        // Prevent Joyride from scrolling by overriding scroll methods
+        const originalScrollIntoView = Element.prototype.scrollIntoView;
+        const originalScrollTo = window.scrollTo;
+        
+        // Override scrollIntoView to prevent Joyride from using it
+        Element.prototype.scrollIntoView = function(options) {
+          // Only allow scrolling if it's not Joyride trying to scroll
+          if (!options || typeof options === 'object') {
+            return; // Block Joyride's scrollIntoView calls
           }
-        });
-      }
-      
-      return () => {
-        // Restore original methods when tour ends
-        Element.prototype.scrollIntoView = originalScrollIntoView;
-        window.scrollTo = originalScrollTo;
-        if (contentRef && originalScrollTop) {
-          Object.defineProperty(contentRef, 'scrollTop', originalScrollTop);
+          return originalScrollIntoView.call(this, options);
+        };
+        
+        // Override window.scrollTo to prevent Joyride from using it
+        window.scrollTo = function(options) {
+          // Block Joyride's window.scrollTo calls
+          return;
+        };
+        
+        // Also prevent scroll on the content container
+        const contentRef = document.querySelector('.flex-1.overflow-y-auto');
+        let originalScrollTop: any = null;
+        if (contentRef) {
+          originalScrollTop = Object.getOwnPropertyDescriptor(contentRef, 'scrollTop');
+          if (originalScrollTop) {
+            Object.defineProperty(contentRef, 'scrollTop', {
+              get: function() {
+                return originalScrollTop.get.call(this);
+              },
+              set: function(value) {
+                // Only allow setting if it's not Joyride trying to scroll
+                if (run) {
+                  return; // Block Joyride's scrollTop changes
+                }
+                return originalScrollTop.set.call(this, value);
+              }
+            });
+          }
         }
-      };
+        
+        return () => {
+          // Restore original methods when tour ends
+          Element.prototype.scrollIntoView = originalScrollIntoView;
+          window.scrollTo = originalScrollTo;
+          if (contentRef && originalScrollTop) {
+            Object.defineProperty(contentRef, 'scrollTop', originalScrollTop);
+          }
+        };
+      } catch (error) {
+        console.warn('Error setting up scroll prevention:', error);
+        // If scroll prevention fails, just return a no-op cleanup function
+        return () => {};
+      }
     }
   }, [run]);
 
@@ -198,8 +209,12 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [shouldDisableScrolling]);
 
+  const isTourActive = useCallback(() => {
+    return run;
+  }, [run]);
+
   return (
-    <TourContext.Provider value={{ startTour, stopTour, run, forceStartTour, checkTourPreference, resetTourPreference, shouldShowTour, saveTourPreference }}>
+    <TourContext.Provider value={{ startTour, stopTour, run, forceStartTour, checkTourPreference, resetTourPreference, shouldShowTour, saveTourPreference, isTourActive }}>
       <Joyride
         steps={steps}
         run={run}
@@ -256,7 +271,17 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-const GuidelineTourContext = createContext({});
+const GuidelineTourContext = createContext<{
+  startTour: () => void;
+  stopTour: () => void;
+  run: boolean;
+  isTourActive: () => boolean; // Add this method
+}>({
+  startTour: () => {},
+  stopTour: () => {},
+  run: false,
+  isTourActive: () => false, // Add this method
+});
 
 export function useGuidelineTour() {
   return useContext(GuidelineTourContext);
@@ -275,6 +300,10 @@ export const GuidelineTourProvider = ({ children }: { children: React.ReactNode 
     setRun(false);
   }, []);
 
+  const isTourActive = useCallback(() => {
+    return run;
+  }, [run]);
+
   const handleJoyrideCallback = (data: any) => {
     const { status, index, type, action } = data;
     if (["finished", "skipped"].includes(status)) {
@@ -289,7 +318,7 @@ export const GuidelineTourProvider = ({ children }: { children: React.ReactNode 
   };
 
   return (
-    <GuidelineTourContext.Provider value={{ startTour, stopTour, run }}>
+    <GuidelineTourContext.Provider value={{ startTour, stopTour, run, isTourActive }}>
       <Joyride
         steps={guidelineTourSteps}
         run={run}
@@ -346,7 +375,17 @@ export const GuidelineTourProvider = ({ children }: { children: React.ReactNode 
   );
 };
 
-const DrugTourContext = createContext({});
+const DrugTourContext = createContext<{
+  startTour: () => void;
+  stopTour: () => void;
+  run: boolean;
+  isTourActive: () => boolean; // Add this method
+}>({
+  startTour: () => {},
+  stopTour: () => {},
+  run: false,
+  isTourActive: () => false, // Add this method
+});
 
 export function useDrugTour() {
   return useContext(DrugTourContext);
@@ -378,8 +417,12 @@ export const DrugTourProvider = ({ children }: { children: React.ReactNode }) =>
     }
   };
 
+  const isTourActive = useCallback(() => {
+    return run;
+  }, [run]);
+
   return (
-    <DrugTourContext.Provider value={{ startTour, stopTour, run }}>
+    <DrugTourContext.Provider value={{ startTour, stopTour, run, isTourActive }}>
       <Joyride
         steps={drugTourSteps}
         run={run}
@@ -449,6 +492,7 @@ const DrinfoSummaryTourContext = createContext<{
   resetTourPreference: () => void;
   shouldShowTour: () => boolean;
   saveTourPreference: (status: 'completed' | 'skipped') => void;
+  isTourActive: () => boolean; // Add this method
 } | undefined>(undefined);
 
 export function useDrinfoSummaryTour() {
@@ -538,52 +582,60 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
   // Hard prevention of Joyride scrolling
   useEffect(() => {
     if (run) {
-      // Prevent Joyride from scrolling by overriding scroll methods
-      const originalScrollIntoView = Element.prototype.scrollIntoView;
-      const originalScrollTo = window.scrollTo;
-      
-      // Override scrollIntoView to prevent Joyride from using it
-      Element.prototype.scrollIntoView = function(options) {
-        // Only allow scrolling if it's not Joyride trying to scroll
-        if (!options || typeof options === 'object') {
-          return; // Block Joyride's scrollIntoView calls
-        }
-        return originalScrollIntoView.call(this, options);
-      };
-      
-      // Override window.scrollTo to prevent Joyride from using it
-      window.scrollTo = function(options) {
-        // Block Joyride's window.scrollTo calls
-        return;
-      };
-      
-      // Also prevent scroll on the content container
-      const contentRef = document.querySelector('.flex-1.overflow-y-auto');
-      let originalScrollTop: any = null;
-      if (contentRef) {
-        originalScrollTop = Object.getOwnPropertyDescriptor(contentRef, 'scrollTop');
-        Object.defineProperty(contentRef, 'scrollTop', {
-          get: function() {
-            return originalScrollTop.get.call(this);
-          },
-          set: function(value) {
-            // Only allow setting if it's not Joyride trying to scroll
-            if (run) {
-              return; // Block Joyride's scrollTop changes
-            }
-            return originalScrollTop.set.call(this, value);
+      try {
+        // Prevent Joyride from scrolling by overriding scroll methods
+        const originalScrollIntoView = Element.prototype.scrollIntoView;
+        const originalScrollTo = window.scrollTo;
+        
+        // Override scrollIntoView to prevent Joyride from using it
+        Element.prototype.scrollIntoView = function(options) {
+          // Only allow scrolling if it's not Joyride trying to scroll
+          if (!options || typeof options === 'object') {
+            return; // Block Joyride's scrollIntoView calls
           }
-        });
-      }
-      
-      return () => {
-        // Restore original methods when tour ends
-        Element.prototype.scrollIntoView = originalScrollIntoView;
-        window.scrollTo = originalScrollTo;
-        if (contentRef && originalScrollTop) {
-          Object.defineProperty(contentRef, 'scrollTop', originalScrollTop);
+          return originalScrollIntoView.call(this, options);
+        };
+        
+        // Override window.scrollTo to prevent Joyride from using it
+        window.scrollTo = function(options) {
+          // Block Joyride's window.scrollTo calls
+          return;
+        };
+        
+        // Also prevent scroll on the content container
+        const contentRef = document.querySelector('.flex-1.overflow-y-auto');
+        let originalScrollTop: any = null;
+        if (contentRef) {
+          originalScrollTop = Object.getOwnPropertyDescriptor(contentRef, 'scrollTop');
+          if (originalScrollTop) {
+            Object.defineProperty(contentRef, 'scrollTop', {
+              get: function() {
+                return originalScrollTop.get.call(this);
+              },
+              set: function(value) {
+                // Only allow setting if it's not Joyride trying to scroll
+                if (run) {
+                  return; // Block Joyride's scrollTop changes
+                }
+                return originalScrollTop.set.call(this, value);
+              }
+            });
+          }
         }
-      };
+        
+        return () => {
+          // Restore original methods when tour ends
+          Element.prototype.scrollIntoView = originalScrollIntoView;
+          window.scrollTo = originalScrollTo;
+          if (contentRef && originalScrollTop) {
+            Object.defineProperty(contentRef, 'scrollTop', originalScrollTop);
+          }
+        };
+      } catch (error) {
+        console.warn('Error setting up scroll prevention:', error);
+        // If scroll prevention fails, just return a no-op cleanup function
+        return () => {};
+      }
     }
   }, [run]);
 
@@ -637,6 +689,10 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
     return !checkTourPreference();
   }, [checkTourPreference]);
 
+  const isTourActive = useCallback(() => {
+    return run;
+  }, [run]);
+
   return (
     <DrinfoSummaryTourContext.Provider value={{ 
       startTour, 
@@ -650,7 +706,8 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
       forceStartTour,
       resetTourPreference,
       shouldShowTour,
-      saveTourPreference
+      saveTourPreference,
+      isTourActive
     }}>
       <Joyride
         steps={drinfoSummaryTourSteps as any}

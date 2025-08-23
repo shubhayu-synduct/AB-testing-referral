@@ -611,23 +611,52 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }
   }, [sessionId, isChatLoading, query, hasFetched, lastQuestion]);
 
-  // Add new controlled scroll effect
+  // Single, working scroll effect for streaming content
   useEffect(() => {
-    if (isStreaming && status !== 'complete') {
-      // During streaming, scroll to the bottom of the content
-      const contentDiv = document.querySelector('.prose');
-      if (contentDiv) {
-        contentDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
-      }
+    // Only scroll during streaming or when messages change
+    if (status !== 'complete' && status !== 'complete_image' && messages.length > 0) {
+      // Use requestAnimationFrame for smooth performance
+      requestAnimationFrame(() => {
+        // Scroll the content container to bottom
+        if (contentRef.current) {
+          contentRef.current.scrollTop = contentRef.current.scrollHeight;
+        }
+        
+        // Also scroll the window to ensure the follow-up area is visible
+        const followUpArea = document.querySelector('.follow-up-question-search');
+        if (followUpArea) {
+          followUpArea.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'end',
+            inline: 'nearest'
+          });
+        }
+      });
     }
-  }, [isStreaming, status, messages, streamedContent]);
+  }, [messages, status]); // Depend on messages and status
 
-  // Add a separate effect to handle content container scrolling
+  // Always scroll to end after any new message (answer) is added
   useEffect(() => {
-    if (contentRef.current && isStreaming && status !== 'complete') {
-      contentRef.current.scrollTop = contentRef.current.scrollHeight;
+    if (messages.length > 0) {
+      // Use requestAnimationFrame for smooth performance
+      requestAnimationFrame(() => {
+        // Scroll the content container to bottom
+        if (contentRef.current) {
+          contentRef.current.scrollTop = contentRef.current.scrollHeight;
+        }
+        
+        // Also scroll the window to ensure the follow-up area is visible
+        const followUpArea = document.querySelector('.follow-up-question-search');
+        if (followUpArea) {
+          followUpArea.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'end',
+            inline: 'nearest'
+          });
+        }
+      });
     }
-  }, [streamedContent, isStreaming, status]);
+  }, [messages]); // Only depend on messages
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -1530,7 +1559,9 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     // Only show for the last assistant message and when streaming is complete
     const isLastMessage = msgIndex === totalMessages - 1;
     const isStreamingComplete = status === 'complete' || status === 'complete_image';
-    return wordCount > 200 && isLastMessage && isStreamingComplete;
+    // Don't show for instant mode
+    const isNotInstantMode = activeMode !== 'instant';
+    return wordCount > 200 && isLastMessage && isStreamingComplete && isNotInstantMode;
   };
 
   // Function to download SVG as PNG
@@ -2075,30 +2106,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                     />
                                   )}
                                   
-                                  {/* Show infographic option for long text answers */}
-                                  {shouldShowInfographicOption(msg.content || '', idx, messages.length) && (
-                                    <div className="mt-4 sm:mt-6">
-                                      <button
-                                        onClick={() => {
-                                          const infographicRequest = `Create a visual abstract for this answer::::::${msg.content}`;
-                                          // Send directly to backend without filling follow-up search bar
-                                          handleSearchWithContent(infographicRequest, true, activeMode === 'instant' ? 'swift' : 'study', true);
-                                        }}
-                                        className="w-auto px-6 py-3 sm:px-8 sm:py-4 border rounded-lg transition-all duration-200 hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 drinfo-visual-abstract-step"
-                                        style={{ 
-                                          borderColor: 'rgba(55, 113, 254, 0.5)', 
-                                          fontFamily: 'DM Sans, sans-serif', 
-                                          fontWeight: 500, 
-                                          fontSize: '16px', 
-                                          color: '#223258', 
-                                          backgroundColor: '#E4ECFF',
-                                          borderRadius: '8px'
-                                        }}
-                                      >
-                                        Create a visual abstract for this answer
-                                      </button>
-                                    </div>
-                                  )}
+                                  {/* Show infographic option for long text answers - MOVED BELOW FEEDBACK */}
                                 </>
                               ) : (
                                 <div className="prose prose-slate max-w-none text-base sm:text-base">
@@ -2214,6 +2222,31 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                   } : {})}
                                   messageId={msg.id}
                                 />
+                                
+                                {/* Show infographic option for long text answers - NOW BELOW FEEDBACK */}
+                                {shouldShowInfographicOption(msg.content || '', idx, messages.length) && (
+                                  <div className="mt-4 sm:mt-6">
+                                    <button
+                                      onClick={() => {
+                                        const infographicRequest = `Create a visual abstract for this answer::::::${msg.content}`;
+                                        // Send directly to backend without filling follow-up search bar
+                                        handleSearchWithContent(infographicRequest, true, activeMode === 'instant' ? 'swift' : 'study', true);
+                                      }}
+                                      className="w-auto px-6 py-3 sm:px-8 sm:py-4 border rounded-lg transition-all duration-200 hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 drinfo-visual-abstract-step"
+                                      style={{ 
+                                        borderColor: 'rgba(55, 113, 254, 0.5)', 
+                                        fontFamily: 'DM Sans, sans-serif', 
+                                        fontWeight: 500, 
+                                        fontSize: '16px', 
+                                        color: '#223258', 
+                                        backgroundColor: '#E4ECFF',
+                                        borderRadius: '8px'
+                                      }}
+                                    >
+                                      Create a visual abstract for this answer
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )}
