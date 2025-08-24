@@ -9,6 +9,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  swcMinify: false,
   skipTrailingSlashRedirect: true,
   skipMiddlewareUrlNormalize: true,
   // Ignore build errors for specific pages
@@ -22,11 +23,13 @@ const nextConfig = {
       // Remove console.log, console.info, console.warn in production client builds
       // Keep console.error for critical error reporting
       config.optimization.minimizer.forEach((minimizer) => {
-        if (minimizer.constructor.name === 'TerserPlugin') {
+        if (minimizer.constructor && minimizer.constructor.name === 'TerserPlugin') {
+          // Disable parallel workers to avoid EPERM kill issues on Windows
+          minimizer.options.parallel = false;
           minimizer.options.terserOptions = {
             ...minimizer.options.terserOptions,
             compress: {
-              ...minimizer.options.terserOptions.compress,
+              ...minimizer.options.terserOptions?.compress,
               drop_console: ['log', 'info', 'warn'],
             },
           };

@@ -1,5 +1,5 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Inter, Poppins } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/providers/auth-provider"
@@ -16,17 +16,10 @@ export const metadata: Metadata = {
   title: "Dr. Info - Medical AI Assistant",
   description: "Get instant access to evidence-based, trusted medical information",
   generator: 'v0.dev',
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false
-  },
   icons: {
     icon: [
       {
         url: '/favicon.png',
-
         type: 'image/png',
       }
     ],
@@ -37,6 +30,13 @@ export const metadata: Metadata = {
       }
     ],
   }
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 }
 
 export default function RootLayout({
