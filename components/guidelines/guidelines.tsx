@@ -50,7 +50,7 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
   const [selectedGuideline, setSelectedGuideline] = useState<Guideline | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(['National', 'Europe', 'International', 'USA']);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(['National']); // Default to National
   const [isMobile, setIsMobile] = useState(false)
   const [userCountry, setUserCountry] = useState<string>('')
   const [userSpecialties, setUserSpecialties] = useState<string[]>([])
@@ -61,7 +61,15 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
   const [bookmarkingGuidelines, setBookmarkingGuidelines] = useState<Set<number>>(new Set())
   const { user } = useAuth()
 
-  const categoryOrder = ['National', 'Europe', 'International', 'USA'];
+  // Dynamic category order based on user's country
+  const getCategoryOrder = () => {
+    if (userCountry === 'united-states') {
+      return ['USA', 'Europe', 'International']; // Hide National for US users
+    }
+    return ['National', 'Europe', 'International', 'USA'];
+  };
+  
+  const categoryOrder = getCategoryOrder();
 
   // Group guidelines by category
   const groupedGuidelines = guidelines.reduce((acc, guideline) => {
@@ -116,6 +124,12 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
             
             if (country) {
               setUserCountry(country);
+              // Update expanded categories based on detected country
+              if (country === 'united-states') {
+                setExpandedCategories(['USA']);
+              } else {
+                setExpandedCategories(['National']);
+              }
             }
             if (specialties && Array.isArray(specialties)) {
               setUserSpecialties(specialties);
@@ -236,6 +250,59 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
     
     return curated;
   };
+
+  const handlePopularSearch = async (term: string) => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      setHasSearched(true)
+      setShowBookmarks(false)
+      
+      // Get the current user's otherSpecialty from the profile
+      let otherSpecialty = '';
+      if (user) {
+        try {
+          const db = getFirebaseFirestore();
+          const userId = user.uid;
+          const userDoc = await getDoc(doc(db, "users", userId));
+          if (userDoc.exists()) {
+            otherSpecialty = userDoc.data()?.profile?.otherSpecialty || '';
+          }
+        } catch (error) {
+          // Ignore error, continue without otherSpecialty
+        }
+      }
+      
+      const response = await fetch('/api/guidelines/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: term,
+          country: userCountry || 'None',
+          specialties: userSpecialties,
+          otherSpecialty: otherSpecialty
+        })
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Search failed with status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      logger.debug('API response:', data);
+      setGuidelines(Array.isArray(data) ? data : [])
+      setRetryCount(0)
+    } catch (err: any) {
+      logger.error('Error searching guidelines:', err)
+      setError(err.message || 'Search failed. Please try again.')
+      setGuidelines([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
@@ -492,8 +559,8 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
   }
 
   useEffect(() => {
-    // Priority order for categories
-    const priorityOrder = ['National', 'Europe', 'International', 'USA'];
+    // Use dynamic category order based on user's country
+    const priorityOrder = getCategoryOrder();
     
     // Find the first category that has guidelines
     const firstCategoryWithGuidelines = priorityOrder.find(category => 
@@ -510,7 +577,7 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
         return [...prev, firstCategoryWithGuidelines];
       });
     }
-  }, [guidelines]);
+  }, [guidelines, userCountry]);
 
   useEffect(() => {
     if (selectedGuideline) {
@@ -640,11 +707,11 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
               {['hypertension', 'arthritis', 'obesity', 'pneumonia', 'diabetes', 'asthma', 'cancer'].map((term) => (
                 <button
                   key={term}
-                  onClick={() => {
-                    setSearchTerm(term);
-                    // Trigger search automatically after setting the term
-                    setTimeout(() => handleSearch(), 100);
-                  }}
+                          onClick={() => {
+          setSearchTerm(term);
+          // Use the term directly in search instead of relying on state update
+          handlePopularSearch(term);
+        }}
                   className="px-3 py-1.5 text-xs sm:text-sm bg-[#F4F7FF] border border-[#B5C9FC] text-[#223258] rounded-[6px] hover:bg-[#E8F0FF] hover:border-[#3771FE] transition-colors"
                   style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500 }}
                 >
