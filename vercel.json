@@ -2,7 +2,8 @@
   "crons": [
     {
       "path": "/api/send-emails",
-      "schedule": "*/5 * * * *"       
+      "schedule": "0 9 * * *",
+      "description": "Send onboarding emails daily at 9 AM (only for users in first 6 days)"
     }
   ]
 } 
