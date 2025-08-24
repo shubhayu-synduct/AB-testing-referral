@@ -45,6 +45,7 @@ interface ChatMessage {
     }>;
     citations?: Record<string, Citation>;
     svg_content?: string[]; // Changed from string to string[]
+    apiResponse?: any; // Added API response field
   };
   feedback?: {
     likes: number;
@@ -121,7 +122,9 @@ interface DrInfoSummaryData {
     title: string;
     content: string;
   }>;
-  svg_content?: string[]; // Changed from string to string[]
+  svg_content?: string[];
+  responseStatus?: number;
+  apiResponse?: any;
 }
 
 const KNOWN_STATUSES: StatusType[] = ['processing', 'searching', 'summarizing', 'formatting', 'complete', 'complete_image'];
@@ -1332,7 +1335,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                       }), {}) : {},
                       svg_content: msg.answer?.svg_content || (data?.svg_content ? 
                         (Array.isArray(data.svg_content) ? data.svg_content.filter((content: any) => content !== null && content !== undefined) : [data.svg_content])
-                      : [])
+                      : []),
+                      apiResponse: data?.apiResponse // Store the API response details
                     },
                   }
                 : msg
@@ -1367,7 +1371,16 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
           }, 2000);
         } catch (error) {
           logger.error('Error updating messages:', error);
-          const fallback = 'Servers are overloaded. Please try again later.';
+          
+          // Check if it's an internet connection error
+          let fallback = 'Servers are overloaded. Please try again later.';
+          if(data?.responseStatus === 429){
+            fallback = 'Too many requests. Please wait until your daily limit resets or <a href="/dashboard/profile?tab=subscription" target="_blank" rel="noopener noreferrer" class="underline text-blue-600 hover:text-blue-800">upgrade to Pro</a> for unlimited access.';
+          }
+          console.log('Internet',navigator.onLine)
+          if (!navigator.onLine) {
+            fallback = 'Connection lost. Please check your internet and try again.';
+          }
           // Add a small randomized delay (2-3 seconds) before showing the fallback answer
           const randomDelayMs = 2000 + Math.floor(Math.random() * 1000);
           await new Promise((resolve) => setTimeout(resolve, randomDelayMs));
@@ -1384,12 +1397,18 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                       ...(msg.answer || { mainSummary: '', sections: [], citations: {} }),
                       mainSummary: fallback,
                       sections: [],
-                      citations: msg.answer?.citations || {}
+                      citations: msg.answer?.citations || {},
+                      apiResponse: data?.apiResponse // Store the API response details
                     }
                   }
                 : msg
             );
           });
+          
+          // Log the API response details for debugging
+          if (data?.apiResponse) {
+            console.log('[API_RESPONSE] Response details after fallback:', data.apiResponse);
+          }
           setStatus('complete');
           setIsLoading(false);
           setIsStreaming(false);
