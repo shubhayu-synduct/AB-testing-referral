@@ -700,7 +700,32 @@ export default function Onboarding() {
             <button
               className="w-full bg-[#C6D7FF]/50 text-[#3771FE] py-2 px-4 border border-[#3771FE]/50 rounded-[5px] font-dm-sans font-medium hover:bg-[#C6D7FF]/70 transition-colors duration-200"
               style={{ fontFamily: 'DM Sans', fontSize: 14 }}
-              onClick={() => router.push('/dashboard')}
+              onClick={async () => {
+                try {
+                  // Send Day 1 welcome email
+                  const response = await fetch('/api/send-welcome-email', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      userName: user?.displayName || formData.firstName || 'Healthcare Professional',
+                      userEmail: user?.email || ''
+                    })
+                  });
+
+                  if (response.ok) {
+                    logger.info("Day 1 welcome email sent successfully");
+                  } else {
+                    logger.error("Failed to send welcome email");
+                  }
+                } catch (error) {
+                  logger.error("Error sending welcome email:", error);
+                }
+
+                // Navigate to dashboard regardless of email success/failure
+                router.push('/dashboard');
+              }}
             >
               Let's Get Started...
             </button>
