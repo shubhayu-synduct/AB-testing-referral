@@ -2234,11 +2234,9 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                   conversationId={sessionId || ''}
                                   threadId={msg.threadId}
                                   answerText={msg.content || ''}
-                                  // Only show retry for the last assistant message
-                                  {...(idx === messages.length - 1 ? {
-                                    onReload: () => handleReload(msg.id),
-                                    isReloading: reloadingMessageId === msg.id
-                                  } : {})}
+                                  // Always pass onReload for the last assistant message
+                                  onReload={idx === messages.length - 1 ? () => handleReload(msg.id) : undefined}
+                                  isReloading={reloadingMessageId === msg.id}
                                   messageId={msg.id}
                                 />
                                 

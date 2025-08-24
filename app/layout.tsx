@@ -14,7 +14,7 @@ const poppins = Poppins({
 })
 
 export const metadata: Metadata = {
-  title: "Dr. Info - Medical AI Assistant",
+  title: "DR. INFO - Medical AI Assistant",
   description: "Get instant access to evidence-based, trusted medical information",
   generator: 'v0.dev',
   viewport: {
