@@ -318,14 +318,14 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               >
                 <div className="flex items-center">
                   <div className="h-8 w-8 rounded-[8px] bg-[#E4ECFF] flex items-center justify-center text-[#223258] font-semibold border border-[#223258]">
-                    {userProfile.firstName?.[0] || user?.email?.[0]}
+                    {(userProfile.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase()}
                   </div>
                   {isOpen && (
                     <div className="ml-3 text-left">
                       <p className="font-semibold text-sm text-[#223258]">
                         {userProfile.firstName && userProfile.lastName 
                           ? `${userProfile.firstName} ${userProfile.lastName}`
-                          : user?.email}
+                          : user?.email || 'User'}
                       </p>
                       <p className="text-xs text-[#223258]/70">
                         {userProfile.occupation 
