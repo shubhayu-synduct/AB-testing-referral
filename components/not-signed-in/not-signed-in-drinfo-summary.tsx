@@ -457,6 +457,112 @@ export function NotSignedInDrInfoSummary() {
     };
   }, [activeCitations, setSelectedCitation, setShowCitationsSidebar, setShowDrugModal]);
 
+  // Add this new useEffect after the existing useEffects
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .citation-reference {
+        position: relative;
+        cursor: pointer;
+      }
+      
+      .citation-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 18px;
+        height: 18px;
+        background-color: #e0f2fe;
+        color: #0284c7;
+        border-radius: 9px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        padding: 0 4px;
+        box-sizing: border-box;
+      }
+      
+      .citation-number:hover {
+        background: #C7D7FF !important;
+      }
+      
+      .citation-tooltip {
+        position: fixed;
+        z-index: 9999;
+        background: white;
+        border: 1px solid #E5E7EB;
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        font-family: 'DM Sans', sans-serif;
+        max-width: 300px;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        white-space: nowrap;
+      }
+      
+      .citation-reference:hover .citation-tooltip {
+        opacity: 1;
+      }
+      
+      .drug-name-clickable {
+        cursor: pointer;
+        color: #3771FE;
+        text-decoration: underline;
+        transition: color 0.2s ease;
+      }
+      
+      .drug-name-clickable:hover {
+        color: #2B5CD9;
+      }
+
+      /* Shimmer text effect for status message */
+      .shimmer-text {
+        background: linear-gradient(90deg,rgba(31, 41, 55, 0.77), #E5E7EB,rgba(31, 41, 55, 0.82));
+        background-size: 200% 100%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        animation: shimmer-text-move 4s ease-in-out infinite;
+      }
+
+      @keyframes shimmer-text-move {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .shimmer-text { animation: none; }
+      }
+
+      /* Reference grid shimmer placeholder */
+      .reference-skeleton {
+        position: relative;
+        overflow: hidden;
+        background: #EEF3FF;
+        border: 1px solid #3771FE;
+        border-radius: 12px;
+      }
+      .reference-skeleton::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(100deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.6) 50%, rgba(255,255,255,0) 60%);
+        transform: translateX(-100%);
+        animation: reference-shimmer 1.4s ease-in-out infinite;
+      }
+      @keyframes reference-shimmer {
+        100% { transform: translateX(100%); }
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Mobile Sidebar Toggle */}
@@ -473,7 +579,7 @@ export function NotSignedInDrInfoSummary() {
           </div>
           <div className="flex items-center space-x-2">
             <Link
-              href="/login"
+              href="/signup"
               className="px-3 py-1.5 bg-white border border-[#C8C8C8] text-[#223258] rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
             >
               Sign In
@@ -547,7 +653,7 @@ export function NotSignedInDrInfoSummary() {
                             </div>
                             <div className="flex items-center gap-4">
                               {idx === messages.length - 1 && status !== 'complete' && status !== 'complete_image' && !msg.content ? (
-                                <span className="italic text-sm sm:text-base">{getStatusMessage(status as StatusType)}</span>
+                                <span className="shimmer-text italic text-sm sm:text-base">{getStatusMessage(status as StatusType)}</span>
                               ) : (
                                 msg.type === 'assistant' && msg.content && (
                                   <span className="font-semibold font-['DM_Sans'] mt-1 text-base text-blue-900">
@@ -588,6 +694,21 @@ export function NotSignedInDrInfoSummary() {
                                 onShowAll={handleShowAllCitations}
                                 getCitationCount={getCitationCount}
                               />
+                            </div>
+                          )}
+                          
+                          {/* Probable references shimmer during formatting/formatting response stage (after streaming, before citations) */}
+                          {idx === messages.length - 1 && (status === 'formatting' || status === 'formatting response') && (() => {
+                            const hasCitations = (msg.answer?.citations && Object.keys(msg.answer.citations).length > 0) ||
+                              (activeCitations && Object.keys(activeCitations).length > 0);
+                            return !hasCitations;
+                          })() && (
+                            <div className="mt-4 sm:mt-6">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+                                <div className="reference-skeleton col-span-2 sm:col-span-1 h-[95px] sm:h-[105px] lg:h-[125px]" />
+                                <div className="reference-skeleton hidden sm:block h-[95px] sm:h-[105px] lg:h-[125px]" />
+                                <div className="reference-skeleton hidden sm:block h-[95px] sm:h-[105px] lg:h-[125px]" />
+                              </div>
                             </div>
                           )}
                         </>
