@@ -190,11 +190,17 @@ export function NotSignedInDrInfoSummary() {
       return;
     }
     
-      setIsLoading(true);
+    setIsLoading(true);
     setImageGenerationStatus('idle');
     
-    const userId = "anonymous_user";
+    // Generate unique anonymous user ID for each request
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(2, 8);
+    const userId = `anonymous_user_${timestamp}_${randomString}`;
     const tempThreadId = Date.now().toString();
+    
+    // Generate unique session ID for each request
+    const sessionId = `public_session_${timestamp}_${randomString}`;
 
     // Add user message
     setMessages(prev => [
@@ -337,7 +343,7 @@ export function NotSignedInDrInfoSummary() {
         }
       },
       { 
-        sessionId: "public_session", 
+        sessionId: sessionId, 
         userId, 
         mode: mode || 'study',
         country: 'US'
