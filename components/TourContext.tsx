@@ -53,6 +53,25 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
+  // Function to open sidebar for mobile responsiveness
+  const ensureSidebarOpen = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      // Check if we're on a mobile device
+      const isMobile = window.innerWidth <= 768;
+      if (isMobile) {
+        // Open sidebar for steps 3-8 (sidebar elements)
+        if (stepIndex >= 2 && stepIndex <= 7) {
+          localStorage.setItem('sidebarOpen', 'true');
+          // Trigger a custom event to notify sidebar components
+          window.dispatchEvent(new CustomEvent('tourSidebarOpen'));
+          // Add a small delay to ensure sidebar animation completes
+          return new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+    }
+    return Promise.resolve();
+  }, [stepIndex]);
+
   const startTour = useCallback(() => {
     // Check if user has already completed or skipped the tour
     if (checkTourPreference()) {
@@ -72,6 +91,11 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
 
   const stopTour = useCallback(() => {
     setRun(false);
+    // Close sidebar when tour stops (completed or skipped)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebarOpen', 'false');
+      window.dispatchEvent(new CustomEvent('tourSidebarClose'));
+    }
   }, []);
 
   const handleJoyrideCallback = (data: any) => {
@@ -80,17 +104,47 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
     if (status === "finished") {
       saveTourPreference('completed');
       setRun(false);
+      // Close sidebar when tour is completed
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('sidebarOpen', 'false');
+        window.dispatchEvent(new CustomEvent('tourSidebarClose'));
+      }
     } else if (status === "skipped") {
       saveTourPreference('skipped');
       setRun(false);
+      // Close sidebar when tour is skipped
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('sidebarOpen', 'false');
+        window.dispatchEvent(new CustomEvent('tourSidebarClose'));
+      }
     } else if (type === "step:after") {
       if (action === "prev") {
         setStepIndex(Math.max(0, index - 1));
       } else if (action === "next") {
-        setStepIndex(index + 1);
+        // If moving to step 3 (sidebar), ensure sidebar is open first
+        if (index === 1) { // Moving from step 2 to step 3
+          setTimeout(() => {
+            ensureSidebarOpen();
+            setStepIndex(index + 1);
+          }, 100);
+        } else {
+          setStepIndex(index + 1);
+        }
+      }
+    } else if (type === "step:before") {
+      // Ensure sidebar is open before showing sidebar-related steps
+      if (index >= 2 && index <= 7) {
+        ensureSidebarOpen();
       }
     }
   };
+
+  // Ensure sidebar is open when step changes
+  useEffect(() => {
+    if (run) {
+      ensureSidebarOpen();
+    }
+  }, [stepIndex, run, ensureSidebarOpen]);
 
   const resetTourPreference = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -216,7 +270,7 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
   return (
     <TourContext.Provider value={{ startTour, stopTour, run, forceStartTour, checkTourPreference, resetTourPreference, shouldShowTour, saveTourPreference, isTourActive }}>
       <Joyride
-        steps={steps}
+        steps={steps as any}
         run={run}
         stepIndex={stepIndex}
         continuous
@@ -577,7 +631,24 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
     setStepIndex(Math.max(0, stepIndex - 1));
   }, [stepIndex]);
 
-  // Remove the event listener approach since proper callback handling should work
+  // Ensure sidebar is open when step changes
+  useEffect(() => {
+    if (run) {
+      // This logic is no longer needed for DrinfoSummaryTourProvider
+      // as the sidebar opening is handled by the main TourProvider.
+      // Keeping it here for consistency with other providers.
+      // if (typeof window !== 'undefined') {
+      //   // Check if we're on a mobile device
+      //   const isMobile = window.innerWidth <= 768;
+      //   if (isMobile) {
+      //     // Open sidebar for mobile tours
+      //     localStorage.setItem('sidebarOpen', 'true');
+      //     // Trigger a custom event to notify sidebar components
+      //     window.dispatchEvent(new CustomEvent('tourSidebarOpen'));
+      //   }
+      // }
+    }
+  }, [stepIndex, run]);
 
   // Hard prevention of Joyride scrolling
   useEffect(() => {
@@ -686,8 +757,9 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
   }, [shouldDisableScrolling]);
 
   const shouldShowTour = useCallback(() => {
-    return !checkTourPreference();
-  }, [checkTourPreference]);
+    // Don't show tour if it's already completed/skipped OR if a tour is currently running
+    return !checkTourPreference() && !run;
+  }, [checkTourPreference, run]);
 
   const isTourActive = useCallback(() => {
     return run;
@@ -734,6 +806,8 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
             borderRadius: "8px",
             border: "1px solid #E4ECFF",
             boxShadow: "0 4px 20px rgba(55, 113, 254, 0.15)",
+            maxWidth: "300px", // Limit width on mobile
+            fontSize: "14px", // Ensure readable font size
           },
           buttonNext: {
             backgroundColor: "#3771FE",

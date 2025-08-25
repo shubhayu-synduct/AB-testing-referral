@@ -85,6 +85,25 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
     }
   }, [setIsOpen])
 
+  // Listen for tour events to open sidebar
+  useEffect(() => {
+    const handleTourSidebarOpen = () => {
+      setIsOpen(true);
+    };
+
+    const handleTourSidebarClose = () => {
+      setIsOpen(false);
+    };
+
+    window.addEventListener('tourSidebarOpen', handleTourSidebarOpen);
+    window.addEventListener('tourSidebarClose', handleTourSidebarClose);
+    
+    return () => {
+      window.removeEventListener('tourSidebarOpen', handleTourSidebarOpen);
+      window.removeEventListener('tourSidebarClose', handleTourSidebarClose);
+    };
+  }, [setIsOpen]);
+
   const handleSignOut = async () => {
     try {
       // Dynamically import Firebase auth

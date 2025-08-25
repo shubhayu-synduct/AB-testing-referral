@@ -55,6 +55,25 @@ export function PublicSidebar({ isOpen, setIsOpen }: PublicSidebarProps) {
     }
   }, [setIsOpen])
 
+  // Listen for tour events to open sidebar
+  useEffect(() => {
+    const handleTourSidebarOpen = () => {
+      setIsOpen(true);
+    };
+
+    const handleTourSidebarClose = () => {
+      setIsOpen(false);
+    };
+
+    window.addEventListener('tourSidebarOpen', handleTourSidebarOpen);
+    window.addEventListener('tourSidebarClose', handleTourSidebarClose);
+    
+    return () => {
+      window.removeEventListener('tourSidebarOpen', handleTourSidebarOpen);
+      window.removeEventListener('tourSidebarClose', handleTourSidebarClose);
+    };
+  }, [setIsOpen]);
+
   const isActive = (path: string) => {
     return pathname === path
   }
