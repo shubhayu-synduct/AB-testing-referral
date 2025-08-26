@@ -187,8 +187,8 @@ export const day6Template = {
           <p class="footer-text">© 2025 DR. INFO by Synduct. All rights reserved.</p>
           <div class="footer-links">
             <p>
-              <a href="https://synduct.com/privacy-policy/">Privacy Policy</a> | 
-              <a href="https://synduct.com/terms-and-conditions/">Terms and Conditions</a> | 
+                <a href="https://drinfo.ai/privacy-policy/">Privacy Policy</a> | 
+                <a href="https://drinfo.ai/termsofservice/">Terms and Conditions</a> | 
               <a href="mailto:info@synduct.com">Contact Us</a>
             </p>
           </div>

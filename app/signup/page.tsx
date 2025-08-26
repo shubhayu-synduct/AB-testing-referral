@@ -42,11 +42,11 @@ export default function SignUp() {
           {/* Terms and Privacy */}
           <div className="text-center mt-4 sm:mt-5 md:mt-6 text-xs sm:text-sm text-gray-500 font-['DM_Sans'] w-full px-2">
             By signing up, you agree to our{' '}
-            <Link href="https://synduct.com/terms-and-conditions/" className="text-[#3771FE] hover:text-[#3771FE] font-['DM_Sans']" target="_blank" rel="noopener noreferrer">
+            <Link href="https://drinfo.ai/termsofservice/" className="text-[#3771FE] hover:text-[#3771FE] font-['DM_Sans']" target="_blank" rel="noopener noreferrer">
               Terms of use
             </Link>
             {' '}and{' '}
-            <Link href="https://synduct.com/privacy-policy/" className="text-[#3771FE] hover:text-[#3771FE] font-['DM_Sans']" target="_blank" rel="noopener noreferrer">
+            <Link href="https://drinfo.ai/privacy-policy/" className="text-[#3771FE] hover:text-[#3771FE] font-['DM_Sans']" target="_blank" rel="noopener noreferrer">
               Privacy policy
             </Link>
           </div>
