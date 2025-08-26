@@ -1375,7 +1375,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
           // Check if it's an internet connection error
           let fallback = 'Servers are overloaded. Please try again later.';
           if(data?.responseStatus === 429){
-            fallback = 'Too many requests. Please wait until your daily limit resets or <a href="/dashboard/profile?tab=subscription" target="_blank" rel="noopener noreferrer" class="underline text-blue-600 hover:text-blue-800">upgrade to Pro</a> for unlimited access.';
+            fallback = 'Too many requests. Please wait until your monthly limit resets or <a href="/dashboard/profile?tab=subscription" target="_blank" rel="noopener noreferrer" class="underline text-blue-600 hover:text-blue-800">upgrade to Pro</a> for unlimited access.';
           }
           console.log('Internet',navigator.onLine)
           if (!navigator.onLine) {

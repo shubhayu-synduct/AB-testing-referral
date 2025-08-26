@@ -26,7 +26,9 @@ export default function DrugInformationPage() {
   const [recommendations, setRecommendations] = useState<Drug[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showRecommendations, setShowRecommendations] = useState(false);
+  const [showNoResultsMessage, setShowNoResultsMessage] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const noResultsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedLetter, setSelectedLetter] = useState('A');
   
@@ -99,14 +101,21 @@ export default function DrugInformationPage() {
   }, [selectedLetter]);
   
   // Fetch recommendations function
-  const fetchRecommendations = async (term: string) => {
+  const fetchRecommendations = async (term: string, isImmediateSearch: boolean = false) => {
     logger.debug('fetchRecommendations called with:', term);
     if (term.trim() === '') {
       setRecommendations([]);
       setShowRecommendations(false);
+      setShowNoResultsMessage(false);
       return;
     }
     setShowRecommendations(true);
+    
+    // Clear any existing no results timeout
+    if (noResultsTimeoutRef.current) {
+      clearTimeout(noResultsTimeoutRef.current);
+    }
+    
     try {
       // Get authentication status in background with fallback
       const authStatus = await getCachedAuthStatus();
@@ -140,6 +149,7 @@ export default function DrugInformationPage() {
       }
       
       setRecommendations(transformedData);
+      setShowNoResultsMessage(false);
       logger.debug('Recommendations set:', transformedData);
       if (searchInputRef.current) {
         searchInputRef.current.focus();
@@ -170,9 +180,29 @@ export default function DrugInformationPage() {
           transformedData = [...transformedData, ...brandOptions];
         }
         setRecommendations(transformedData);
+        setShowNoResultsMessage(false);
       } catch (fallbackError) {
         logger.error('Search fallback also failed:', fallbackError);
         setRecommendations([]);
+        // Show no results message immediately for active searches, or after delay for typing
+        if (isImmediateSearch) {
+          setShowNoResultsMessage(true);
+        } else {
+          noResultsTimeoutRef.current = setTimeout(() => {
+            setShowNoResultsMessage(true);
+          }, 5000);
+        }
+      }
+    }
+    
+    // If no results found, show message based on search type
+    if (recommendations.length === 0) {
+      if (isImmediateSearch) {
+        setShowNoResultsMessage(true);
+      } else {
+        noResultsTimeoutRef.current = setTimeout(() => {
+          setShowNoResultsMessage(true);
+        }, 5000);
       }
     }
   };
@@ -182,17 +212,24 @@ export default function DrugInformationPage() {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
+    if (noResultsTimeoutRef.current) {
+      clearTimeout(noResultsTimeoutRef.current);
+    }
     if (searchTerm.trim() === '') {
       setRecommendations([]);
       setShowRecommendations(false);
+      setShowNoResultsMessage(false);
       return;
     }
     searchTimeoutRef.current = setTimeout(() => {
-      fetchRecommendations(searchTerm);
+      fetchRecommendations(searchTerm, false);
     }, 300);
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
+      }
+      if (noResultsTimeoutRef.current) {
+        clearTimeout(noResultsTimeoutRef.current);
       }
     };
   }, [searchTerm]);
@@ -237,6 +274,18 @@ export default function DrugInformationPage() {
     };
   }, []);
 
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+      if (noResultsTimeoutRef.current) {
+        clearTimeout(noResultsTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const DrugInformationContent = () => {
     return (
       <div className="max-w-5xl mx-auto px-4 py-4 md:py-8 mt-0 md:mt-16 relative">
@@ -269,7 +318,12 @@ export default function DrugInformationPage() {
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && searchTerm.trim() !== '') {
+                  // Clear any existing timeout and immediately show recommendations
+                  if (noResultsTimeoutRef.current) {
+                    clearTimeout(noResultsTimeoutRef.current);
+                  }
                   setShowRecommendations(true);
+                  fetchRecommendations(searchTerm, true);
                 }
               }}
               onBlur={(e) => {
@@ -288,7 +342,11 @@ export default function DrugInformationPage() {
               className="flex items-center justify-center border-none bg-transparent relative ml-1 md:ml-2 hover:opacity-80 transition-opacity"
               onClick={() => {
                 if (searchTerm.trim() !== '') {
-                  fetchRecommendations(searchTerm);
+                  // Clear any existing timeout and immediately show recommendations
+                  if (noResultsTimeoutRef.current) {
+                    clearTimeout(noResultsTimeoutRef.current);
+                  }
+                  fetchRecommendations(searchTerm, true);
                 }
               }}
             >
@@ -329,6 +387,17 @@ export default function DrugInformationPage() {
                   )}
                 </Link>
               ))}
+            </div>
+          )}
+          
+          {/* No search results notification */}
+          {showNoResultsMessage && searchTerm.trim() !== '' && recommendations.length === 0 && (
+            <div className="absolute z-10 mt-1 w-full max-w-[1118px] mx-auto">
+              <div className="text-center py-3 mb-4">
+                <p className="text-[#263969] font-['DM_Sans'] text-[14px]">
+                  No search results found. We are continuously working to expand our drug database.
+                </p>
+              </div>
             </div>
           )}
         </div>
