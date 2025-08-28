@@ -823,8 +823,8 @@ export function NotSignedInDrInfoSummary() {
                               })() && (
                                 <div className="mt-4 sm:mt-6">
                                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-                                    <div className="reference-skeleton col-span-2 sm:col-span-1 h-[95px] sm:h-[105px] lg:h-[125px]" />
-                                    <div className="reference-skeleton hidden sm:block h-[95px] sm:h-[105px] lg:h-[125px]" />
+                                    <div className="reference-skeleton h-[95px] sm:h-[105px] lg:h-[125px]" />
+                                    <div className="reference-skeleton h-[95px] sm:h-[105px] lg:h-[125px]" />
                                     <div className="reference-skeleton hidden sm:block h-[95px] sm:h-[105px] lg:h-[125px]" />
                                   </div>
                                 </div>

@@ -94,7 +94,7 @@ export default function ProfilePage() {
     // Check if tab parameter is set in URL
     const tabParam = searchParams.get('tab');
     if (tabParam === 'subscription') {
-      setActiveTab('subscription');
+      setActiveTab('profile');
     }
     
     // Check if payment was cancelled
@@ -433,13 +433,14 @@ export default function ProfilePage() {
           >
             Profile
           </button>
-          <button
+          {/* Tempory comment out subscription tab */}
+          {/* <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'subscription' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
             onClick={() => handleTabChange('subscription')}
           >
             Subscription
-          </button>
+          </button> */}
           {/* <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'feedback' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
