@@ -153,7 +153,44 @@ export default function AnswerFeedback({
   const handleCopyText = async () => {
     if (!answerText) return;
     try {
-      await navigator.clipboard.writeText(answerText);
+
+      // Function to convert markdown to clean text
+      const convertMarkdownToCleanText = (markdown: string): string => {
+        let cleanText = markdown;
+        
+        // Remove citation markers like [1], [2], etc.
+        cleanText = cleanText.replace(/\[\d+(?:,\s*\d+)*\]/g, '');
+        
+        // Convert headers to plain text while preserving structure
+        cleanText = cleanText.replace(/^#{1,6}\s+(.+)$/gm, '\n$1\n');
+        
+        // Convert bold text (**text** or __text__) - preserve the emphasis with formatting
+        cleanText = cleanText.replace(/\*\*(.*?)\*\*/g, '$1');
+        cleanText = cleanText.replace(/__(.*?)__/g, '$1');
+        
+        // Convert italic text (*text* or _text_)
+        cleanText = cleanText.replace(/\*(.*?)\*/g, '$1');
+        cleanText = cleanText.replace(/_(.*?)_/g, '$1');
+        
+        // Convert bullet points while preserving indentation
+        cleanText = cleanText.replace(/^(\s*)[\*\-\+]\s+/gm, '$1• ');
+        
+        // Convert numbered lists while preserving indentation and numbers
+        cleanText = cleanText.replace(/^(\s*)(\d+)\.\s+/gm, '$1$2. ');
+        
+        // Clean up excessive line breaks but preserve paragraph separation
+        cleanText = cleanText.replace(/\n{4,}/g, '\n\n\n'); // Limit to max 3 line breaks
+        cleanText = cleanText.replace(/\n\s*\n\s*\n\s*\n/g, '\n\n\n'); // Clean up spacing
+        
+        // Clean up multiple spaces but preserve intentional spacing
+        cleanText = cleanText.replace(/[ \t]{2,}/g, ' '); // Only reduce multiple spaces/tabs to single space
+        
+        // Trim the entire text but preserve internal structure
+        return cleanText.trim();
+      };
+      
+      const cleanText = convertMarkdownToCleanText(answerText);
+      await navigator.clipboard.writeText(cleanText);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
@@ -204,7 +241,7 @@ export default function AnswerFeedback({
   };
 
   return (
-    <div className="mt-4 max-w-[684px]">
+    <div className="mt-4 max-w-[684px] drinfo-feedback-step">
       {/* Top row: Helpful, Not helpful, Copy */}
       <div ref={buttonContainerRef} className="flex flex-row items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
         <div className="relative h-8 sm:h-10 w-24 sm:w-32 overflow-hidden bg-transparent p-[1px] rounded-lg">

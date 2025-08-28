@@ -3,14 +3,15 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from 'next/link'
-import { collection, addDoc, query as firestoreQuery, where, orderBy, getDocs } from 'firebase/firestore'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { collection, addDoc, query as firestoreQuery, where, orderBy, getDocs, doc, setDoc } from 'firebase/firestore'
 import { getSessionCookie } from '@/lib/auth-service'
 import { getFirebaseFirestore } from '@/lib/firebase'
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import { ArrowRight, X, Search } from "lucide-react"
 import { v4 as uuidv4 } from 'uuid'
 import { logger } from '@/lib/logger';
+import { track } from '@vercel/analytics';
+import { useTour } from "@/components/TourContext"
 // Removed GoogleGenAI import - now using secure server-side API
 
 // Define the interface for the message structure
@@ -40,6 +41,37 @@ export default function Dashboard() {
   const suggestionTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const lastQueryRef = useRef<string>("")
   const lastWordRef = useRef<string>("")
+  const isRequestInProgressRef = useRef<boolean>(false)
+
+
+    // Track dashboard landing
+    // useEffect(() => {
+    //   track('DashboardLanded', {
+    //     user: user ? 'authenticated' : 'unauthenticated',
+    //     timestamp: new Date().toISOString()
+    //   });
+    // }, [user]);
+  
+  // Tour functionality
+  const tourContext = useTour()
+  const [showTourPrompt, setShowTourPrompt] = useState(false)
+
+  // Show tour prompt after 5 seconds, but only if user hasn't completed/skipped before
+  useEffect(() => {
+    // Check if tour should be shown based on saved preferences
+    if (tourContext && tourContext.shouldShowTour) {
+      const shouldShow = tourContext.shouldShowTour();
+      if (!shouldShow) {
+        setShowTourPrompt(false);
+        return;
+      }
+    }
+
+    const timeout = setTimeout(() => {
+      setShowTourPrompt(true);
+    }, 5000);
+    return () => clearTimeout(timeout);
+  }, [tourContext]);
 
   // Check if there's a meaningful change in the query
   const hasMeaningfulChange = (newQuery: string) => {
@@ -217,6 +249,10 @@ export default function Dashboard() {
     fetchPreviousQueries();
   }, [user]);
 
+
+
+
+
   // Add event listeners for user activity
   useEffect(() => {
     const handleUserActivity = () => {
@@ -235,6 +271,13 @@ export default function Dashboard() {
     };
   }, []);
 
+  // Reset request lock when user changes or component unmounts
+  useEffect(() => {
+    return () => {
+      isRequestInProgressRef.current = false;
+    };
+  }, [user]);
+
   // Handle clicks outside the search component
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -252,9 +295,35 @@ export default function Dashboard() {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!query.trim() || !user) return
+    // Prevent multiple simultaneous requests
+    if (isRequestInProgressRef.current || isLoading) {
+      logger.debug("[DASHBOARD] Request already in progress or loading, ignoring duplicate call");
+      return;
+    }
     
-    setIsLoading(true)
+    if (!query.trim() || !user) return
+        // Track search query
+    track('SearchQuerySubmitted', {
+      queryLength: query.length,
+      mode: activeMode,
+      hasUser: !!user
+    })
+    
+    // Immediately lock everything - no more interactions possible
+    isRequestInProgressRef.current = true;
+    setIsLoading(true);
+    
+    // Disable the form immediately
+    const form = e.currentTarget as HTMLFormElement;
+    if (form) {
+      const inputs = form.querySelectorAll('input, textarea, button');
+      inputs.forEach((input: Element) => {
+        if (input instanceof HTMLElement) {
+          input.setAttribute('disabled', 'true');
+        }
+      });
+    }
+    
     logger.debug("[DASHBOARD] Creating new chat session for query:", query);
     
     try {
@@ -302,6 +371,8 @@ export default function Dashboard() {
     } catch (error) {
       logger.error("[DASHBOARD] Error creating chat session:", error);
       setIsLoading(false);
+      // Reset request lock on error
+      isRequestInProgressRef.current = false;
       alert("Failed to create chat. Please try again.");
     }
   }
@@ -328,6 +399,8 @@ export default function Dashboard() {
     setShowSuggestions(false);
   };
 
+
+  
   return (
     <DashboardLayout>
       <div className="flex flex-col min-h-[calc(100vh-56px)] md:min-h-screen">
@@ -339,13 +412,15 @@ export default function Dashboard() {
               </h1>
               <form onSubmit={handleSearch} className="w-full max-w-2xl">
                 <div ref={searchRef} className="relative mx-auto">
-                  <div className="w-full bg-white rounded border-2 border-[#3771fe44] shadow-[0px_0px_11px_#0000000c] p-3 md:p-4">
+                  <div className="w-full bg-white rounded border-2 border-[#3771fe44] shadow-[0px_0px_11px_#0000000c] p-3 md:p-4 dashboard-search-bar">
                     <div className="flex items-center">
                       <div className="relative flex-1">
                         <textarea
                           value={query}
-                          className="w-full text-base md:text-[18px] text-[#223258] font-normal font-['DM_Sans'] outline-none resize-none min-h-[24px] whitespace-pre-wrap break-words"
+                          disabled={isLoading}
+                          className={`w-full text-base md:text-[18px] text-[#223258] font-normal font-['DM_Sans'] outline-none resize-none min-h-[24px] whitespace-pre-wrap break-words ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                           onChange={(e) => {
+                            if (isLoading) return; // Prevent changes while loading
                             setQuery(e.target.value);
                             // Auto-resize the textarea
                             const textarea = e.target;
@@ -356,10 +431,13 @@ export default function Dashboard() {
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                               e.preventDefault();
-                              handleSearch(e);
+                              if (!isLoading) {
+                                handleSearch(e);
+                              }
                             }
                           }}
                           onFocus={(e) => {
+                            if (isLoading) return; // Prevent focus while loading
                             if (query) setShowSuggestions(true);
                             // Resize on focus if there's content
                             const textarea = e.target;
@@ -376,7 +454,7 @@ export default function Dashboard() {
 
                     <div className="flex justify-between items-center mt-2">
                       {/* Toggle switch for Acute/Research mode */}
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <label className="flex items-center gap-2 cursor-pointer select-none dashboard-acute-toggle">
                         <input
                           type="checkbox"
                           checked={activeMode === 'instant'}
@@ -391,9 +469,17 @@ export default function Dashboard() {
                           Acute
                         </span>
                       </label>
-                      <button type="submit" className="flex-shrink-0">
+                      <button 
+                        type="submit" 
+                        disabled={isLoading}
+                        className={`flex-shrink-0 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
                         {isLoading ? (
-                          <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <div className="flex space-x-1">
+                            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                            <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                          </div>
                         ) : (
                           <img src="search.svg" alt="Search" width={30} height={30} />
                         )}
@@ -430,6 +516,86 @@ export default function Dashboard() {
           </Link>
         </div>
       </div>
+      
+      {/* Tour Prompt */}
+      {showTourPrompt && (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black bg-opacity-40">
+          <div 
+            className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center border"
+            style={{
+              borderRadius: "8px",
+              border: "1px solid #E4ECFF",
+              boxShadow: "0 4px 20px rgba(55, 113, 254, 0.15)",
+            }}
+          >
+            <h2 
+              className="text-lg font-semibold mb-2"
+              style={{
+                color: "#223258",
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: "600"
+              }}
+            >
+              Take a quick tour?
+            </h2>
+            <p 
+              className="mb-4"
+              style={{
+                color: "#223258",
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: "400"
+              }}
+            >
+              Would you like a quick tour of the dashboard features?
+            </p>
+            <div className="flex justify-center gap-4">
+              <button 
+                className="px-4 py-2 rounded transition-colors"
+                onClick={() => { 
+                  setShowTourPrompt(false); 
+                  if (tourContext && tourContext.startTour) {
+                    tourContext.startTour();
+                  }
+                }}
+                style={{
+                  backgroundColor: "#3771FE",
+                  color: "#fff",
+                  borderRadius: "6px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  padding: "8px 16px",
+                  border: "none",
+                  fontFamily: "DM Sans, sans-serif"
+                }}
+              >
+                Yes, show me
+              </button>
+              <button 
+                className="px-4 py-2 rounded transition-colors"
+                onClick={() => { 
+                  setShowTourPrompt(false); 
+                  // Save preference as skipped when user clicks "No, thanks"
+                  if (tourContext && tourContext.saveTourPreference) {
+                    tourContext.saveTourPreference('skipped');
+                  }
+                }}
+                style={{
+                  backgroundColor: "#E4ECFF",
+                  color: "#3771FE",
+                  borderRadius: "6px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  padding: "8px 16px",
+                  border: "1px solid #3771FE",
+                  fontFamily: "DM Sans, sans-serif"
+                }}
+              >
+                No, thanks
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   )
 }

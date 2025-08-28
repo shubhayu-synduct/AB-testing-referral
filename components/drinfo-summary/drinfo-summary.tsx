@@ -17,8 +17,10 @@ import { createCitationTooltip } from '@/lib/citationTooltipUtils'
 import { marked } from 'marked'
 import Link from 'next/link'
 import { MovingBorder } from "@/components/ui/moving-border"
+import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { logger } from '@/lib/logger'
+import { useDrinfoSummaryTour } from '@/components/TourContext'
 
 interface DrInfoSummaryProps {
   user: any;
@@ -43,6 +45,7 @@ interface ChatMessage {
     }>;
     citations?: Record<string, Citation>;
     svg_content?: string[]; // Changed from string to string[]
+    apiResponse?: any; // Added API response field
   };
   feedback?: {
     likes: number;
@@ -119,7 +122,9 @@ interface DrInfoSummaryData {
     title: string;
     content: string;
   }>;
-  svg_content?: string[]; // Changed from string to string[]
+  svg_content?: string[];
+  responseStatus?: number;
+  apiResponse?: any;
 }
 
 const KNOWN_STATUSES: StatusType[] = ['processing', 'searching', 'summarizing', 'formatting', 'complete', 'complete_image'];
@@ -609,23 +614,52 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }
   }, [sessionId, isChatLoading, query, hasFetched, lastQuestion]);
 
-  // Add new controlled scroll effect
+  // Single, working scroll effect for streaming content
   useEffect(() => {
-    if (isStreaming && status !== 'complete') {
-      // During streaming, scroll to the bottom of the content
-      const contentDiv = document.querySelector('.prose');
-      if (contentDiv) {
-        contentDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
-      }
+    // Only scroll during streaming or when messages change
+    if (status !== 'complete' && status !== 'complete_image' && messages.length > 0) {
+      // Use requestAnimationFrame for smooth performance
+      requestAnimationFrame(() => {
+        // Scroll the content container to bottom
+        if (contentRef.current) {
+          contentRef.current.scrollTop = contentRef.current.scrollHeight;
+        }
+        
+        // Also scroll the window to ensure the follow-up area is visible
+        const followUpArea = document.querySelector('.follow-up-question-search');
+        if (followUpArea) {
+          followUpArea.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'end',
+            inline: 'nearest'
+          });
+        }
+      });
     }
-  }, [isStreaming, status, messages, streamedContent]);
+  }, [messages, status]); // Depend on messages and status
 
-  // Add a separate effect to handle content container scrolling
+  // Always scroll to end after any new message (answer) is added
   useEffect(() => {
-    if (contentRef.current && isStreaming && status !== 'complete') {
-      contentRef.current.scrollTop = contentRef.current.scrollHeight;
+    if (messages.length > 0) {
+      // Use requestAnimationFrame for smooth performance
+      requestAnimationFrame(() => {
+        // Scroll the content container to bottom
+        if (contentRef.current) {
+          contentRef.current.scrollTop = contentRef.current.scrollHeight;
+        }
+        
+        // Also scroll the window to ensure the follow-up area is visible
+        const followUpArea = document.querySelector('.follow-up-question-search');
+        if (followUpArea) {
+          followUpArea.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'end',
+            inline: 'nearest'
+          });
+        }
+      });
     }
-  }, [streamedContent, isStreaming, status]);
+  }, [messages]); // Only depend on messages
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -657,7 +691,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     });
     
     // Start the search/streaming first to create the answer icon
-    handleSearchWithContent(followUpQuestion, true, activeMode === 'instant' ? 'swift' : 'study');
+    handleSearchWithContent(followUpQuestion, true, activeMode === 'instant' ? 'swift' : 'study', false);
     setFollowUpQuestion(''); // Clear follow-up input after follow-up
 
     // Wait for the DOM to update with the new answer icon
@@ -915,6 +949,64 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         height: auto;
         max-width: 100%;
       }
+
+      /* SVG content in answer tab */
+      .answer-svg-content {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: 1rem 0;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      
+      .answer-svg-content svg {
+        width: 100%;
+        height: auto;
+        max-width: 100%;
+        display: block;
+        background: white;
+      }
+
+      /* Reference grid shimmer placeholder */
+      .reference-skeleton {
+        position: relative;
+        overflow: hidden;
+        background: #EEF3FF;
+        border: 1px solid #3771FE;
+        border-radius: 12px;
+      }
+      .reference-skeleton::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(100deg, rgba(255,255,255,0) 40%, rgba(255,255,255,0.6) 50%, rgba(255,255,255,0) 60%);
+        transform: translateX(-100%);
+        animation: reference-shimmer 1.4s ease-in-out infinite;
+      }
+      @keyframes reference-shimmer {
+        100% { transform: translateX(100%); }
+      }
+
+      /* Shimmer text effect for status message */
+      .shimmer-text {
+        background: linear-gradient(90deg,rgba(31, 41, 55, 0.77), #E5E7EB,rgba(31, 41, 55, 0.82));
+        background-size: 200% 100%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        animation: shimmer-text-move 4s ease-in-out infinite;
+      }
+
+      @keyframes shimmer-text-move {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .shimmer-text { animation: none; }
+      }
     `;
     document.head.appendChild(style);
     
@@ -1103,7 +1195,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     };
   }, [activeCitations]);
 
-  const handleSearchWithContent = async (content: string, isFollowUp: boolean = false, mode?: string) => {
+  const handleSearchWithContent = async (content: string, isFollowUp: boolean = false, mode?: string, directImageRequest: boolean = false) => {
     let hasCompleted = false;
     if (!content.trim()) return;
     if (!sessionId) {
@@ -1243,7 +1335,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                       }), {}) : {},
                       svg_content: msg.answer?.svg_content || (data?.svg_content ? 
                         (Array.isArray(data.svg_content) ? data.svg_content.filter((content: any) => content !== null && content !== undefined) : [data.svg_content])
-                      : [])
+                      : []),
+                      apiResponse: data?.apiResponse // Store the API response details
                     },
                   }
                 : msg
@@ -1278,8 +1371,49 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
           }, 2000);
         } catch (error) {
           logger.error('Error updating messages:', error);
-          setError('Failed to update messages. Please try again.');
+          
+          // Check if it's an internet connection error
+          let fallback = 'Servers are overloaded. Please try again later.';
+          if(data?.responseStatus === 429){
+            fallback = 'Too many requests. Please wait until your monthly limit resets or <a href="/dashboard/profile?tab=subscription" target="_blank" rel="noopener noreferrer" class="underline text-blue-600 hover:text-blue-800">upgrade to Pro</a> for unlimited access.';
+          }
+          console.log('Internet',navigator.onLine)
+          if (!navigator.onLine) {
+            fallback = 'Connection lost. Please check your internet and try again.';
+          }
+          // Add a small randomized delay (2-3 seconds) before showing the fallback answer
+          const randomDelayMs = 2000 + Math.floor(Math.random() * 1000);
+          await new Promise((resolve) => setTimeout(resolve, randomDelayMs));
+          // Show the error as the assistant's answer and mark as complete
+          setMessages(prev => {
+            if (prev.length === 0) return prev;
+            const lastIndex = prev.length - 1;
+            return prev.map((msg, idx) =>
+              idx === lastIndex && msg.type === 'assistant'
+                ? {
+                    ...msg,
+                    content: fallback,
+                    answer: {
+                      ...(msg.answer || { mainSummary: '', sections: [], citations: {} }),
+                      mainSummary: fallback,
+                      sections: [],
+                      citations: msg.answer?.citations || {},
+                      apiResponse: data?.apiResponse // Store the API response details
+                    }
+                  }
+                : msg
+            );
+          });
+          
+          // Log the API response details for debugging
+          if (data?.apiResponse) {
+            console.log('[API_RESPONSE] Response details after fallback:', data.apiResponse);
+          }
+          setStatus('complete');
           setIsLoading(false);
+          setIsStreaming(false);
+          setStatusMessage(null);
+          setError(null);
         }
       },
       { 
@@ -1287,7 +1421,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         userId, 
         parent_thread_id: parentThreadId, 
         mode: activeMode === 'instant' ? 'swift' : 'study',
-        country: userCountry // Add country to the options
+        country: userCountry, // Add country to the options
+        direct_image_request: directImageRequest // Add direct image request flag
       }
     );
   };
@@ -1415,6 +1550,37 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     // Add dummy citation numbers in the format [1], [2], etc.
     let citationCount = 1;
     return content.replace(/\[citation\]/g, () => `[${citationCount++}]`);
+  };
+
+  // Helper function to check if content is SVG
+  const isSvgContent = (content: string): boolean => {
+    if (!content || typeof content !== 'string') return false;
+    const trimmedContent = content.trim();
+    const isSvg = trimmedContent.startsWith('<svg') || trimmedContent.startsWith('<?xml');
+    if (isSvg) {
+      logger.debug('[SVG_DETECTION] Detected SVG content:', trimmedContent.substring(0, 100) + '...');
+    }
+    return isSvg;
+  };
+
+  // Helper function to count words in text content
+  const countWords = (content: string): number => {
+    if (!content || typeof content !== 'string') return 0;
+    // Remove HTML tags and count words
+    const textContent = content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    return textContent.split(/\s+/).filter(word => word.length > 0).length;
+  };
+
+  // Helper function to check if answer should show infographic option
+  const shouldShowInfographicOption = (content: string, msgIndex: number, totalMessages: number): boolean => {
+    if (!content || isSvgContent(content)) return false;
+    const wordCount = countWords(content);
+    // Only show for the last assistant message and when streaming is complete
+    const isLastMessage = msgIndex === totalMessages - 1;
+    const isStreamingComplete = status === 'complete' || status === 'complete_image';
+    // Don't show for instant mode
+    const isNotInstantMode = activeMode !== 'instant';
+    return wordCount > 200 && isLastMessage && isStreamingComplete && isNotInstantMode;
   };
 
   // Function to download SVG as PNG
@@ -1676,15 +1842,158 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }
   };
 
+  const tourContext = useDrinfoSummaryTour();
+  const [showTourPrompt, setShowTourPrompt] = useState(false);
+  
+  // Custom scroll function to scroll to bottom of answer and citation grid
+  const scrollToAnswerBottom = () => {
+    // First, scroll to the very bottom of the answer content
+    setTimeout(() => {
+      // Scroll to the very bottom of the content container
+      const contentRef = document.querySelector('.flex-1.overflow-y-auto');
+      if (contentRef) {
+        contentRef.scrollTop = contentRef.scrollHeight;
+      }
+      
+      // Also scroll the window to the bottom
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior: 'smooth'
+      });
+      
+      // Scroll to the follow-up question area to ensure we're at the very bottom
+      const followUpArea = document.querySelector('.follow-up-question-search');
+      if (followUpArea) {
+        followUpArea.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        });
+      }
+      
+      // Additional scroll to citation grid
+      const citationGrid = document.querySelector('.drinfo-citation-grid-step');
+      if (citationGrid) {
+        citationGrid.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        });
+      }
+    }, 100);
+  };
+
+  // Modified tour start function with 2-second delay
+  const startTourWithDelay = () => {
+    if (!tourContext) return;
+    
+    setShowTourPrompt(false);
+    scrollToAnswerBottom();
+    
+    // Delay tour start by 2 seconds to allow scrolling to complete
+    setTimeout(() => {
+      tourContext.startTour();
+    }, 2000);
+  };
+
+  useEffect(() => {
+    // Check if tour should be shown based on saved preferences
+    if (tourContext && tourContext.shouldShowTour) {
+      const shouldShow = tourContext.shouldShowTour();
+      if (!shouldShow) {
+        setShowTourPrompt(false);
+        return;
+      }
+    }
+
+    const timeout = setTimeout(() => {
+      setShowTourPrompt(true);
+    }, 25000);
+    return () => clearTimeout(timeout);
+  }, [tourContext]);
+
   return (
     <div className="p-2 sm:p-4 md:p-6 h-[100dvh] flex flex-col relative overflow-hidden">
+      {showTourPrompt && (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black bg-opacity-40">
+          <div 
+            className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center border"
+            style={{
+              borderRadius: "8px",
+              border: "1px solid #E4ECFF",
+              boxShadow: "0 4px 20px rgba(55, 113, 254, 0.15)",
+            }}
+          >
+            <h2 
+              className="text-lg font-semibold mb-2"
+              style={{
+                color: "#223258",
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: "600"
+              }}
+            >
+              Take a quick tour?
+            </h2>
+            <p 
+              className="mb-4"
+              style={{
+                color: "#223258",
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: "400"
+              }}
+            >
+              Would you like a quick tour of the answer and feedback features?
+            </p>
+            <div className="flex justify-center gap-4">
+              <button 
+                className="px-4 py-2 rounded transition-colors"
+                onClick={startTourWithDelay}
+                style={{
+                  backgroundColor: "#3771FE",
+                  color: "#fff",
+                  borderRadius: "6px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  padding: "8px 16px",
+                  border: "none",
+                  fontFamily: "DM Sans, sans-serif"
+                }}
+              >
+                Yes, show me
+              </button>
+              <button 
+                className="px-4 py-2 rounded transition-colors"
+                onClick={() => { 
+                  setShowTourPrompt(false); 
+                  // Save preference as skipped when user clicks "No, thanks"
+                  if (tourContext && tourContext.saveTourPreference) {
+                    tourContext.saveTourPreference('skipped');
+                  }
+                }}
+                style={{
+                  backgroundColor: "#E4ECFF",
+                  color: "#3771FE",
+                  borderRadius: "6px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  padding: "8px 16px",
+                  border: "1px solid #3771FE",
+                  fontFamily: "DM Sans, sans-serif"
+                }}
+              >
+                No, thanks
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Top Bar with Share Button */}
       <div className="flex justify-between items-center mb-4 px-2 sm:px-4">
         <div className="flex-1"></div>
         <button
           onClick={handleShare}
           disabled={!sessionId || messages.length === 0}
-          className="flex items-center space-x-2 px-4 py-2 bg-white border border-[#C8C8C8] text-[#223258] rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+          className="flex items-center space-x-2 px-4 py-2 bg-white border border-[#C8C8C8] text-[#223258] rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium drinfo-share-step"
         >
                       <img src="/Share icon.svg" alt="Share" className="w-5 h-5" />
           <span className="hidden sm:inline">Share</span>
@@ -1696,8 +2005,11 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         {isChatLoading ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="flex flex-col items-center space-y-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="text-blue-600 font-medium">Loading ...</span>
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
             </div>
           </div>
         ) : (
@@ -1717,7 +2029,12 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                     <div key={msg.id} className="mb-4">
                       {msg.type === 'user' ? (
                         <div className="p-3 sm:p-4 border rounded-5px" style={{ borderColor: 'rgba(55, 113, 254, 0.5)', fontFamily: 'DM Sans, sans-serif', fontWeight: 500, fontSize: '16px sm:text-[18px]', color: '#223258', backgroundColor: '#E4ECFF' }}>
-                          <p className="m-0">{msg.content}</p>
+                          <p className="m-0">
+                            {msg.content.includes('Create a visual abstract for this answer::::::') 
+                              ? 'Create a visual abstract for this answer' 
+                              : msg.content
+                            }
+                          </p>
                         </div>
                       ) : (
                         <>
@@ -1729,7 +2046,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                             </div>
                             <div className="flex items-center gap-4">
                               {idx === messages.length - 1 && status !== 'complete' && status !== 'complete_image' && !msg.content ? (
-                                <span className="text-gray-500 italic text-sm sm:text-base">{getStatusMessage(status as StatusType)}</span>
+                                <span className="shimmer-text italic text-sm sm:text-base">{getStatusMessage(status as StatusType)}</span>
                               ) : (
                                 msg.type === 'assistant' && msg.content && (
                                   <>
@@ -1761,21 +2078,55 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                           {(msg.content || (idx === messages.length - 1 && isStreaming)) && (
                             <div className="mb-4 sm:mb-6">
                               {activeTab === 'answer' ? (
-                                <div
-                                  className="prose prose-slate prose-ul:text-black marker:text-black max-w-none text-base sm:text-base prose-h2:text-base prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold"
-                                  style={{ fontFamily: 'DM Sans, sans-serif' }}
-                                  dangerouslySetInnerHTML={{
-                                    __html:
-                                      idx === messages.length - 1 && status !== 'complete' && status !== 'complete_image'
-                                        ? formatWithDummyCitations(
-                                            marked.parse(addDummyCitations(msg.content || ''), { async: false })
-                                          )
-                                        : formatWithCitations(
-                                            marked.parse(msg.content || '', { async: false }),
-                                            msg.answer?.citations
-                                          ),
-                                  }}
-                                />
+                                <>
+                                  {isSvgContent(msg.content || '') ? (
+                                    (() => {
+                                      logger.debug('[SVG_RENDERING] Rendering SVG content for message:', msg.id);
+                                      return (
+                                        // Render SVG content as image
+                                        <div className="flex justify-center relative group">
+                                          <div 
+                                            className="answer-svg-content w-full max-w-4xl"
+                                            dangerouslySetInnerHTML={{ __html: msg.content || '' }}
+                                          />
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              downloadSvgAsPng(msg.content || '', `answer-${msg.threadId}`);
+                                            }}
+                                            className="absolute top-2 right-2 p-2 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full shadow-md transition-all duration-200 hover:scale-110 opacity-0 group-hover:opacity-100"
+                                            title="Download as PNG"
+                                          >
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                              <polyline points="7,10 12,15 17,10"/>
+                                              <line x1="12" y1="15" x2="12" y2="3"/>
+                                            </svg>
+                                          </button>
+                                        </div>
+                                      );
+                                    })()
+                                  ) : (
+                                    // Render text content as before
+                                    <div
+                                      className="prose prose-slate prose-ul:text-black marker:text-black max-w-none text-base sm:text-base prose-h2:text-base prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold drinfo-answer-content"
+                                      style={{ fontFamily: 'DM Sans, sans-serif' }}
+                                      dangerouslySetInnerHTML={{
+                                        __html:
+                                          idx === messages.length - 1 && status !== 'complete' && status !== 'complete_image'
+                                            ? formatWithDummyCitations(
+                                                marked.parse(addDummyCitations(msg.content || ''), { async: false })
+                                              )
+                                            : formatWithCitations(
+                                                marked.parse(msg.content || '', { async: false }),
+                                                msg.answer?.citations
+                                              ),
+                                      }}
+                                    />
+                                  )}
+                                  
+                                  {/* Show infographic option for long text answers - MOVED BELOW FEEDBACK */}
+                                </>
                               ) : (
                                 <div className="prose prose-slate max-w-none text-base sm:text-base">
                                   {msg.answer?.svg_content && msg.answer.svg_content.length > 0 ? (
@@ -1842,6 +2193,20 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                               )}
                             </div>
                           )}
+                          {/* Probable references shimmer during formatting/formatting response stage (after streaming, before citations) */}
+                          {idx === messages.length - 1 && (status === 'formatting' || status === 'formatting response') && (() => {
+                            const hasCitations = (msg.answer?.citations && Object.keys(msg.answer.citations).length > 0) ||
+                              (activeCitations && Object.keys(activeCitations).length > 0);
+                            return !hasCitations;
+                          })() && (
+                            <div className="mt-4 sm:mt-6">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+                                <div className="reference-skeleton h-[95px] sm:h-[105px] lg:h-[125px]" />
+                                <div className="reference-skeleton h-[95px] sm:h-[105px] lg:h-[125px]" />
+                                <div className="reference-skeleton hidden sm:block h-[95px] sm:h-[105px] lg:h-[125px]" />
+                              </div>
+                            </div>
+                          )}
                           {(() => {
                             const shouldShowCitations = (msg.answer?.citations && Object.keys(msg.answer.citations).length > 0) || 
                               (activeCitations && Object.keys(activeCitations).length > 0);
@@ -1869,13 +2234,36 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                   conversationId={sessionId || ''}
                                   threadId={msg.threadId}
                                   answerText={msg.content || ''}
-                                  // Only show retry for the last assistant message
-                                  {...(idx === messages.length - 1 ? {
-                                    onReload: () => handleReload(msg.id),
-                                    isReloading: reloadingMessageId === msg.id
-                                  } : {})}
+                                  // Always pass onReload for the last assistant message
+                                  onReload={idx === messages.length - 1 ? () => handleReload(msg.id) : undefined}
+                                  isReloading={reloadingMessageId === msg.id}
                                   messageId={msg.id}
                                 />
+                                
+                                {/* Show infographic option for long text answers - NOW BELOW FEEDBACK */}
+                                {shouldShowInfographicOption(msg.content || '', idx, messages.length) && (
+                                  <div className="mt-4 sm:mt-6">
+                                    <button
+                                      onClick={() => {
+                                        const infographicRequest = `Create a visual abstract for this answer::::::${msg.content}`;
+                                        // Send directly to backend without filling follow-up search bar
+                                        handleSearchWithContent(infographicRequest, true, activeMode === 'instant' ? 'swift' : 'study', true);
+                                      }}
+                                      className="w-auto px-6 py-3 sm:px-8 sm:py-4 border rounded-lg transition-all duration-200 hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 drinfo-visual-abstract-step"
+                                      style={{ 
+                                        borderColor: 'rgba(55, 113, 254, 0.5)', 
+                                        fontFamily: 'DM Sans, sans-serif', 
+                                        fontWeight: 500, 
+                                        fontSize: '16px', 
+                                        color: '#223258', 
+                                        backgroundColor: '#E4ECFF',
+                                        borderRadius: '8px'
+                                      }}
+                                    >
+                                      Create a visual abstract for this answer
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )}
@@ -1892,7 +2280,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                 <div ref={inputAnchorRef} style={{ marginBottom: '120px sm:140px' }} />
                 <div className="sticky bottom-0 bg-gray-50 pt-2 pb-4 z-10">
                   <div className="max-w-4xl mx-auto px-2 sm:px-4">
-                    <div className="relative w-full bg-white rounded border-2 border-[#3771fe44] shadow-[0px_0px_11px_#0000000c] p-3 md:p-4">
+                    <div className="relative w-full bg-white rounded border-2 border-[#3771fe44] shadow-[0px_0px_11px_#0000000c] p-3 md:p-4 follow-up-question-search">
                       <div className="relative">
                         <textarea
                           value={followUpQuestion}
@@ -1936,8 +2324,11 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                         </button>
                       </div>
                     </div>
-                    <div className="w-full py-3 text-center text-[14px] text-gray-400">
-                      <p>Generated by AI, apply professional/physicians' judgment. <a href="https://synduct.com/terms-and-conditions/" target="_blank" rel="noopener noreferrer" className="font-regular underline text-black hover:text-[#3771FE] transition-colors duration-200">Click here</a> for further information.</p>
+                    <div className="w-full py-3 md:py-4 text-center text-xs md:text-sm text-gray-400 px-4">
+                      <p>Do not insert protected health information or personal data.</p>
+                        <Link href="https://synduct.com/terms-and-conditions/" className="text-black hover:text-[#3771FE] underline inline-block" target="_blank" rel="noopener noreferrer">
+                          Terms and Conditions
+                        </Link>
                     </div>
                   </div>
                 </div>

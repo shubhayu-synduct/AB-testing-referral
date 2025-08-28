@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   // Get the path of the request
   const path = request.nextUrl.pathname
 
@@ -12,6 +12,7 @@ export function middleware(request: NextRequest) {
     path === "/forgot-password" || 
     path.startsWith("/reset-password") ||
     path.startsWith("/dashboard/public/") || // Allow access to public shared chats
+    path.startsWith("/not-signed-in") || // Allow access to not-signed-in route
     path.startsWith("/_next") ||
     path.startsWith("/api") ||
     path.endsWith(".svg") ||
@@ -47,7 +48,7 @@ export function middleware(request: NextRequest) {
 
   // Only redirect to login for truly protected routes
   // Let client-side auth handle most auth logic to prevent race conditions
-  if (!hasValidAuthCookie && !isPublicPath) {
+  if (!hasValidAuthCookie && !isPublicPath ) {
     // Remove onboarding from critical paths - let AuthProvider handle it
     const criticalProtectedPaths: string[] = [] // Remove '/onboarding' from here
     const isCriticalPath = criticalProtectedPaths.some(criticalPath => path.startsWith(criticalPath))

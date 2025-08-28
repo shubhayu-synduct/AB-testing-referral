@@ -31,7 +31,7 @@ export const ReferenceGrid: React.FC<ReferenceGridProps> = ({ citations, onShowA
   const visibleCitations = Object.fromEntries(filteredCitations);
 
   return (
-    <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 w-full">
+    <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 w-full drinfo-citation-grid-step">
       {(() => {
         const entries = filteredCitations;
         const showAll = getCitationCount(visibleCitations) >= 1;

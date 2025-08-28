@@ -6,8 +6,9 @@ import GuidelineSummaryModal from './guideline-summary-modal'
 import GuidelineSummaryMobileModal from './guideline-summary-mobile-modal'
 import { useAuth } from '@/hooks/use-auth'
 import { getFirebaseFirestore } from '@/lib/firebase'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore'
 import { logger } from '@/lib/logger'
+import { track } from '@vercel/analytics'
 
 interface Guideline {
   id: number;
@@ -23,6 +24,20 @@ interface Guideline {
   link?: string;
 }
 
+interface Bookmark {
+  guidelineId: number;
+  guidelineTitle: string;
+  category: string;
+  url: string;
+  society: string;
+  lastUpdated: string;
+  savedAt: string;
+  lastAccessed: string;
+  notes: string;
+  pdf_saved: boolean;
+  link: string;
+}
+
 interface GuidelinesProps {
   initialGuidelines?: Guideline[];
 }
@@ -30,17 +45,31 @@ interface GuidelinesProps {
 export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) {
   const [guidelines, setGuidelines] = useState<Guideline[]>(initialGuidelines || [])
   const [searchTerm, setSearchTerm] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedGuideline, setSelectedGuideline] = useState<Guideline | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
-  const [expandedCategories, setExpandedCategories] = useState<string[]>(['National'])
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(['National']); // Default to National
   const [isMobile, setIsMobile] = useState(false)
   const [userCountry, setUserCountry] = useState<string>('')
+  const [userSpecialties, setUserSpecialties] = useState<string[]>([])
+  const [hasSearched, setHasSearched] = useState(false)
+  const [curatedGuidelines, setCuratedGuidelines] = useState<Guideline[]>([])
+  const [bookmarkedGuidelines, setBookmarkedGuidelines] = useState<Bookmark[]>([])
+  const [showBookmarks, setShowBookmarks] = useState(false)
+  const [bookmarkingGuidelines, setBookmarkingGuidelines] = useState<Set<number>>(new Set())
   const { user } = useAuth()
 
-  const categoryOrder = ['National', 'Europe', 'International', 'USA'];
+  // Dynamic category order based on user's country
+  const getCategoryOrder = () => {
+    if (userCountry === 'united-states') {
+      return ['USA', 'Europe', 'International']; // Hide National for US users
+    }
+    return ['National', 'Europe', 'International', 'USA'];
+  };
+  
+  const categoryOrder = getCategoryOrder();
 
   // Group guidelines by category
   const groupedGuidelines = guidelines.reduce((acc, guideline) => {
@@ -60,9 +89,28 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
     );
   };
 
+  const loadUserBookmarks = async () => {
+    if (!user?.uid) return;
+    
+    try {
+      const db = getFirebaseFirestore();
+      const userId = user.uid;
+      const userDoc = await getDoc(doc(db, "users", userId));
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const bookmarks = userData.bookmarks || [];
+        setBookmarkedGuidelines(bookmarks);
+      }
+    } catch (error) {
+      logger.error('Error loading user bookmarks:', error);
+    }
+  }
+
   useEffect(() => {
-    const fetchUserCountry = async () => {
+    const fetchUserProfile = async () => {
       if (user) {
+        console.log('User authenticated:', user.uid);
         try {
           const db = getFirebaseFirestore();
           const userId = user.uid;
@@ -71,28 +119,219 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
           if (userDoc.exists()) {
             const userData = userDoc.data();
             const country = userData?.profile?.country;
+            const specialties = userData?.profile?.specialties || [];
+            const otherSpecialty = userData?.profile?.otherSpecialty || '';
+            
             if (country) {
               setUserCountry(country);
+              // Update expanded categories based on detected country
+              if (country === 'united-states') {
+                setExpandedCategories(['USA']);
+              } else {
+                setExpandedCategories(['National']);
+              }
+            }
+            if (specialties && Array.isArray(specialties)) {
+              setUserSpecialties(specialties);
+            }
+            
+            // Load user bookmarks
+            await loadUserBookmarks();
+            
+            // Automatically fetch guidelines based on user's country and specialties
+            if (country || specialties.length > 0 || otherSpecialty) {
+              await fetchInitialGuidelines(country, specialties, otherSpecialty);
             }
           }
         } catch (error) {
-          logger.error("Error fetching user country:", error);
+          logger.error("Error fetching user profile:", error);
         }
+      } else {
+        console.log('No user authenticated');
       }
     };
 
-    fetchUserCountry();
+    fetchUserProfile();
   }, [user]);
+
+  useEffect(() => {
+    track('GuidelinesPageVisited', {
+      user: user ? 'authenticated' : 'unauthenticated',
+      userCountry: userCountry || 'unknown',
+      timestamp: new Date().toISOString()
+    });
+  }, [user, userCountry]);
+
+  const fetchInitialGuidelines = async (country: string, specialties: string[], otherSpecialty: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Create a search query based on country and specialties
+      let query = '';
+      if (country && country !== 'united-states') {
+        query += `${country} `;
+      }
+      if (specialties.length > 0) {
+        query += specialties.join(' ');
+      }
+      if (otherSpecialty) {
+        query += ` ${otherSpecialty}`;
+      }
+      
+      // If no specific query, use a general term
+      if (!query.trim()) {
+        query = 'clinical guidelines';
+      }
+      
+      const response = await fetch('/api/guidelines/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: query.trim(),
+          country: country || 'None',
+          specialties: specialties,
+          otherSpecialty: otherSpecialty
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to fetch guidelines with status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Curate the results to show all guidelines
+      const allGuidelines = Array.isArray(data) ? data : [];
+      const curated = curateGuidelines(allGuidelines);
+      setCuratedGuidelines(curated);
+    } catch (err: any) {
+      logger.error('Error fetching initial guidelines:', err);
+      setError(err.message || 'Failed to fetch initial guidelines. Please try searching manually.');
+      setCuratedGuidelines([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const curateGuidelines = (guidelines: Guideline[]): Guideline[] => {
+    // Filter out incomplete guidelines first - only require essential fields
+    const validGuidelines = guidelines.filter(guideline => 
+      guideline.id && 
+      guideline.title
+      // Removed strict filtering for description, category, last_updated
+    );
+    
+    if (validGuidelines.length === 0) return [];
+    
+    // Consider all categories, not just National
+    // Group guidelines by category to ensure diversity
+    const guidelinesByCategory = validGuidelines.reduce((acc, guideline) => {
+      const category = guideline.category || 'Other';
+      if (!acc[category]) {
+        acc[category] = [];
+      }
+      acc[category].push(guideline);
+      return acc;
+    }, {} as Record<string, Guideline[]>);
+    
+    // Create a curated list with guidelines from different categories
+    const curated: Guideline[] = [];
+    
+    // Include all guidelines from all categories
+    Object.keys(guidelinesByCategory).forEach(category => {
+      guidelinesByCategory[category].forEach(guideline => {
+        curated.push(guideline);
+      });
+    });
+    
+    return curated;
+  };
+
+  const handlePopularSearch = async (term: string) => {
+    try {
+      setIsLoading(true)
+      setError(null)
+      setHasSearched(true)
+      setShowBookmarks(false)
+      
+      // Get the current user's otherSpecialty from the profile
+      let otherSpecialty = '';
+      if (user) {
+        try {
+          const db = getFirebaseFirestore();
+          const userId = user.uid;
+          const userDoc = await getDoc(doc(db, "users", userId));
+          if (userDoc.exists()) {
+            otherSpecialty = userDoc.data()?.profile?.otherSpecialty || '';
+          }
+        } catch (error) {
+          // Ignore error, continue without otherSpecialty
+        }
+      }
+      
+      const response = await fetch('/api/guidelines/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: term,
+          country: userCountry || 'None',
+          specialties: userSpecialties,
+          otherSpecialty: otherSpecialty
+        })
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Search failed with status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      logger.debug('API response:', data);
+      setGuidelines(Array.isArray(data) ? data : [])
+      setRetryCount(0)
+    } catch (err: any) {
+      logger.error('Error searching guidelines:', err)
+      setError(err.message || 'Search failed. Please try again.')
+      setGuidelines([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
       setGuidelines(initialGuidelines || [])
+      setHasSearched(false)
+      setShowBookmarks(false)
       return
     }
     
     try {
       setIsLoading(true)
       setError(null)
+      setHasSearched(true)
+      setShowBookmarks(false)
+      
+      // Get the current user's otherSpecialty from the profile
+      let otherSpecialty = '';
+      if (user) {
+        try {
+          const db = getFirebaseFirestore();
+          const userId = user.uid;
+          const userDoc = await getDoc(doc(db, "users", userId));
+          if (userDoc.exists()) {
+            otherSpecialty = userDoc.data()?.profile?.otherSpecialty || '';
+          }
+        } catch (error) {
+          // Ignore error, continue without otherSpecialty
+        }
+      }
       
       const response = await fetch('/api/guidelines/search', {
         method: 'POST',
@@ -101,7 +340,9 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
         },
         body: JSON.stringify({
           query: searchTerm,
-          country: userCountry || 'None' // Pass the user's country or default to 'International'
+          country: userCountry || 'None',
+          specialties: userSpecialties,
+          otherSpecialty: otherSpecialty
         })
       })
       
@@ -128,6 +369,14 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
     handleSearch()
   }
 
+  const clearSearch = () => {
+    setSearchTerm('')
+    setHasSearched(false)
+    setGuidelines([])
+    setError(null)
+    setShowBookmarks(false)
+  }
+
   const handleGuidelineClick = (guideline: Guideline) => {
     setSelectedGuideline(guideline)
     setIsModalOpen(true)
@@ -138,9 +387,180 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
     setSelectedGuideline(null)
   }
 
+  const toggleBookmark = async (guideline: Guideline) => {
+    if (bookmarkingGuidelines.has(guideline.id)) {
+      console.log('Bookmark operation already in progress for guideline:', guideline.id);
+      return; // Prevent multiple simultaneous operations
+    }
+    
+    if (!user?.uid) {
+      console.log('User not authenticated');
+      return;
+    }
+    
+    try {
+      console.log('Starting bookmark operation for guideline:', guideline.id);
+      setBookmarkingGuidelines(prev => new Set([...prev, guideline.id]));
+      
+      if (isBookmarked(guideline)) {
+        console.log('Removing bookmark');
+        // Remove from bookmarks
+        await removeBookmark(guideline);
+      } else {
+        console.log('Adding bookmark');
+        // Add to bookmarks and library
+        await saveBookmark(guideline);
+      }
+    } catch (error) {
+      console.error('Error toggling bookmark:', error);
+      logger.error('Error toggling bookmark:', error);
+      // You could add a toast notification here for user feedback
+    } finally {
+      console.log('Bookmark operation completed, resetting state');
+      setBookmarkingGuidelines(prev => new Set([...prev].filter(id => id !== guideline.id)));
+    }
+  }
+
+  const saveBookmark = async (guideline: Guideline) => {
+    try {
+      // Validate required fields
+      if (!guideline.id || !guideline.title) {
+        throw new Error("Invalid guideline data: missing required fields");
+      }
+      
+      // Step 1: Save to user's bookmarks
+      const db = getFirebaseFirestore();
+      const userId = user?.uid; // Use optional chaining
+      if (!userId) {
+        throw new Error("User not logged in.");
+      }
+      const userRef = doc(db, "users", userId);
+      
+      // Create bookmark data with proper defaults and no undefined values
+      const bookmarkData: Bookmark = {
+        guidelineId: guideline.id,
+        guidelineTitle: guideline.title || 'Untitled Guideline',
+        category: guideline.category || 'Other',
+        url: guideline.url || '',
+        society: guideline.society || '',
+        lastUpdated: guideline.last_updated || new Date().toISOString(),
+        savedAt: new Date().toISOString(),
+        lastAccessed: new Date().toISOString(),
+        notes: "",
+        pdf_saved: guideline.pdf_saved || false,
+        link: guideline.link || ''
+      };
+      
+      // Filter out any remaining undefined values to prevent Firebase errors
+      const cleanBookmarkData = Object.fromEntries(
+        Object.entries(bookmarkData).filter(([_, value]) => value !== undefined)
+      ) as Bookmark;
+      
+      console.log('Saving bookmark data:', cleanBookmarkData);
+      
+      await updateDoc(userRef, {
+        bookmarks: arrayUnion(cleanBookmarkData)
+      });
+      
+      // Step 2: Save to library (if not already there)
+      if (!guideline.pdf_saved) {
+        const librarySaved = await saveToLibrary(guideline);
+        if (librarySaved) {
+          // Update the bookmark with new pdf_saved status
+          cleanBookmarkData.pdf_saved = true;
+          
+          // Remove the old bookmark and add the updated one
+          const userDoc = await getDoc(userRef);
+          const currentBookmarks = userDoc.data()?.bookmarks || [];
+          const updatedBookmarks = currentBookmarks.filter(
+            (bookmark: Bookmark) => bookmark.guidelineId !== guideline.id
+          );
+          
+          await updateDoc(userRef, {
+            bookmarks: [...updatedBookmarks, cleanBookmarkData]
+          });
+        }
+      }
+      
+      // Update local state
+      setBookmarkedGuidelines(prev => [...prev, cleanBookmarkData]);
+      
+    } catch (error) {
+      logger.error('Error saving bookmark:', error);
+      throw error;
+    }
+  }
+
+  const removeBookmark = async (guideline: Guideline) => {
+    try {
+      const db = getFirebaseFirestore();
+      const userId = user?.uid; // Use optional chaining
+      if (!userId) {
+        throw new Error("User not logged in.");
+      }
+      const userRef = doc(db, "users", userId);
+      
+      // Get current bookmarks
+      const userDoc = await getDoc(userRef);
+      const currentBookmarks = userDoc.data()?.bookmarks || [];
+      
+      // Remove the specific bookmark
+      const updatedBookmarks = currentBookmarks.filter(
+        (bookmark: Bookmark) => bookmark.guidelineId !== guideline.id
+      );
+      
+      // Update the document
+      await updateDoc(userRef, {
+        bookmarks: updatedBookmarks
+      });
+      
+      // Update local state
+      setBookmarkedGuidelines(updatedBookmarks);
+      
+    } catch (error) {
+      logger.error('Error removing bookmark:', error);
+      throw error;
+    }
+  }
+
+  const saveToLibrary = async (guideline: Guideline): Promise<boolean> => {
+    try {
+      // Call your library API to save the guideline
+      const response = await fetch('/api/library/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          guidelineId: guideline.id,
+          title: guideline.title,
+          category: guideline.category,
+          url: guideline.url,
+          society: guideline.society,
+          lastUpdated: guideline.last_updated,
+          link: guideline.link
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        return data.pdf_saved || false;
+      }
+      
+      return false;
+    } catch (error) {
+      logger.error('Error saving to library:', error);
+      return false;
+    }
+  }
+
+  const isBookmarked = (guideline: Guideline) => {
+    return bookmarkedGuidelines.some(bg => bg.guidelineId === guideline.id);
+  }
+
   useEffect(() => {
-    // Priority order for categories
-    const priorityOrder = ['National', 'Europe', 'International', 'USA'];
+    // Use dynamic category order based on user's country
+    const priorityOrder = getCategoryOrder();
     
     // Find the first category that has guidelines
     const firstCategoryWithGuidelines = priorityOrder.find(category => 
@@ -157,7 +577,7 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
         return [...prev, firstCategoryWithGuidelines];
       });
     }
-  }, [guidelines]);
+  }, [guidelines, userCountry]);
 
   useEffect(() => {
     if (selectedGuideline) {
@@ -224,7 +644,15 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
                 }
               }}
             />
-            <div className="absolute right-1.5 sm:right-2 md:right-2 top-1/2 transform -translate-y-1/2">
+            <div className="absolute right-1.5 sm:right-2 md:right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
+              {searchTerm && (
+                <button 
+                  onClick={clearSearch}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                >
+                  ✕
+                </button>
+              )}
               <button 
                 onClick={handleSearch}
                 disabled={isLoading}
@@ -238,7 +666,234 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
               </button>
             </div>
           </div>
+          
+          {/* Bookmark Button - Below search bar */}
+          {!hasSearched && (
+            <div className="flex justify-center mt-3">
+              <button 
+                onClick={() => setShowBookmarks(!showBookmarks)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+                  showBookmarks 
+                    ? 'bg-[#01257C] text-white border border-[#01257C]' 
+                    : 'bg-[#01257C] text-white hover:bg-[#011a5c] border border-[#01257C]'
+                }`}
+                title={showBookmarks ? 'Hide your saved guidelines' : 'Show your saved guidelines'}
+                style={{
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontWeight: 500,
+                  fontSize: 'clamp(12px, 1.5vw, 14px)'
+                }}
+              >
+                <Bookmark 
+                  size={14} 
+                  className="w-3.5 h-3.5" 
+                  fill={showBookmarks ? 'currentColor' : 'none'}
+                />
+                <span>
+                  {showBookmarks ? 'Hide Bookmarks' : 'Show Bookmarks'}
+                </span>
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Popular Searches */}
+        {!hasSearched && (
+          <div className="mb-6 sm:mb-8">
+            <h3 className="text-sm sm:text-base font-medium text-[#223258] mb-3 px-2 text-center" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+              Popular Searches
+            </h3>
+            <div className="flex flex-wrap gap-2 px-2 justify-center">
+              {['hypertension', 'arthritis', 'obesity', 'pneumonia', 'diabetes', 'asthma', 'cancer'].map((term) => (
+                <button
+                  key={term}
+                          onClick={() => {
+          setSearchTerm(term);
+          // Use the term directly in search instead of relying on state update
+          handlePopularSearch(term);
+        }}
+                  className="px-3 py-1.5 text-xs sm:text-sm bg-[#F4F7FF] border border-[#B5C9FC] text-[#223258] rounded-[6px] hover:bg-[#E8F0FF] hover:border-[#3771FE] transition-colors"
+                  style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500 }}
+                >
+                  {term}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Bookmarks Section */}
+        {!hasSearched && showBookmarks && (
+          <div className="mb-4 sm:mb-6 p-3 sm:p-4" style={{ background: '#EEF3FF' }}>
+            <div className="border px-0 pb-2 sm:pb-4 pt-1 sm:pt-2" style={{ borderColor: '#A2BDFF', borderWidth: 1, borderStyle: 'solid', background: '#fff' }}>
+              <div className="px-3 sm:px-6 py-2 sm:py-4">
+                <h2 
+                  className="text-base sm:text-lg lg:text-xl text-gray-900 mb-4"
+                  style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500, color: '#263969' }}
+                >
+                  Your Saved Guidelines ({bookmarkedGuidelines.length})
+                </h2>
+                
+                {bookmarkedGuidelines.length > 0 ? (
+                  <div className="space-y-3 sm:space-y-4">
+                    {bookmarkedGuidelines.map((guideline, index) => (
+                      <div key={`bookmark-${guideline.guidelineId || 'guideline'}-${index}-${guideline.guidelineTitle?.slice(0, 10)}`}>
+                        <div className="p-3 sm:p-4 shadow-sm border" style={{ background: '#fff', borderColor: '#A2BDFF' }}>
+                          <div className="space-y-2 sm:space-y-3">
+                            {/* Title as a link */}
+                            <a 
+                              href={guideline.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="block"
+                              style={{
+                                fontFamily: 'DM Sans, sans-serif',
+                                color: '#214498',
+                                fontWeight: 500,
+                                fontSize: 'clamp(14px, 1.5vw, 16px)',
+                                background: 'none',
+                                border: 'none',
+                              }}
+                            >
+                              {guideline.guidelineTitle}
+                            </a>
+                            
+                            {/* Year and Publisher badges */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              {/* Year badge */}
+                              <span 
+                                className="px-2 sm:px-3 py-1 text-xs sm:text-sm"
+                                style={{
+                                  fontFamily: 'DM Sans, sans-serif',
+                                  color: '#3771FE',
+                                  background: 'rgba(148, 167, 214, 0.2)',
+                                  fontWeight: 400,
+                                  border: 'none',
+                                  marginRight: 4,
+                                }}
+                              >
+                                {new Date(guideline.lastUpdated).getFullYear()}
+                              </span>
+                              
+                              {/* Publisher badge */}
+                              {guideline.society && (
+                                <span 
+                                  className="px-2 sm:px-3 py-1 text-xs sm:text-sm break-words max-w-full"
+                                  style={{
+                                    fontFamily: 'DM Sans, sans-serif',
+                                    color: '#3771FE',
+                                    background: 'rgba(148, 167, 214, 0.2)',
+                                    fontWeight: 400,
+                                    border: 'none',
+                                    display: 'inline-block',
+                                    wordBreak: 'break-word'
+                                  }}
+                                >
+                                  {guideline.society}
+                                </span>
+                              )}
+                            </div>
+                            
+                            {/* Remove Bookmark and Dive In buttons */}
+                            <div className="flex flex-row items-center gap-3">
+                              <button 
+                                onClick={() => toggleBookmark({
+                                  id: guideline.guidelineId,
+                                  title: guideline.guidelineTitle,
+                                  description: '',
+                                  category: guideline.category,
+                                  last_updated: guideline.lastUpdated,
+                                  url: guideline.url,
+                                  society: guideline.society,
+                                  link: guideline.link,
+                                  pdf_saved: guideline.pdf_saved
+                                } as Guideline)}
+                                disabled={bookmarkingGuidelines.has(guideline.guidelineId)}
+                                className={`flex items-center gap-1 text-blue-500 hover:text-blue-600 transition-colors ${bookmarkingGuidelines.has(guideline.guidelineId) ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                                style={{ fontSize: 'clamp(12px, 1.5vw, 14px)' }}
+                              >
+                                {bookmarkingGuidelines.has(guideline.guidelineId) ? (
+                                  <Loader2 size={16} className="sm:w-5 sm:h-5 animate-spin" />
+                                ) : (
+                                  <Bookmark size={16} className="sm:w-5 sm:h-5" fill="currentColor" />
+                                )}
+                                <span>{bookmarkingGuidelines.has(guideline.guidelineId) ? 'Removing...' : 'Remove'}</span>
+                              </button>
+                              
+                              <div className="flex-grow"></div>
+                              
+                              {/* Dive In button */}
+                              <button 
+                                onClick={() => handleGuidelineClick({
+                                  id: guideline.guidelineId,
+                                  title: guideline.guidelineTitle,
+                                  description: '',
+                                  category: guideline.category,
+                                  last_updated: guideline.lastUpdated,
+                                  url: guideline.url,
+                                  society: guideline.society,
+                                  link: guideline.link,
+                                  pdf_saved: guideline.pdf_saved
+                                } as Guideline)}
+                                disabled={!guideline.pdf_saved}
+                                className={`flex items-center gap-1 px-3 sm:px-4 py-1.5 sm:py-2 transition-colors text-xs sm:text-sm
+                                ${guideline.pdf_saved 
+                                    ? '' 
+                                    : 'cursor-not-allowed'}
+                                `}
+                                style={{
+                                  background: guideline.pdf_saved ? '#01257C' : 'rgba(1, 37, 124, 0.5)',
+                                  color: '#fff',
+                                  fontFamily: 'DM Sans, sans-serif',
+                                  fontWeight: 500,
+                                  border: 'none',
+                                  boxShadow: 'none',
+                                  opacity: guideline.pdf_saved ? 1 : 0.5,
+                                  minWidth: '10px',
+                                  fontSize: 'clamp(12px, 1.5vw, 14px)'
+                                }}
+                              >
+                                {guideline.pdf_saved ? 'Guideline AI Summary' : 'Processing for AI Summary...'}
+                                {guideline.pdf_saved && (
+                                  <span className="flex items-center ml-1 sm:ml-2">
+                                    <ChevronRight size={14} className="sm:w-4 sm:h-4" style={{marginLeft: -10}} color="#fff" />
+                                    <ChevronRight size={14} className="sm:w-4 sm:h-4" style={{marginLeft: -10}} color="#fff" />
+                                  </span>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 sm:py-12">
+                    <BookOpen className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
+                    <p 
+                      className="text-sm sm:text-base text-gray-600"
+                      style={{ fontFamily: 'DM Sans, sans-serif' }}
+                    >
+                      No bookmarks found
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Guidelines for Your Specialty Heading */}
+        {!hasSearched && (
+          <div className="mb-4 sm:mb-6 text-center">
+            <h2 
+              className="text-lg sm:text-xl lg:text-2xl text-gray-900"
+              style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500, color: '#263969' }}
+            >
+              Guidelines for Your Specialty
+            </h2>
+          </div>
+        )}
         
         {error && (
           <div
@@ -264,178 +919,371 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
         )}
         
         <div className="space-y-3 sm:space-y-4 p-3 sm:p-4" style={{ background: '#EEF3FF' }}>
-          {categoryOrder
-            .map(category => (
-              <div key={category} className="border px-0 pb-2 sm:pb-4 pt-1 sm:pt-2" style={{ borderColor: '#A2BDFF', borderWidth: 1, borderStyle: 'solid', background: '#fff' }}>
-              <button
-                onClick={() => toggleCategory(category)}
-                  className="w-full px-3 sm:px-6 py-2 sm:py-4 flex items-center justify-between text-left"
-                  style={{
-                    background: '#fff'
-                  }}
-              >
-                  <h2 
-                    className="text-base sm:text-lg lg:text-xl text-gray-900"
-                    style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500, color: '#263969' }}
-                  >
-                    {category === 'Europe' ? 'European' : category} Guidelines
-                  </h2>
-                <ChevronDown 
-                  className={`h-4 w-4 sm:h-5 sm:w-5 text-gray-500 transition-transform ${
-                    expandedCategories.includes(category) ? 'transform rotate-180' : ''
-                  }`}
-                />
-              </button>
-              
-              {expandedCategories.includes(category) && (
-                <div className="p-2 sm:p-4 space-y-2 sm:space-y-4">
-                    {(groupedGuidelines[category]?.filter(guideline => 
-                        guideline.id && 
-                        guideline.title && 
-                        guideline.description && 
-                        guideline.category && 
-                        guideline.last_updated
-                      ).length ?? 0) > 0 ? (
-                      groupedGuidelines[category]
-                        .filter(guideline => 
-                          guideline.id && 
-                          guideline.title && 
-                          guideline.description && 
-                          guideline.category && 
-                          guideline.last_updated
-                        )
-                        .map((guideline) => (
-                    <div key={guideline.id}>
-                        <div className="p-2 sm:p-4 shadow-sm border" style={{ background: '#fff', borderColor: '#A2BDFF' }}>
-                        <div className="space-y-2 sm:space-y-3">
-                          {/* Title as a link */}
-                          <a 
-                            href={guideline.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                              className="block"
-                              style={{
-                                fontFamily: 'DM Sans, sans-serif',
-                                color: '#214498',
-                                fontWeight: 500,
-                                fontSize: 'clamp(14px, 1.5vw, 16px)',
-                                background: 'none',
-                                border: 'none',
-                              }}
-                          >
-                            {guideline.title}
-                          </a>
-                          
-                          {/* Year and Publisher badges */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            {/* Year badge */}
-                              <span 
-                                className="px-2 sm:px-3 py-1 text-xs sm:text-sm"
-                                style={{
-                                  fontFamily: 'DM Sans, sans-serif',
-                                  color: '#3771FE',
-                                  background: 'rgba(148, 167, 214, 0.2)',
-                                  fontWeight: 400,
-                                  border: 'none',
-                                  marginRight: 4,
-                                }}
-                              >
-                              {new Date(guideline.last_updated).getFullYear()}
-                            </span>
-                            
-                            {/* Publisher badge */}
-                              {guideline.society && (
-                                <span 
-                                  className="px-2 sm:px-3 py-1 text-xs sm:text-sm break-words max-w-full"
-                                  style={{
-                                    fontFamily: 'DM Sans, sans-serif',
-                                    color: '#3771FE',
-                                    background: 'rgba(148, 167, 214, 0.2)',
-                                    fontWeight: 400,
-                                    border: 'none',
-                                    display: 'inline-block',
-                                    wordBreak: 'break-word'
-                                  }}
-                                >
-                                  {guideline.society}
-                              </span>
-                            )}
-                          </div>
-                          
-                          {/* Save and Dive In buttons */}
-                          <div className="flex flex-row items-center gap-3">
-                            <button className="flex items-center gap-1 text-slate-500 hover:text-blue-500 transition-colors" style={{ fontSize: 'clamp(12px, 1.5vw, 14px)' }}>
-                              <Bookmark size={16} className="sm:w-5 sm:h-5" />
-                              <span>Save</span>
-                            </button>
-                            
-                            <div className="flex-grow"></div>
-                            
-                            {/* Dive In button */}
-                            <button 
-                              onClick={() => handleGuidelineClick(guideline)}
-                              disabled={!guideline.pdf_saved}
-                                className={`flex items-center gap-1 px-3 sm:px-4 py-1.5 sm:py-2 transition-colors text-xs sm:text-sm
-                                ${guideline.pdf_saved 
-                                    ? '' 
-                                    : 'cursor-not-allowed'}
-                                `}
-                                style={{
-                                  background: guideline.pdf_saved ? '#01257C' : 'rgba(1, 37, 124, 0.5)',
-                                  color: '#fff',
-                                  fontFamily: 'DM Sans, sans-serif',
-                                  fontWeight: 500,
-                                  border: 'none',
-                                  boxShadow: 'none',
-                                  opacity: guideline.pdf_saved ? 1 : 0.5,
-                                  minWidth: '10px',
-                                  fontSize: 'clamp(12px, 1.5vw, 14px)'
-                                }}
-                            >
-                                Guideline AI Summary
-                                <span className="flex items-center ml-1 sm:ml-2">
-                                  <ChevronRight size={14} className="sm:w-4 sm:h-4" style={{marginLeft: -10}} color="#fff" />
-                                  <ChevronRight size={14} className="sm:w-4 sm:h-4" style={{marginLeft: -10}} color="#fff" />
-                                </span>
-                            </button>
-                          </div>
-                        </div>
+          {!hasSearched && (
+            // Show curated guidelines when no search is performed
+            <>
+              {isLoading ? (
+                // Show loading state for curated guidelines
+                <div className="border px-0 pb-2 sm:pb-4 pt-1 sm:pt-2" style={{ borderColor: '#A2BDFF', borderWidth: 1, borderStyle: 'solid', background: '#fff' }}>
+                  <div className="px-3 sm:px-6 py-2 sm:py-4">
+                    <div className="flex justify-center py-6 sm:py-8">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                       </div>
                     </div>
-                  ))
-                    ) : (
-                      <div className="text-center py-8 sm:py-12">
-                        <BookOpen className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
-                        <p 
-                          className="text-sm sm:text-base text-gray-600"
-                          style={{ fontFamily: 'DM Sans, sans-serif' }}
-                        >
-                          {`No ${category === 'Europe' ? 'European' : category} guidelines found, Try a different search term.`}
-                        </p>
+                  </div>
+                </div>
+              ) : (
+                // Show actual guidelines when loaded
+                <>
+                  {categoryOrder
+                    .map(category => {
+                      // Filter curated guidelines by category and check if any exist
+                      const categoryGuidelines = curatedGuidelines.filter(guideline => 
+                        guideline.category === category &&
+                        guideline.id && 
+                        guideline.title
+                      );
+                      
+                      // Only show buckets that have guidelines
+                      if (categoryGuidelines.length === 0) {
+                        return null;
+                      }
+                      
+                      return (
+                        <div key={category} className="border px-0 pb-2 sm:pb-4 pt-1 sm:pt-2" style={{ borderColor: '#A2BDFF', borderWidth: 1, borderStyle: 'solid', background: '#fff' }}>
+                          <button
+                            onClick={() => toggleCategory(category)}
+                            className="w-full px-3 sm:px-6 py-2 sm:py-4 flex items-center justify-between text-left"
+                            style={{
+                              background: '#fff'
+                            }}
+                          >
+                            <h2 
+                              className="text-base sm:text-lg lg:text-xl text-gray-900"
+                              style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500, color: '#263969' }}
+                            >
+                              {category === 'Europe' ? 'European' : category} Guidelines
+                            </h2>
+                            <ChevronDown 
+                              className={`h-4 w-4 sm:h-5 sm:w-5 text-gray-500 transition-transform ${
+                                expandedCategories.includes(category) ? 'transform rotate-180' : ''
+                              }`}
+                            />
+                          </button>
+                          
+                          {expandedCategories.includes(category) && (
+                            <div className="p-2 sm:p-4 space-y-2 sm:space-y-4">
+                              <div className="space-y-3 sm:space-y-4">
+                                {categoryGuidelines.map((guideline, index) => (
+                                  <div key={`${guideline.id || 'guideline'}-${index}-${guideline.title?.slice(0, 10)}`}>
+                                    <div className="p-3 sm:p-4 shadow-sm border" style={{ background: '#fff', borderColor: '#A2BDFF' }}>
+                                      <div className="space-y-2 sm:space-y-3">
+                                        {/* Title as a link */}
+                                        <a 
+                                          href={guideline.url} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer"
+                                          className="block"
+                                          style={{
+                                            fontFamily: 'DM Sans, sans-serif',
+                                            color: '#214498',
+                                            fontWeight: 500,
+                                            fontSize: 'clamp(14px, 1.5vw, 16px)',
+                                            background: 'none',
+                                            border: 'none',
+                                          }}
+                                        >
+                                          {guideline.title}
+                                        </a>
+                                        
+                                        {/* Year and Publisher badges */}
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          {/* Year badge */}
+                                          <span 
+                                            className="px-2 sm:px-3 py-1 text-xs sm:text-sm"
+                                            style={{
+                                              fontFamily: 'DM Sans, sans-serif',
+                                              color: '#3771FE',
+                                              background: 'rgba(148, 167, 214, 0.2)',
+                                              fontWeight: 400,
+                                              border: 'none',
+                                              marginRight: 4,
+                                            }}
+                                          >
+                                            {new Date(guideline.last_updated).getFullYear()}
+                                          </span>
+                                          
+                                          {/* Publisher badge */}
+                                          {guideline.society && (
+                                            <span 
+                                              className="px-2 sm:px-3 py-1 text-xs sm:text-sm break-words max-w-full"
+                                              style={{
+                                                fontFamily: 'DM Sans, sans-serif',
+                                                color: '#3771FE',
+                                                background: 'rgba(148, 167, 214, 0.2)',
+                                                fontWeight: 400,
+                                                border: 'none',
+                                                display: 'inline-block',
+                                                wordBreak: 'break-word'
+                                              }}
+                                            >
+                                              {guideline.society}
+                                            </span>
+                                          )}
+                                        </div>
+                                        
+                                        {/* Save and Dive In buttons */}
+                                        <div className="flex flex-row items-center gap-3">
+                                          <button 
+                                            onClick={() => toggleBookmark(guideline)}
+                                            disabled={bookmarkingGuidelines.has(guideline.id)}
+                                            className={`flex items-center gap-1 transition-colors ${
+                                              isBookmarked(guideline) 
+                                                ? 'text-blue-500 hover:text-blue-600' 
+                                                : 'text-slate-500 hover:text-blue-500'
+                                            } ${(bookmarkingGuidelines.has(guideline.id)) ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`} 
+                                            style={{ fontSize: 'clamp(12px, 1.5vw, 14px)' }}
+                                            title={!user?.uid ? 'Please log in to save guidelines' : bookmarkingGuidelines.has(guideline.id) ? 'Processing...' : ''}
+                                          >
+                                            <Bookmark 
+                                              size={16} 
+                                              className="sm:w-5 sm:h-5" 
+                                              fill={isBookmarked(guideline) ? 'currentColor' : 'none'}
+                                            />
+                                            <span>{isBookmarked(guideline) ? 'Saved' : 'Save'}</span>
+                                          </button>
+                                          
+                                          <div className="flex-grow"></div>
+                                          
+                                          {/* Dive In button */}
+                                          <button 
+                                            onClick={() => handleGuidelineClick(guideline)}
+                                            disabled={!guideline.pdf_saved}
+                                            className={`flex items-center gap-1 px-3 sm:px-4 py-1.5 sm:py-2 transition-colors text-xs sm:text-sm
+                                            ${guideline.pdf_saved 
+                                                ? '' 
+                                                : 'cursor-not-allowed'}
+                                            `}
+                                            style={{
+                                              background: guideline.pdf_saved ? '#01257C' : 'rgba(1, 37, 124, 0.5)',
+                                              color: '#fff',
+                                              fontFamily: 'DM Sans, sans-serif',
+                                              fontWeight: 500,
+                                              border: 'none',
+                                              boxShadow: 'none',
+                                              opacity: guideline.pdf_saved ? 1 : 0.5,
+                                              minWidth: '10px',
+                                              fontSize: 'clamp(12px, 1.5vw, 14px)'
+                                            }}
+                                          >
+                                            Guideline AI Summary
+                                            <span className="flex items-center ml-1 sm:ml-2">
+                                              <ChevronRight size={14} className="sm:w-4 sm:h-4" style={{marginLeft: -10}} color="#fff" />
+                                              <ChevronRight size={14} className="sm:w-4 sm:h-4" style={{marginLeft: -10}} color="#fff" />
+                                            </span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </>
+              )}
+            </>
+          )}
+          
+          {hasSearched && (
+            // Show categorized search results when user searches
+            <>
+              {categoryOrder
+                .map(category => (
+                  <div key={category} className="border px-0 pb-2 sm:pb-4 pt-1 sm:pt-2" style={{ borderColor: '#A2BDFF', borderWidth: 1, borderStyle: 'solid', background: '#fff' }}>
+                    <button
+                      onClick={() => toggleCategory(category)}
+                      className="w-full px-3 sm:px-6 py-2 sm:py-4 flex items-center justify-between text-left"
+                      style={{
+                        background: '#fff'
+                      }}
+                    >
+                      <h2 
+                        className="text-base sm:text-lg lg:text-xl text-gray-900"
+                        style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500, color: '#263969' }}
+                      >
+                        {category === 'Europe' ? 'European' : category} Guidelines
+                      </h2>
+                      <ChevronDown 
+                        className={`h-4 w-4 sm:h-5 sm:w-5 text-gray-500 transition-transform ${
+                          expandedCategories.includes(category) ? 'transform rotate-180' : ''
+                        }`}
+                      />
+                    </button>
+                    
+                    {expandedCategories.includes(category) && (
+                      <div className="p-2 sm:p-4 space-y-2 sm:space-y-4">
+                        {isLoading ? (
+                          // Show loading state for each category when searching
+                          <div className="flex justify-center py-6 sm:py-8">
+                            <div className="flex space-x-1">
+                              <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                              <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                              <div className="w-2 h-2 bg-[#223258]/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                            </div>
+                          </div>
+                        ) : (groupedGuidelines[category]?.filter(guideline => 
+                            guideline.id && 
+                            guideline.title && 
+                            guideline.description && 
+                            guideline.category && 
+                            guideline.last_updated
+                          ).length ?? 0) > 0 ? (
+                            groupedGuidelines[category]
+                              .filter(guideline => 
+                                guideline.id && 
+                                guideline.title && 
+                                guideline.description && 
+                                guideline.category && 
+                                guideline.last_updated
+                              )
+                              .map((guideline, index) => (
+                          <div key={`${guideline.id || 'guideline'}-${index}-${guideline.title?.slice(0, 10)}`}>
+                              <div className="p-3 sm:p-4 shadow-sm border" style={{ background: '#fff', borderColor: '#A2BDFF' }}>
+                              <div className="space-y-2 sm:space-y-3">
+                                {/* Title as a link */}
+                                <a 
+                                  href={guideline.url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                    className="block"
+                                    style={{
+                                      fontFamily: 'DM Sans, sans-serif',
+                                      color: '#214498',
+                                      fontWeight: 500,
+                                      fontSize: 'clamp(14px, 1.5vw, 16px)',
+                                      background: 'none',
+                                      border: 'none',
+                                    }}
+                                >
+                                    {guideline.title}
+                                  </a>
+                                  
+                                  {/* Year and Publisher badges */}
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    {/* Year badge */}
+                                      <span 
+                                        className="px-2 sm:px-3 py-1 text-xs sm:text-sm"
+                                        style={{
+                                          fontFamily: 'DM Sans, sans-serif',
+                                          color: '#3771FE',
+                                          background: 'rgba(148, 167, 214, 0.2)',
+                                          fontWeight: 400,
+                                          border: 'none',
+                                          marginRight: 4,
+                                        }}
+                                      >
+                                      {new Date(guideline.last_updated).getFullYear()}
+                                    </span>
+                                    
+                                    {/* Publisher badge */}
+                                      {guideline.society && (
+                                        <span 
+                                          className="px-2 sm:px-3 py-1 text-xs sm:text-sm break-words max-w-full"
+                                          style={{
+                                            fontFamily: 'DM Sans, sans-serif',
+                                            color: '#3771FE',
+                                            background: 'rgba(148, 167, 214, 0.2)',
+                                            fontWeight: 400,
+                                            border: 'none',
+                                            display: 'inline-block',
+                                            wordBreak: 'break-word'
+                                          }}
+                                        >
+                                          {guideline.society}
+                                        </span>
+                                      )}
+                                  </div>
+                                  
+                                  {/* Save and Dive In buttons */}
+                                  <div className="flex flex-row items-center gap-3">
+                                    <button 
+                                      onClick={() => toggleBookmark(guideline)}
+                                      disabled={bookmarkingGuidelines.has(guideline.id)}
+                                      className={`flex items-center gap-1 transition-colors ${
+                                        isBookmarked(guideline) 
+                                          ? 'text-blue-500 hover:text-blue-600' 
+                                          : 'text-slate-500 hover:text-blue-500'
+                                      } ${(bookmarkingGuidelines.has(guideline.id)) ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`} 
+                                      style={{ fontSize: 'clamp(12px, 1.5vw, 14px)' }}
+                                      title={!user?.uid ? 'Please log in to save guidelines' : bookmarkingGuidelines.has(guideline.id) ? 'Processing...' : ''}
+                                    >
+                                      <Bookmark 
+                                        size={16} 
+                                        className="sm:w-5 sm:h-5" 
+                                        fill={isBookmarked(guideline) ? 'currentColor' : 'none'}
+                                      />
+                                      <span>{isBookmarked(guideline) ? 'Saved' : 'Save'}</span>
+                                    </button>
+                                    
+                                    <div className="flex-grow"></div>
+                                    
+                                    {/* Dive In button */}
+                                    <button 
+                                      onClick={() => handleGuidelineClick(guideline)}
+                                      disabled={!guideline.pdf_saved}
+                                        className={`flex items-center gap-1 px-3 sm:px-4 py-1.5 sm:py-2 transition-colors text-xs sm:text-sm
+                                        ${guideline.pdf_saved 
+                                            ? '' 
+                                            : 'cursor-not-allowed'}
+                                        `}
+                                        style={{
+                                          background: guideline.pdf_saved ? '#01257C' : 'rgba(1, 37, 124, 0.5)',
+                                          color: '#fff',
+                                          fontFamily: 'DM Sans, sans-serif',
+                                          fontWeight: 500,
+                                          border: 'none',
+                                          boxShadow: 'none',
+                                          opacity: guideline.pdf_saved ? 1 : 0.5,
+                                          minWidth: '10px',
+                                          fontSize: 'clamp(12px, 1.5vw, 14px)'
+                                        }}
+                                    >
+                                        Guideline AI Summary
+                                        <span className="flex items-center ml-1 sm:ml-2">
+                                          <ChevronRight size={14} className="sm:w-4 sm:h-4" style={{marginLeft: -10}} color="#fff" />
+                                          <ChevronRight size={14} className="sm:w-4 sm:h-4" style={{marginLeft: -10}} color="#fff" />
+                                        </span>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                            ) : (
+                              <div className="text-center py-8 sm:py-12">
+                                <BookOpen className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
+                                <p 
+                                  className="text-sm sm:text-base text-gray-600"
+                                  style={{ fontFamily: 'DM Sans, sans-serif' }}
+                                >
+                                  {`No ${category === 'Europe' ? 'European' : category} guidelines found, Try a different search term.`}
+                                </p>
+                              </div>
+                            )}
                       </div>
                     )}
-                </div>
-              )}
-            </div>
-          ))}
-          
-          {/* {Object.values(groupedGuidelines).flat().length === 0 && !isLoading && !error && (
-            <div className="text-center py-8 sm:py-12">
-              <BookOpen className="h-8 w-8 sm:h-12 sm:w-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
-              <p 
-                className="text-sm sm:text-base text-gray-600"
-                style={{ fontFamily: 'DM Sans, sans-serif' }}
-              >
-                No guidelines found. Try a different search term.
-              </p>
-            </div>
-          )} */}
-          
-          {isLoading && (
-            <div className="flex justify-center py-8 sm:py-12">
-              <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 animate-spin" />
-            </div>
+                  </div>
+                ))}
+            </>
           )}
+          
         </div>
       </div>
 

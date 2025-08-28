@@ -85,6 +85,25 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
     }
   }, [setIsOpen])
 
+  // Listen for tour events to open sidebar
+  useEffect(() => {
+    const handleTourSidebarOpen = () => {
+      setIsOpen(true);
+    };
+
+    const handleTourSidebarClose = () => {
+      setIsOpen(false);
+    };
+
+    window.addEventListener('tourSidebarOpen', handleTourSidebarOpen);
+    window.addEventListener('tourSidebarClose', handleTourSidebarClose);
+    
+    return () => {
+      window.removeEventListener('tourSidebarOpen', handleTourSidebarOpen);
+      window.removeEventListener('tourSidebarClose', handleTourSidebarClose);
+    };
+  }, [setIsOpen]);
+
   const handleSignOut = async () => {
     try {
       // Dynamically import Firebase auth
@@ -159,7 +178,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             <nav className="space-y-1">
               <div className="mb-6">
                 <button
-                  className="flex items-center justify-center w-full rounded-md p-2 border border-solid border-[#cecece] hover:bg-gray-50"
+                  className="flex items-center justify-center w-full rounded-md p-2 border border-solid border-[#cecece] hover:bg-gray-50 sidebar-new-search"
                   onClick={() => {
                     router.push("/dashboard");
                     if (window.innerWidth < 768) {
@@ -196,7 +215,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                     setIsOpen(false);
                   }
                 }}
-                className={`flex items-center px-3 py-2 rounded-lg ${
+                className={`flex items-center px-3 py-2 rounded-lg sidebar-guidelines ${
                   isActive('/guidelines') 
                     ? 'text-[#223258] bg-blue-50 font-medium' 
                     : 'text-[#223258] hover:bg-gray-100'
@@ -213,7 +232,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                     setIsOpen(false);
                   }
                 }}
-                className={`flex items-center px-3 py-2 rounded-lg ${
+                className={`flex items-center px-3 py-2 rounded-lg sidebar-drug-info ${
                   isActive('/drug-information') 
                     ? 'text-[#223258] bg-blue-50 font-medium' 
                     : 'text-[#223258] hover:bg-gray-100'
@@ -230,7 +249,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                     setIsOpen(false);
                   }
                 }}
-                className={`flex items-center px-3 py-2 rounded-lg ${
+                className={`flex items-center px-3 py-2 rounded-lg sidebar-visual-abstract ${
                   isActive('/image-generator') 
                     ? 'text-[#223258] bg-blue-50 font-medium' 
                     : 'text-[#223258] hover:bg-gray-100'
@@ -246,8 +265,25 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                   </div>
                 )}
               </Link>
-              
+
               <Link 
+                href="/library"
+                onClick={() => {
+                  if (window.innerWidth < 768) {
+                    setIsOpen(false);
+                  }
+                }}
+                className={`flex items-center px-3 py-2 rounded-lg sidebar-history ${
+                  isActive('/library') 
+                    ? 'text-[#223258] bg-blue-50 font-medium' 
+                    : 'text-[#223258] hover:bg-gray-100'
+                }`}
+              >
+                <img src="/history.svg" alt="History" className="h-5 w-5" />
+                {isOpen && <span className="ml-3">Library</span>}
+              </Link>
+              
+              {/* <Link 
                 href="/dashboard/history"
                 onClick={() => {
                   if (window.innerWidth < 768) {
@@ -262,7 +298,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               >
                 <img src="/history.svg" alt="History" className="h-5 w-5" />
                 {isOpen && <span className="ml-3">History</span>}
-              </Link>
+              </Link> */}
             </nav>
           </div>
 
@@ -278,18 +314,18 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             <div className="relative">
               <button
                 onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-gray-50"
+                className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-gray-50 sidebar-profile"
               >
                 <div className="flex items-center">
                   <div className="h-8 w-8 rounded-[8px] bg-[#E4ECFF] flex items-center justify-center text-[#223258] font-semibold border border-[#223258]">
-                    {userProfile.firstName?.[0] || user?.email?.[0]}
+                    {(userProfile.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase()}
                   </div>
                   {isOpen && (
                     <div className="ml-3 text-left">
                       <p className="font-semibold text-sm text-[#223258]">
                         {userProfile.firstName && userProfile.lastName 
                           ? `${userProfile.firstName} ${userProfile.lastName}`
-                          : user?.email}
+                          : user?.email || 'User'}
                       </p>
                       <p className="text-xs text-[#223258]/70">
                         {userProfile.occupation 
@@ -312,7 +348,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                   <div className="p-2">
                     {/* Profile Settings */}
                     <button
-                      className="flex items-center w-full px-3 py-2 rounded-[8px] bg-[#E4ECFF] text-[#223258] font-semibold mb-1"
+                      className="flex items-center w-full px-3 py-2 rounded-[8px] text-[#223258] hover:bg-[#E4ECFF] font-semibold mb-1"
                       onClick={() => {
                         router.push("/dashboard/profile");
                         if (window.innerWidth < 768) {
@@ -324,6 +360,22 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                       <svg className="mr-3 h-5 w-5" fill="none" stroke="#223258" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                       Profile Settings
                     </button>
+                    
+                    {/* Upgrade Plan */}
+                    {/* <button
+                      className="flex items-center w-full px-3 py-2 text-[#223258] hover:bg-[#E4ECFF] rounded-[8px] mb-1 font-semibold"
+                      onClick={() => {
+                        router.push("/dashboard/profile?tab=subscription");
+                        if (window.innerWidth < 768) {
+                          setIsOpen(false);
+                          setIsProfileOpen(false);
+                        }
+                      }}
+                    >
+                      <svg className="mr-3 h-5 w-5" fill="none" stroke="#223258" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                      Upgrade Plan
+                    </button> */}
+                    
                     {/* Sign Out */}
                     <button
                       onClick={handleSignOut}

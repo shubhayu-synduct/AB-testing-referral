@@ -7,6 +7,7 @@ import Image from "next/image"
 import { getFirebaseAuth } from "@/lib/firebase"
 import { useAuth } from "@/hooks/use-auth"
 import { logger } from "@/lib/logger"
+import { handleUserSignup } from "@/lib/signup-integration"
 
 function VerifyEmailContent() {
   const router = useRouter()
@@ -65,6 +66,19 @@ function VerifyEmailContent() {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         })
+        
+        // Add user to email automation system
+        try {
+          await handleUserSignup({
+            email: user.email || '',
+            userId: user.uid,
+            name: user.displayName || user.email?.split('@')[0] || 'User'
+          })
+          logger.info("Verified user added to email automation system")
+        } catch (automationError) {
+          logger.error("Failed to add verified user to email automation:", automationError)
+          // Don't fail the verification if email automation fails
+        }
         
         router.push('/onboarding')
       }

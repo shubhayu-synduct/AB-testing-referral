@@ -11,19 +11,25 @@ interface PublicLayoutProps {
 
 export function PublicLayout({ children }: PublicLayoutProps) {
   const router = useRouter()
-  const [isOpen, setIsOpen] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('sidebarOpen')
-      return stored === null ? false : stored === 'true'
-    }
-    return false
-  })
+  const [isOpen, setIsOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
+
+  // Ensure component is mounted before accessing localStorage
+  useEffect(() => {
+    setMounted(true)
+    const stored = localStorage.getItem('sidebarOpen')
+    if (stored !== null) {
+      setIsOpen(stored === 'true')
+    }
+  }, [])
 
   // Keep sidebar open/close state in sync with localStorage
   useEffect(() => {
-    localStorage.setItem('sidebarOpen', isOpen.toString())
-  }, [isOpen])
+    if (mounted) {
+      localStorage.setItem('sidebarOpen', isOpen.toString())
+    }
+  }, [isOpen, mounted])
 
   const getPageTitle = () => {
     if (pathname.startsWith('/dashboard/public/')) {
@@ -38,6 +44,38 @@ export function PublicLayout({ children }: PublicLayoutProps) {
         className="h-8 w-auto"
         priority
       />
+    )
+  }
+
+  // Don't render until mounted to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="flex h-screen bg-gray-50">
+        <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 z-40 flex items-center px-4">
+          <div className="flex items-center justify-between w-full">
+            <div className="w-11"></div>
+            <div className="flex-1 flex justify-center">
+              <h1 className="text-[#204398] font-semibold text-lg">{getPageTitle()}</h1>
+            </div>
+            <button
+              onClick={() => router.push('/dashboard')}
+              className="p-2 hover:bg-gray-100 rounded-md"
+            >
+              <Image 
+                src="/new-search.svg" 
+                alt="New Search" 
+                width={28}
+                height={28}
+                className="w-7 h-7"
+                priority
+              />
+            </button>
+          </div>
+        </div>
+        <main className="flex-1 overflow-auto md:mt-0 mt-14">
+          {children}
+        </main>
+      </div>
     )
   }
 

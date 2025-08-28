@@ -499,7 +499,11 @@ export default function GuidelineSummaryModal({
             <div className="flex-1 overflow-y-auto px-6 pb-6 min-h-0" style={{paddingTop: 0}}>
               {isLoading ? (
                 <div className="flex flex-col justify-center items-center h-full">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+                  <div className="flex space-x-1 justify-center mb-4">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
                   <div className="text-base text-gray-500" style={{ fontFamily: 'DM Sans, sans-serif', marginTop: 8 }}>
                     Generating AI Summary for this Guideline ...
                   </div>

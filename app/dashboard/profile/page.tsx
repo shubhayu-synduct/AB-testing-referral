@@ -1,20 +1,41 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { unstable_noStore as noStore } from 'next/cache';
+import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirebaseFirestore } from "@/lib/firebase";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { useAuth } from "@/hooks/use-auth";
+import { useSearchParams, useRouter } from "next/navigation";
+
 
 export default function ProfilePage() {
+  noStore(); // Disable static generation/prerendering
+  
   const { user, loading: authLoading } = useAuth();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'subscription' | 'feedback'>('profile');
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('yearly');
+  const [currentSubscription, setCurrentSubscription] = useState<any>(null);
   const [showSpecialtiesDropdown, setShowSpecialtiesDropdown] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
   const specialtiesRef = useRef<HTMLDivElement>(null);
+  const placeOfWorkRef = useRef<HTMLDivElement>(null);
+  const occupationRef = useRef<HTMLDivElement>(null);
+  const countryRef = useRef<HTMLDivElement>(null);
+  const [showPlaceOfWorkDropdown, setShowPlaceOfWorkDropdown] = useState(false);
+  const [showOccupationDropdown, setShowOccupationDropdown] = useState(false);
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+  const [specialtiesSearchTerm, setSpecialtiesSearchTerm] = useState('');
+  const [countrySearchTerm, setCountrySearchTerm] = useState('');
+  const [occupationSearchTerm, setOccupationSearchTerm] = useState('');
+  const [placeOfWorkSearchTerm, setPlaceOfWorkSearchTerm] = useState('');
 
   // Occupation and Specialties options
   const occupationOptions = [
@@ -30,19 +51,63 @@ export default function ProfilePage() {
     { value: "other", label: "Other" },
   ];
   const specialtiesOptions = [
+    { value: "anesthesiology", label: "Anesthesiology" },
+    { value: "allergy-immunology", label: "Allergy & Immunology" },
     { value: "cardiology", label: "Cardiology" },
+    { value: "critical-care", label: "Critical Care" },
     { value: "dermatology", label: "Dermatology" },
+    { value: "emergency-medicine", label: "Emergency Medicine" },
     { value: "endocrinology", label: "Endocrinology" },
+    { value: "family-medicine", label: "Family Medicine" },
     { value: "gastroenterology", label: "Gastroenterology" },
+    { value: "geriatrics", label: "Geriatrics" },
     { value: "hematology", label: "Hematology" },
     { value: "infectious-disease", label: "Infectious Disease" },
+    { value: "internal-medicine", label: "Internal Medicine" },
+    { value: "microbiology", label: "Microbiology" },
     { value: "nephrology", label: "Nephrology" },
     { value: "neurology", label: "Neurology" },
+    { value: "nuclear-medicine", label: "Nuclear Medicine" },
+    { value: "obstetrics-gynecology", label: "Obstetrics and Gynecology" },
     { value: "oncology", label: "Oncology" },
+    { value: "ophthalmology", label: "Ophthalmology" },
+    { value: "orthopedics", label: "Orthopedics" },
+    { value: "otolaryngology", label: "Otolaryngology" },
+    { value: "palliative-care", label: "Palliative Care Medicine" },
+    { value: "pathology", label: "Pathology" },
+    { value: "pediatrics", label: "Pediatrics" },
+    { value: "psychiatry", label: "Psychiatry" },
     { value: "pulmonology", label: "Pulmonology" },
+    { value: "radiology", label: "Radiology" },
+    { value: "reproductive-endocrinology", label: "Reproductive Endocrinology & Infertility" },
     { value: "rheumatology", label: "Rheumatology" },
+    { value: "sports-medicine", label: "Sports Medicine" },
+    { value: "surgery", label: "Surgery" },
+    { value: "urology", label: "Urology" },
     { value: "other", label: "Other" },
   ];
+
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  useEffect(() => {
+    // Check if tab parameter is set in URL
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'subscription') {
+      setActiveTab('profile');
+    }
+    
+    // Check if payment was cancelled
+    const statusParam = searchParams.get('status');
+    if (statusParam === 'cancelled') {
+      setError('Payment was cancelled. You can try again anytime or continue with the free plan.');
+      // Auto-hide the message after 5 seconds
+      const timer = setTimeout(() => {
+        setError('');
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (authLoading) return; // Wait for auth to finish
@@ -54,13 +119,19 @@ export default function ProfilePage() {
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
         // Convert country value to match dropdown format if needed
-        const country = docSnap.data().country || docSnap.data().profile?.country || 'united-states';
+        const country = docSnap.data().country || docSnap.data().profile || docSnap.data().profile?.country || 'united-states';
         const formattedCountry = country.toLowerCase().replace(/\s+/g, '-');
         
         setProfile({
           ...docSnap.data().profile || {},
           email: docSnap.data().email || user.email,
           country: formattedCountry
+        });
+
+        // Set current subscription data
+        setCurrentSubscription({
+          tier: docSnap.data().subscriptionTier || 'free',
+          subscription: docSnap.data().subscription || null
         });
       }
       setLoading(false);
@@ -79,6 +150,19 @@ export default function ProfilePage() {
     function handleClickOutside(event: MouseEvent) {
       if (specialtiesRef.current && event.target instanceof Node && !specialtiesRef.current.contains(event.target)) {
         setShowSpecialtiesDropdown(false);
+        setSpecialtiesSearchTerm('');
+      }
+      if (placeOfWorkRef.current && event.target instanceof Node && !placeOfWorkRef.current.contains(event.target)) {
+        setShowPlaceOfWorkDropdown(false);
+        setPlaceOfWorkSearchTerm('');
+      }
+      if (occupationRef.current && event.target instanceof Node && !occupationRef.current.contains(event.target)) {
+        setShowOccupationDropdown(false);
+        setOccupationSearchTerm('');
+      }
+      if (countryRef.current && event.target instanceof Node && !countryRef.current.contains(event.target)) {
+        setShowCountryDropdown(false);
+        setCountrySearchTerm('');
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -99,6 +183,146 @@ export default function ProfilePage() {
     setProfile((prev: any) => ({ ...prev, specialties: e.target.value.split(",").map((s) => s.trim()) }));
   };
 
+  const getCurrentPlanDisplay = () => {
+    if (!currentSubscription) return 'Free';
+    
+    const { tier, subscription } = currentSubscription;
+    
+    if (tier === 'free' || !subscription) return 'Free';
+    if (tier === 'student') return 'Pro Student';
+    if (tier === 'clinician') return 'Pro Physician';
+    
+    return 'Free';
+  };
+
+  // Debug logging for subscription data
+  useEffect(() => {
+    if (currentSubscription) {
+      console.log('🔍 Current Subscription Data:', {
+        tier: currentSubscription.tier,
+        status: currentSubscription.subscription?.status,
+        cancelAtPeriodEnd: currentSubscription.subscription?.cancelAtPeriodEnd,
+        currentPeriodEnd: currentSubscription.subscription?.currentPeriodEnd,
+        interval: currentSubscription.subscription?.interval
+      });
+    }
+  }, [currentSubscription]);
+
+  const isCurrentPlan = (plan: string) => {
+    if (!currentSubscription) return plan === 'free';
+    return currentSubscription.tier === plan;
+  };
+
+  const isCurrentBillingInterval = (interval: string) => {
+    if (!currentSubscription?.subscription?.interval) return false;
+    return currentSubscription.subscription.interval === interval;
+  };
+
+  const handleTabChange = (tab: 'profile' | 'subscription' | 'feedback') => {
+    setActiveTab(tab);
+    router.push(`/dashboard/profile?tab=${tab}`);
+  };
+
+  const handlePlanSelect = async (plan: string, interval: string) => {
+    if (!user) {
+      setError('Please sign in to continue');
+      return;
+    }
+
+    if (plan === 'free') {
+      setError('Please select a paid plan');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      // Get the Firebase ID token
+      const idToken = await user.getIdToken();
+      
+      const response = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          plan: plan,
+          interval: interval,
+          idToken,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
+
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+    } catch (err: any) {
+      console.error('Payment error:', err);
+      setError(err.message || 'Failed to process payment');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!user) {
+      setError('Please sign in to continue');
+      return;
+    }
+
+    if (!currentSubscription?.subscription?.id) {
+      setError('No active subscription to cancel');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      // Get the Firebase ID token
+      const idToken = await user.getIdToken();
+      
+      const response = await fetch('/api/stripe/cancel-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          subscriptionId: currentSubscription.subscription.id,
+          idToken,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to cancel subscription');
+      }
+
+      // Update local state to reflect cancellation
+      setCurrentSubscription((prev: any) => ({
+        ...prev,
+        subscription: {
+          ...prev.subscription,
+          status: 'canceled',
+          cancelAtPeriodEnd: true
+        }
+      }));
+
+      setSuccess(true);
+    } catch (err: any) {
+      console.error('Cancellation error:', err);
+      setError(err.message || 'Failed to cancel subscription');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -109,8 +333,10 @@ export default function ProfilePage() {
       const db = getFirebaseFirestore();
       const docRef = doc(db, "users", user.uid);
       // Update only the specified fields inside the 'profile' object using dot notation
-      const { firstName, lastName, occupation, institution, specialties, placeOfWork, country } = profile;
-      await updateDoc(docRef, {
+      const { firstName, lastName, occupation, institution, specialties, placeOfWork, country, otherSpecialty, otherOccupation, otherPlaceOfWork } = profile;
+      
+      // Create update object with only defined values
+      const updateData: any = {
         "profile.firstName": firstName,
         "profile.lastName": lastName,
         "profile.occupation": occupation,
@@ -118,11 +344,71 @@ export default function ProfilePage() {
         "profile.specialties": specialties,
         "profile.placeOfWork": placeOfWork,
         "profile.country": country,
+        "profile.otherSpecialty": otherSpecialty || "",
+        "profile.otherOccupation": otherOccupation || "",
+        "profile.otherPlaceOfWork": otherPlaceOfWork || "",
         "country": country // Also update the top-level country field
-      });
+      };
+      
+      await updateDoc(docRef, updateData);
       setSuccess(true);
     }
     setSaving(false);
+  };
+
+  const deleteProfile = async () => {
+    if (deleteConfirmation !== 'DELETE') return;
+    
+    setDeleting(true);
+    try {
+      const auth = await getFirebaseAuth();
+      const user = auth.currentUser;
+      if (user) {
+        // Send delete confirmation email first
+        try {
+          await fetch('/api/send-delete-email', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userName: user.displayName || user.email?.split('@')[0] || 'User',
+              userEmail: user.email,
+              deletionReason: 'User requested account deletion'
+            }),
+          });
+        } catch (emailError) {
+          console.warn('Failed to send delete email:', emailError);
+          // Don't fail the deletion if email fails
+        }
+
+        const db = getFirebaseFirestore();
+        const docRef = doc(db, "users", user.uid);
+        
+        // Delete the user document from Firestore
+        await deleteDoc(docRef);
+        
+        // Delete the user's authentication account
+        await user.delete();
+        
+        // Sign out to clear authentication cookies
+        await auth.signOut();
+        
+        // Reset local state
+        setProfile(null);
+        setShowDeleteModal(false);
+        setDeleteConfirmation('');
+        
+        // Redirect to signup page
+        window.location.href = '/signup';
+      }
+    } catch (error) {
+      console.error('Error deleting profile:', error);
+      // If there's an error, it might be because the user needs to re-authenticate
+      // You might want to show a message asking them to sign in again
+    } finally {
+      setDeleting(false);
+    }
   };
 
   if (authLoading || loading) return <div className="flex justify-center items-center h-screen font-['DM_Sans']">Loading...</div>;
@@ -143,26 +429,25 @@ export default function ProfilePage() {
           <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'profile' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
-            onClick={() => setActiveTab('profile')}
+            onClick={() => handleTabChange('profile')}
           >
             Profile
           </button>
-          <button
+          {/* Tempory comment out subscription tab */}
+          {/* <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'subscription' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
-            onClick={() => setActiveTab('subscription')}
-            disabled
+            onClick={() => handleTabChange('subscription')}
           >
             Subscription
-          </button>
-          <button
+          </button> */}
+          {/* <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'feedback' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
-            onClick={() => setActiveTab('feedback')}
-            disabled
+            onClick={() => handleTabChange('feedback')}
           >
             Feedback
-          </button>
+          </button> */}
         </div>
 
         {/* Profile Tab Content */}
@@ -186,235 +471,349 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <label className="block text-[#000000] mb-1 font-medium">Country</label>
-                  <select
-                    name="country"
-                    value={profile?.country || 'united-states'}
-                    onChange={handleSelectChange}
-                    className="w-full border border-[#B5C9FC] rounded-[8px] px-4 py-2 bg-white text-[#223258] font-medium outline-none focus:ring-2 focus:ring-[#B5C9FC]"
-                  >
-                    <option value="afghanistan">Afghanistan</option>
-                    <option value="albania">Albania</option>
-                    <option value="algeria">Algeria</option>
-                    <option value="andorra">Andorra</option>
-                    <option value="angola">Angola</option>
-                    <option value="antigua-and-barbuda">Antigua and Barbuda</option>
-                    <option value="argentina">Argentina</option>
-                    <option value="armenia">Armenia</option>
-                    <option value="australia">Australia</option>
-                    <option value="austria">Austria</option>
-                    <option value="azerbaijan">Azerbaijan</option>
-                    <option value="bahamas">Bahamas</option>
-                    <option value="bahrain">Bahrain</option>
-                    <option value="bangladesh">Bangladesh</option>
-                    <option value="barbados">Barbados</option>
-                    <option value="belarus">Belarus</option>
-                    <option value="belgium">Belgium</option>
-                    <option value="belize">Belize</option>
-                    <option value="benin">Benin</option>
-                    <option value="bhutan">Bhutan</option>
-                    <option value="bolivia">Bolivia</option>
-                    <option value="bosnia-and-herzegovina">Bosnia and Herzegovina</option>
-                    <option value="botswana">Botswana</option>
-                    <option value="brazil">Brazil</option>
-                    <option value="brunei">Brunei</option>
-                    <option value="bulgaria">Bulgaria</option>
-                    <option value="burkina-faso">Burkina Faso</option>
-                    <option value="burundi">Burundi</option>
-                    <option value="cabo-verde">Cabo Verde</option>
-                    <option value="cambodia">Cambodia</option>
-                    <option value="cameroon">Cameroon</option>
-                    <option value="canada">Canada</option>
-                    <option value="central-african-republic">Central African Republic</option>
-                    <option value="chad">Chad</option>
-                    <option value="chile">Chile</option>
-                    <option value="china">China</option>
-                    <option value="colombia">Colombia</option>
-                    <option value="comoros">Comoros</option>
-                    <option value="congo">Congo</option>
-                    <option value="costa-rica">Costa Rica</option>
-                    <option value="croatia">Croatia</option>
-                    <option value="cuba">Cuba</option>
-                    <option value="cyprus">Cyprus</option>
-                    <option value="czech-republic">Czech Republic</option>
-                    <option value="denmark">Denmark</option>
-                    <option value="djibouti">Djibouti</option>
-                    <option value="dominica">Dominica</option>
-                    <option value="dominican-republic">Dominican Republic</option>
-                    <option value="ecuador">Ecuador</option>
-                    <option value="egypt">Egypt</option>
-                    <option value="el-salvador">El Salvador</option>
-                    <option value="equatorial-guinea">Equatorial Guinea</option>
-                    <option value="eritrea">Eritrea</option>
-                    <option value="estonia">Estonia</option>
-                    <option value="eswatini">Eswatini</option>
-                    <option value="ethiopia">Ethiopia</option>
-                    <option value="fiji">Fiji</option>
-                    <option value="finland">Finland</option>
-                    <option value="france">France</option>
-                    <option value="gabon">Gabon</option>
-                    <option value="gambia">Gambia</option>
-                    <option value="georgia">Georgia</option>
-                    <option value="germany">Germany</option>
-                    <option value="ghana">Ghana</option>
-                    <option value="greece">Greece</option>
-                    <option value="grenada">Grenada</option>
-                    <option value="guatemala">Guatemala</option>
-                    <option value="guinea">Guinea</option>
-                    <option value="guinea-bissau">Guinea-Bissau</option>
-                    <option value="guyana">Guyana</option>
-                    <option value="haiti">Haiti</option>
-                    <option value="honduras">Honduras</option>
-                    <option value="hungary">Hungary</option>
-                    <option value="iceland">Iceland</option>
-                    <option value="india">India</option>
-                    <option value="indonesia">Indonesia</option>
-                    <option value="iran">Iran</option>
-                    <option value="iraq">Iraq</option>
-                    <option value="ireland">Ireland</option>
-                    <option value="israel">Israel</option>
-                    <option value="italy">Italy</option>
-                    <option value="jamaica">Jamaica</option>
-                    <option value="japan">Japan</option>
-                    <option value="jordan">Jordan</option>
-                    <option value="kazakhstan">Kazakhstan</option>
-                    <option value="kenya">Kenya</option>
-                    <option value="kiribati">Kiribati</option>
-                    <option value="kuwait">Kuwait</option>
-                    <option value="kyrgyzstan">Kyrgyzstan</option>
-                    <option value="laos">Laos</option>
-                    <option value="latvia">Latvia</option>
-                    <option value="lebanon">Lebanon</option>
-                    <option value="lesotho">Lesotho</option>
-                    <option value="liberia">Liberia</option>
-                    <option value="libya">Libya</option>
-                    <option value="liechtenstein">Liechtenstein</option>
-                    <option value="lithuania">Lithuania</option>
-                    <option value="luxembourg">Luxembourg</option>
-                    <option value="madagascar">Madagascar</option>
-                    <option value="malawi">Malawi</option>
-                    <option value="malaysia">Malaysia</option>
-                    <option value="maldives">Maldives</option>
-                    <option value="mali">Mali</option>
-                    <option value="malta">Malta</option>
-                    <option value="marshall-islands">Marshall Islands</option>
-                    <option value="mauritania">Mauritania</option>
-                    <option value="mauritius">Mauritius</option>
-                    <option value="mexico">Mexico</option>
-                    <option value="micronesia">Micronesia</option>
-                    <option value="moldova">Moldova</option>
-                    <option value="monaco">Monaco</option>
-                    <option value="mongolia">Mongolia</option>
-                    <option value="montenegro">Montenegro</option>
-                    <option value="morocco">Morocco</option>
-                    <option value="mozambique">Mozambique</option>
-                    <option value="myanmar">Myanmar</option>
-                    <option value="namibia">Namibia</option>
-                    <option value="nauru">Nauru</option>
-                    <option value="nepal">Nepal</option>
-                    <option value="netherlands">Netherlands</option>
-                    <option value="new-zealand">New Zealand</option>
-                    <option value="nicaragua">Nicaragua</option>
-                    <option value="niger">Niger</option>
-                    <option value="nigeria">Nigeria</option>
-                    <option value="north-korea">North Korea</option>
-                    <option value="north-macedonia">North Macedonia</option>
-                    <option value="norway">Norway</option>
-                    <option value="oman">Oman</option>
-                    <option value="pakistan">Pakistan</option>
-                    <option value="palau">Palau</option>
-                    <option value="palestine">Palestine</option>
-                    <option value="panama">Panama</option>
-                    <option value="papua-new-guinea">Papua New Guinea</option>
-                    <option value="paraguay">Paraguay</option>
-                    <option value="peru">Peru</option>
-                    <option value="philippines">Philippines</option>
-                    <option value="poland">Poland</option>
-                    <option value="portugal">Portugal</option>
-                    <option value="qatar">Qatar</option>
-                    <option value="romania">Romania</option>
-                    <option value="russia">Russia</option>
-                    <option value="rwanda">Rwanda</option>
-                    <option value="saint-kitts-and-nevis">Saint Kitts and Nevis</option>
-                    <option value="saint-lucia">Saint Lucia</option>
-                    <option value="saint-vincent-and-the-grenadines">Saint Vincent and the Grenadines</option>
-                    <option value="samoa">Samoa</option>
-                    <option value="san-marino">San Marino</option>
-                    <option value="sao-tome-and-principe">Sao Tome and Principe</option>
-                    <option value="saudi-arabia">Saudi Arabia</option>
-                    <option value="senegal">Senegal</option>
-                    <option value="serbia">Serbia</option>
-                    <option value="seychelles">Seychelles</option>
-                    <option value="sierra-leone">Sierra Leone</option>
-                    <option value="singapore">Singapore</option>
-                    <option value="slovakia">Slovakia</option>
-                    <option value="slovenia">Slovenia</option>
-                    <option value="solomon-islands">Solomon Islands</option>
-                    <option value="somalia">Somalia</option>
-                    <option value="south-africa">South Africa</option>
-                    <option value="south-korea">South Korea</option>
-                    <option value="south-sudan">South Sudan</option>
-                    <option value="spain">Spain</option>
-                    <option value="sri-lanka">Sri Lanka</option>
-                    <option value="sudan">Sudan</option>
-                    <option value="suriname">Suriname</option>
-                    <option value="sweden">Sweden</option>
-                    <option value="switzerland">Switzerland</option>
-                    <option value="syria">Syria</option>
-                    <option value="taiwan">Taiwan</option>
-                    <option value="tajikistan">Tajikistan</option>
-                    <option value="tanzania">Tanzania</option>
-                    <option value="thailand">Thailand</option>
-                    <option value="timor-leste">Timor-Leste</option>
-                    <option value="togo">Togo</option>
-                    <option value="tonga">Tonga</option>
-                    <option value="trinidad-and-tobago">Trinidad and Tobago</option>
-                    <option value="tunisia">Tunisia</option>
-                    <option value="turkey">Turkey</option>
-                    <option value="turkmenistan">Turkmenistan</option>
-                    <option value="tuvalu">Tuvalu</option>
-                    <option value="uganda">Uganda</option>
-                    <option value="ukraine">Ukraine</option>
-                    <option value="united-arab-emirates">United Arab Emirates</option>
-                    <option value="united-kingdom">United Kingdom</option>
-                    <option value="united-states">United States</option>
-                    <option value="uruguay">Uruguay</option>
-                    <option value="uzbekistan">Uzbekistan</option>
-                    <option value="vanuatu">Vanuatu</option>
-                    <option value="vatican-city">Vatican City</option>
-                    <option value="venezuela">Venezuela</option>
-                    <option value="vietnam">Vietnam</option>
-                    <option value="yemen">Yemen</option>
-                    <option value="zambia">Zambia</option>
-                    <option value="zimbabwe">Zimbabwe</option>
-                  </select>
+                  <div className="relative" ref={countryRef}>
+                    <div
+                      className={`w-full min-h-[40px] px-2 py-1 border border-[#B5C9FC] rounded-[8px] bg-white flex items-center justify-between gap-1 focus-within:ring-2 focus-within:ring-[#B5C9FC] focus-within:border-transparent`}
+                      tabIndex={0}
+                      onClick={() => setShowCountryDropdown(true)}
+                      style={{ cursor: 'text', position: 'relative' }}
+                    >
+                      {!profile?.country && (
+                        <span className="text-gray-400 select-none font-medium">Select Country</span>
+                      )}
+                      {profile?.country && (
+                        <span className="text-[#223258] select-none font-medium">
+                          {profile.country.split("-").map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}
+                        </span>
+                      )}
+                      {/* Remove down arrow symbol */}
+                    </div>
+                    {showCountryDropdown && (
+                      <div className="absolute z-10 left-0 right-0 bg-white border border-[#B5C9FC] rounded-b-[8px] shadow-lg max-h-48 overflow-y-auto mt-1">
+                        {/* Search input for countries */}
+                        <div className="sticky top-0 bg-white border-b border-[#B5C9FC] p-2">
+                          <input
+                            type="text"
+                            placeholder="Search countries..."
+                            value={countrySearchTerm}
+                            className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[6px] text-sm text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent"
+                            onChange={(e) => {
+                              setCountrySearchTerm(e.target.value);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                setShowCountryDropdown(false);
+                              }
+                            }}
+                            autoFocus
+                          />
+                        </div>
+                        {Object.entries({
+                          "afghanistan": "Afghanistan",
+                          "albania": "Albania",
+                          "algeria": "Algeria",
+                          "andorra": "Andorra",
+                          "angola": "Angola",
+                          "antigua-and-barbuda": "Antigua and Barbuda",
+                          "argentina": "Argentina",
+                          "armenia": "Armenia",
+                          "australia": "Australia",
+                          "austria": "Austria",
+                          "azerbaijan": "Azerbaijan",
+                          "bahamas": "Bahamas",
+                          "bahrain": "Bahrain",
+                          "bangladesh": "Bangladesh",
+                          "barbados": "Barbados",
+                          "belarus": "Belarus",
+                          "belgium": "Belgium",
+                          "belize": "Belize",
+                          "benin": "Benin",
+                          "bhutan": "Bhutan",
+                          "bolivia": "Bolivia",
+                          "bosnia-and-herzegovina": "Bosnia and Herzegovina",
+                          "botswana": "Botswana",
+                          "brazil": "Brazil",
+                          "brunei": "Brunei",
+                          "bulgaria": "Bulgaria",
+                          "burkina-faso": "Burkina Faso",
+                          "burundi": "Burundi",
+                          "cabo-verde": "Cabo Verde",
+                          "cambodia": "Cambodia",
+                          "cameroon": "Cameroon",
+                          "canada": "Canada",
+                          "central-african-republic": "Central African Republic",
+                          "chad": "Chad",
+                          "chile": "Chile",
+                          "china": "China",
+                          "colombia": "Colombia",
+                          "comoros": "Comoros",
+                          "congo": "Congo",
+                          "costa-rica": "Costa Rica",
+                          "croatia": "Croatia",
+                          "cuba": "Cuba",
+                          "cyprus": "Cyprus",
+                          "czech-republic": "Czech Republic",
+                          "denmark": "Denmark",
+                          "djibouti": "Djibouti",
+                          "dominica": "Dominica",
+                          "dominican-republic": "Dominican Republic",
+                          "ecuador": "Ecuador",
+                          "egypt": "Egypt",
+                          "el-salvador": "El Salvador",
+                          "equatorial-guinea": "Equatorial Guinea",
+                          "eritrea": "Eritrea",
+                          "estonia": "Estonia",
+                          "eswatini": "Eswatini",
+                          "ethiopia": "Ethiopia",
+                          "fiji": "Fiji",
+                          "finland": "Finland",
+                          "france": "France",
+                          "gabon": "Gabon",
+                          "gambia": "Gambia",
+                          "georgia": "Georgia",
+                          "germany": "Germany",
+                          "ghana": "Ghana",
+                          "greece": "Greece",
+                          "grenada": "Grenada",
+                          "guatemala": "Guatemala",
+                          "guinea": "Guinea",
+                          "guinea-bissau": "Guinea-Bissau",
+                          "guyana": "Guyana",
+                          "haiti": "Haiti",
+                          "honduras": "Honduras",
+                          "hungary": "Hungary",
+                          "iceland": "Iceland",
+                          "india": "India",
+                          "indonesia": "Indonesia",
+                          "iran": "Iran",
+                          "iraq": "Iraq",
+                          "ireland": "Ireland",
+                          "israel": "Israel",
+                          "italy": "Italy",
+                          "jamaica": "Jamaica",
+                          "japan": "Japan",
+                          "jordan": "Jordan",
+                          "kazakhstan": "Kazakhstan",
+                          "kenya": "Kenya",
+                          "kiribati": "Kiribati",
+                          "kuwait": "Kuwait",
+                          "kyrgyzstan": "Kyrgyzstan",
+                          "laos": "Laos",
+                          "latvia": "Latvia",
+                          "lebanon": "Lebanon",
+                          "lesotho": "Lesotho",
+                          "liberia": "Liberia",
+                          "libya": "Libya",
+                          "liechtenstein": "Liechtenstein",
+                          "lithuania": "Lithuania",
+                          "luxembourg": "Luxembourg",
+                          "madagascar": "Madagascar",
+                          "malawi": "Malawi",
+                          "malaysia": "Malaysia",
+                          "maldives": "Maldives",
+                          "mali": "Mali",
+                          "malta": "Malta",
+                          "marshall-islands": "Marshall Islands",
+                          "mauritania": "Mauritania",
+                          "mauritius": "Mauritius",
+                          "mexico": "Mexico",
+                          "micronesia": "Micronesia",
+                          "moldova": "Moldova",
+                          "monaco": "Monaco",
+                          "mongolia": "Mongolia",
+                          "montenegro": "Montenegro",
+                          "morocco": "Morocco",
+                          "mozambique": "Mozambique",
+                          "myanmar": "Myanmar",
+                          "namibia": "Namibia",
+                          "nauru": "Nauru",
+                          "nepal": "Nepal",
+                          "netherlands": "Netherlands",
+                          "new-zealand": "New Zealand",
+                          "nicaragua": "Nicaragua",
+                          "niger": "Niger",
+                          "nigeria": "Nigeria",
+                          "north-korea": "North Korea",
+                          "north-macedonia": "North Macedonia",
+                          "norway": "Norway",
+                          "oman": "Oman",
+                          "pakistan": "Pakistan",
+                          "palau": "Palau",
+                          "palestine": "Palestine",
+                          "panama": "Panama",
+                          "papua-new-guinea": "Papua New Guinea",
+                          "paraguay": "Paraguay",
+                          "peru": "Peru",
+                          "philippines": "Philippines",
+                          "poland": "Poland",
+                          "portugal": "Portugal",
+                          "qatar": "Qatar",
+                          "romania": "Romania",
+                          "russia": "Russia",
+                          "rwanda": "Rwanda",
+                          "saint-kitts-and-nevis": "Saint Kitts and Nevis",
+                          "saint-lucia": "Saint Lucia",
+                          "saint-vincent-and-the-grenadines": "Saint Vincent and the Grenadines",
+                          "samoa": "Samoa",
+                          "san-marino": "San Marino",
+                          "sao-tome-and-principe": "Sao Tome and Principe",
+                          "saudi-arabia": "Saudi Arabia",
+                          "senegal": "Senegal",
+                          "serbia": "Serbia",
+                          "seychelles": "Seychelles",
+                          "sierra-leone": "Sierra Leone",
+                          "singapore": "Singapore",
+                          "slovakia": "Slovakia",
+                          "slovenia": "Slovenia",
+                          "solomon-islands": "Solomon Islands",
+                          "somalia": "Somalia",
+                          "south-africa": "South Africa",
+                          "south-korea": "South Korea",
+                          "south-sudan": "South Sudan",
+                          "spain": "Spain",
+                          "sri-lanka": "Sri Lanka",
+                          "sudan": "Sudan",
+                          "suriname": "Suriname",
+                          "sweden": "Sweden",
+                          "switzerland": "Switzerland",
+                          "syria": "Syria",
+                          "taiwan": "Taiwan",
+                          "tajikistan": "Tajikistan",
+                          "tanzania": "Tanzania",
+                          "thailand": "Thailand",
+                          "timor-leste": "Timor-Leste",
+                          "togo": "Togo",
+                          "tonga": "Tonga",
+                          "trinidad-and-tobago": "Trinidad and Tobago",
+                          "tunisia": "Tunisia",
+                          "turkey": "Turkey",
+                          "turkmenistan": "Turkmenistan",
+                          "tuvalu": "Tuvalu",
+                          "uganda": "Uganda",
+                          "ukraine": "Ukraine",
+                          "united-arab-emirates": "United Arab Emirates",
+                          "united-kingdom": "United Kingdom",
+                          "united-states": "United States",
+                          "uruguay": "Uruguay",
+                          "uzbekistan": "Uzbekistan",
+                          "vanuatu": "Vanuatu",
+                          "vatican-city": "Vatican City",
+                          "venezuela": "Venezuela",
+                          "vietnam": "Vietnam",
+                          "yemen": "Yemen",
+                          "zambia": "Zambia",
+                          "zimbabwe": "Zimbabwe"
+                        })
+                        .filter(([value, label]) => label.toLowerCase().includes(countrySearchTerm.toLowerCase()))
+                        .map(([value, label]) => (
+                          <div
+                            key={value}
+                            className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
+                            style={{ fontSize: '14px', color: '#223258' }}
+                            onClick={() => {
+                              setProfile((prev: any) => ({ ...prev, country: value }));
+                              setShowCountryDropdown(false);
+                              setCountrySearchTerm('');
+                            }}
+                          >
+                            {label}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-[#000000] mb-1 font-medium">Occupation</label>
-                  <select
-                    name="occupation"
-                    value={profile.occupation || ''}
-                    onChange={handleSelectChange}
-                    className="w-full border border-[#B5C9FC] rounded-[8px] px-4 py-2 bg-white text-[#223258] font-medium outline-none focus:ring-2 focus:ring-[#B5C9FC]"
-                  >
-                    <option value="" disabled>Select Occupation</option>
-                    {occupationOptions.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                  <label className="block text-[#000000] mb-1 font-medium">Profession</label>
+                  <input 
+                    value={profile?.occupation ? (profile.occupation === "other" ? profile.otherOccupation || "Other" : profile.occupation.split("-").map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")) : "Select Occupation"} 
+                    disabled 
+                    className="w-full border border-[#B5C9FC] rounded-[8px] px-4 py-2 bg-white text-[#223258] font-medium outline-none cursor-not-allowed opacity-60" 
+                  />
                 </div>
                 <div>
                   <label className="block text-[#000000] mb-1 font-medium">Place of Work</label>
-                  <select
-                    name="placeOfWork"
-                    value={profile.placeOfWork || ''}
-                    onChange={handleSelectChange}
-                    className="w-full border border-[#B5C9FC] rounded-[8px] px-4 py-2 bg-white text-[#223258] font-medium outline-none focus:ring-2 focus:ring-[#B5C9FC]"
-                  >
-                    <option value="" disabled>Select Place of Work</option>
-                    <option value="hospital-clinic">Hospital/Clinic</option>
-                    <option value="outpatient-clinic">Outpatient Clinic</option>
-                    <option value="private-practice">Private Practice</option>
-                  </select>
+                  <div className="relative" ref={placeOfWorkRef}>
+                    <div
+                      className={`w-full min-h-[40px] px-2 py-1 border border-[#B5C9FC] rounded-[8px] bg-white flex items-center justify-between gap-1 focus-within:ring-2 focus-within:ring-[#B5C9FC] focus-within:border-transparent`}
+                      tabIndex={0}
+                      onClick={() => setShowPlaceOfWorkDropdown(true)}
+                      style={{ cursor: 'text', position: 'relative' }}
+                    >
+                      {!profile?.placeOfWork && (
+                        <span className="text-gray-400 select-none font-medium">Select Place of Work</span>
+                      )}
+                      {profile?.placeOfWork && (
+                        <span className="text-[#223258] select-none font-medium">
+                          {profile.placeOfWork === "other" ? "Other" : profile.placeOfWork.split("-").map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}
+                        </span>
+                      )}
+                      {/* Remove down arrow symbol */}
+                    </div>
+                    {showPlaceOfWorkDropdown && (
+                      <div className="absolute z-10 left-0 right-0 bg-white border border-[#B5C9FC] rounded-b-[8px] shadow-lg max-h-48 overflow-y-auto mt-1">
+                        {/* Search input for place of work */}
+                        <div className="sticky top-0 bg-white border-b border-[#B5C9FC] p-2">
+                          <input
+                            type="text"
+                            placeholder="Search place of work..."
+                            value={placeOfWorkSearchTerm}
+                            className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[6px] text-sm text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent"
+                            onChange={(e) => {
+                              setPlaceOfWorkSearchTerm(e.target.value);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                setShowPlaceOfWorkDropdown(false);
+                              }
+                            }}
+                            autoFocus
+                          />
+                        </div>
+                        {[
+                          { value: "hospital-clinic", label: "Hospital/Clinic" },
+                          { value: "outpatient-clinic", label: "Outpatient Clinic" },
+                          { value: "private-practice", label: "Private Practice" },
+                          { value: "university", label: "University" },
+                          { value: "other", label: "Other" }
+                        ]
+                        .filter(opt => opt.value !== profile?.placeOfWork)
+                        .filter(opt => opt.label.toLowerCase().includes(placeOfWorkSearchTerm.toLowerCase()))
+                        .map(opt => (
+                          <div
+                            key={opt.value}
+                            className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
+                            style={{ fontSize: '14px', color: '#223258' }}
+                            onClick={() => {
+                              setProfile((prev: any) => ({ 
+                                ...prev, 
+                                placeOfWork: opt.value,
+                                otherPlaceOfWork: opt.value === "other" ? "" : ""
+                              }));
+                              setShowPlaceOfWorkDropdown(false);
+                              setPlaceOfWorkSearchTerm('');
+                            }}
+                          >
+                            {opt.label}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {profile?.placeOfWork === "other" && (
+                    <div className="mt-2">
+                      <label className="block text-sm font-medium text-black mb-1">Specify Other Place of Work</label>
+                      <input
+                        type="text"
+                        name="otherPlaceOfWork"
+                        placeholder="Please specify your place of work"
+                        value={profile.otherPlaceOfWork || ""}
+                        onChange={e => setProfile((prev: any) => ({ ...prev, otherPlaceOfWork: e.target.value }))}
+                        className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[8px] text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent text-sm bg-white"
+                        style={{ fontSize: 14 }}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[#000000] mb-1 font-medium">Institution</label>
@@ -430,7 +829,7 @@ export default function ProfilePage() {
                       style={{ cursor: 'text', position: 'relative' }}
                     >
                       {(!specialtiesArray || specialtiesArray.length === 0) && (
-                        <span className="text-gray-400 text-sm select-none" style={{ fontSize: 11 }}>Select Specialties</span>
+                        <span className="text-gray-400 text-sm select-none font-medium">Select Specialties</span>
                       )}
                       {specialtiesArray.map((specialty: string) => (
                         <span
@@ -448,7 +847,16 @@ export default function ProfilePage() {
                                   : prev.specialties
                                     ? [prev.specialties]
                                     : [];
-                                return { ...prev, specialties: arr.filter((s: string) => s !== specialty) };
+                                const newSpecialties = arr.filter((s: string) => s !== specialty);
+                                
+                                // If removing "other", clear otherSpecialty
+                                // If "other" is not in remaining specialties, clear otherSpecialty
+                                const shouldClearOtherSpecialty = specialty === "other" || !newSpecialties.includes("other");
+                                return { 
+                                  ...prev, 
+                                  specialties: newSpecialties,
+                                  otherSpecialty: shouldClearOtherSpecialty ? "" : prev.otherSpecialty
+                                };
                               });
                             }}
                             className="ml-1 text-[#3771FE] hover:text-[#223258]"
@@ -467,7 +875,28 @@ export default function ProfilePage() {
                     </div>
                     {showSpecialtiesDropdown && (
                       <div className="absolute z-10 left-0 right-0 bg-white border border-[#B5C9FC] rounded-b-[8px] shadow-lg max-h-48 overflow-y-auto mt-1">
-                        {specialtiesOptions.filter(opt => !specialtiesArray.includes(opt.value)).map(opt => (
+                        {/* Search input for specialties */}
+                        <div className="sticky top-0 bg-white border-b border-[#B5C9FC] p-2">
+                          <input
+                            type="text"
+                            placeholder="Search specialties..."
+                            value={specialtiesSearchTerm}
+                            className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[6px] text-sm text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent"
+                            onChange={(e) => {
+                              setSpecialtiesSearchTerm(e.target.value);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') {
+                                setShowSpecialtiesDropdown(false);
+                              }
+                            }}
+                            autoFocus
+                          />
+                        </div>
+                        {specialtiesOptions
+                          .filter(opt => !specialtiesArray.includes(opt.value))
+                          .filter(opt => opt.label.toLowerCase().includes(specialtiesSearchTerm.toLowerCase()))
+                          .map(opt => (
                           <div
                             key={opt.value}
                             className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer text-sm text-[#223258]"
@@ -478,9 +907,18 @@ export default function ProfilePage() {
                                   : prev.specialties
                                     ? [prev.specialties]
                                     : [];
-                                return { ...prev, specialties: [...arr, opt.value] };
+                                const newSpecialties = [...arr, opt.value];
+                                
+                                // If adding "other", keep otherSpecialty as is
+                                // If adding non-"other", clear otherSpecialty
+                                return { 
+                                  ...prev, 
+                                  specialties: newSpecialties,
+                                  otherSpecialty: opt.value === "other" ? (prev.otherSpecialty || "") : ""
+                                };
                               });
                               setShowSpecialtiesDropdown(false);
+                              setSpecialtiesSearchTerm('');
                             }}
                           >
                             {opt.label}
@@ -517,9 +955,326 @@ export default function ProfilePage() {
                 {saving ? 'Saving...' : 'Update profile'}
               </button>
             </div>
+            <div className="flex justify-end mt-4 w-full mb-4 md:mb-0">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(true)}
+                className="bg-[#F4F7FF] border border-[#B5C9FC] text-[#747474] font-regular px-8 py-2 rounded-[8px] transition-colors text-lg w-48 hover:bg-[#E8F0FF] hover:text-[#223258]"
+              >
+                Delete Profile
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Subscription Tab Content */}
+        {activeTab === 'subscription' && (
+          <div>
+            <h2 className="text-xl font-regular text-[#000000] mb-1">Subscription Plans</h2>
+            <p className="text-[#747474] text-sm mb-6">Choose your plan or upgrade your current subscription</p>
+            
+            {/* Current Plan Display */}
+            <div className="mb-6 p-4 bg-[#F4F7FF] border border-[#B5C9FC] rounded-[10px]">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-[#747474] mb-1">Current Plan</p>
+                  <p className="text-lg font-semibold text-[#223258]">{getCurrentPlanDisplay()}</p>
+                  {currentSubscription?.subscription?.currentPeriodEnd && (
+                    <p className="text-sm text-[#747474] mt-1">
+                      {currentSubscription?.subscription?.cancelAtPeriodEnd || currentSubscription?.subscription?.status === 'canceled' ? (
+                        `Cancels on ${new Date(currentSubscription.subscription.currentPeriodEnd).toLocaleDateString('en-US', { 
+                          day: 'numeric',
+                          month: 'long', 
+                          year: 'numeric' 
+                        })}`
+                      ) : (
+                        `Renews on ${new Date(currentSubscription.subscription.currentPeriodEnd).toLocaleDateString('en-US', { 
+                          day: 'numeric',
+                          month: 'long', 
+                          year: 'numeric' 
+                        })}`
+                      )}
+                    </p>
+                  )}
+                </div>
+                {(currentSubscription?.subscription?.status === 'active' || currentSubscription?.subscription?.cancelAtPeriodEnd) && (
+                  <div className="bg-[#17B26A] text-[#FFFFFF] text-xs px-3 py-1 rounded-full font-medium">
+                    Active
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Billing Toggle */}
+            <div className="flex justify-center mb-8">
+              <div className="bg-white border border-[#B5C9FC] rounded-[10px] p-1 inline-flex">
+                <button
+                  onClick={() => setBillingInterval('monthly')}
+                  className={`px-6 py-2 rounded-[8px] font-medium transition-colors ${
+                    billingInterval === 'monthly' 
+                      ? 'bg-[#3771FE] text-white' 
+                      : 'text-[#223258] hover:bg-[#F4F7FF]'
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setBillingInterval('yearly')}
+                  className={`px-6 py-2 rounded-[8px] font-medium transition-colors ${
+                    billingInterval === 'yearly' 
+                      ? 'bg-[#3771FE] text-white' 
+                      : 'text-[#223258] hover:bg-[#F4F7FF]'
+                  }`}
+                >
+                  Yearly
+                </button>
+              </div>
+            </div>
+            
+            {/* Single Row Subscription Plans */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Free Plan */}
+              <div className={`border rounded-[10px] p-6 ${
+                isCurrentPlan('free') 
+                  ? 'border-[#3771FE] bg-[#F4F7FF]' 
+                  : 'border-[#B5C9FC] bg-white'
+              }`}>
+                <h4 className="text-xl font-semibold text-[#000000] mb-2">Free</h4>
+                <p className="text-sm text-[#747474] mb-4">Evidence-based answers for everyday clinical questions</p>
+                <div className="text-2xl font-bold text-[#000000] mb-4 text-center">€0</div>
+                
+                {/* Button positioned above features */}
+                <div className="w-full py-3 px-4 rounded-[8px] font-medium border border-[#3771FE] text-[#3771FE] bg-white text-center mb-6">
+                  {isCurrentPlan('free') ? 'Current Plan' : 'Free Plan'}
+                </div>
+                
+                <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
+                  <li>Evidence-based answers you can trust</li>
+                  <li>Medical guidelines</li>
+                  <li>Drug information</li>
+                  <li>Benchmark-backed quality answers</li>
+                  <li>30 Clinical questions / month</li>
+                  <li>5 AI Visual Abstracts / month</li>
+                  <li>Limits reset every month</li> 
+                </ul>
+                <p className="text-xs text-gray-600 italic mt-2">*Fair-use rate limits may apply</p>
+              </div>
+
+              {/* Premium Student Plan */}
+              <div className={`border rounded-[10px] p-6 relative ${
+                isCurrentPlan('student') && isCurrentBillingInterval(billingInterval)
+                  ? 'border-[#3771FE] bg-[#F4F7FF]' 
+                  : 'border-[#B5C9FC] bg-white'
+              }`}>
+                {/* Save Badge for Yearly */}
+                {billingInterval === 'yearly' && (
+                  <div className="absolute -top-3 right-4 bg-[#3771FE] text-white text-xs px-2 py-1 rounded-full font-medium">
+                    You save 20%
+                  </div>
+                )}
+                <h4 className="text-xl font-semibold text-[#000000] mb-2">Pro Student</h4>
+                <p className="text-sm text-[#747474] mb-4">Unlimited, guideline-backed answers with transparent citations</p>
+                <div className="flex items-baseline gap-1 mb-4 flex-nowrap justify-center">
+                  <span className="text-2xl font-bold text-[#000000]">
+                    {billingInterval === 'monthly' ? '€12.50' : '€9.92'}
+                  </span>
+                  <span className="text-sm text-[#000000] whitespace-nowrap">/ mo</span>
+                  {billingInterval === 'yearly' && (
+                    <span className="text-[10px] text-[#747474] whitespace-nowrap">(€119 billed yearly)</span>
+                  )}
+                </div>
+                
+                {/* Button positioned above description */}
+                <button
+                  onClick={isCurrentPlan('student') && isCurrentBillingInterval(billingInterval) ? undefined : () => handlePlanSelect('student', billingInterval)}
+                  className={`w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-4 ${
+                    isCurrentPlan('student') && isCurrentBillingInterval(billingInterval)
+                      ? 'border border-[#3771FE] text-[#3771FE] bg-white cursor-not-allowed'
+                      : 'bg-[#3771FE] text-white hover:bg-[#2A5CDB]'
+                  }`}
+                  disabled={isCurrentPlan('student') && isCurrentBillingInterval(billingInterval)}
+                >
+                  {isCurrentPlan('student') && isCurrentBillingInterval(billingInterval) ? 'Current Plan' : 'Get Pro Student'}
+                </button>
+                
+                <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
+                  <li>Unlimited Clinical Questions</li>
+                  <li>Unlimited Visual Abstracts</li>
+                  <li>Everything in Free</li>
+                </ul>
+                <p className="text-xs text-gray-600 italic mt-2">*Fair-use rate limits may apply</p>
+              </div>
+
+              {/* Premium Physician Plan */}
+              <div className={`border rounded-[10px] p-6 relative ${
+                isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval)
+                  ? 'border-[#3771FE] bg-[#F4F7FF]' 
+                  : 'border-[#B5C9FC] bg-white'
+              }`}>
+                {/* Save Badge for Yearly */}
+                {billingInterval === 'yearly' && (
+                  <div className="absolute -top-3 right-4 bg-[#3771FE] text-white text-xs px-2 py-1 rounded-full font-medium">
+                    You save 17%
+                  </div>
+                )}
+                <h4 className="text-xl font-semibold text-[#000000] mb-2">Pro Physician</h4>
+                <p className="text-sm text-[#747474] mb-4">Unlimited, guideline-backed answers with transparent citations</p>
+                <div className="flex items-baseline gap-1 mb-4 flex-nowrap justify-center">
+                  <span className="text-2xl font-bold text-[#000000]">
+                    {billingInterval === 'monthly' ? '€19.90' : '€16.58'}
+                  </span>
+                  <span className="text-sm text-[#000000] whitespace-nowrap">/ mo</span>
+                  {billingInterval === 'yearly' && (
+                    <span className="text-[10px] text-[#747474] whitespace-nowrap">(€199 billed yearly)</span>
+                  )}
+                </div>
+                
+                {/* Button positioned above description */}
+                <button
+                  onClick={isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval) ? undefined : () => handlePlanSelect('clinician', billingInterval)}
+                  className={`w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-4 ${
+                    isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval)
+                      ? 'border border-[#3771FE] text-[#3771FE] bg-white cursor-not-allowed'
+                      : 'bg-[#3771FE] text-white hover:bg-[#2A5CDB]'
+                  }`}
+                  disabled={isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval)}
+                >
+                  {isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval) ? 'Current Plan' : 'Get Pro Physician'}
+                </button>
+                
+                <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
+                  <li>Unlimited Clinical Questions</li>
+                  <li>Unlimited Visual Abstracts</li>
+                  <li>Everything in Free</li>
+                  {billingInterval === 'yearly' && (
+                    <li><span className="font-bold text-[#000000]">Early-bird discount available till the end of the year (€159 billed yearly)</span></li>
+                  )}
+                </ul>
+                <p className="text-xs text-gray-600 italic mt-2">*Fair-use rate limits may apply</p>
+              </div>
+
+              {/* Enterprise Plan */}
+              <div className="border rounded-[10px] p-6 border-[#B5C9FC] bg-white">
+                <h4 className="text-xl font-semibold text-[#000000] mb-2">Enterprise</h4>
+                <p className="text-sm text-[#747474] mb-4">Governed, evidence-based assistance at organizational scale</p>
+                <div className="text-lg font-bold text-[#000000] mb-4 text-center">Custom pricing</div>
+                
+                {/* Button positioned above features */}
+                <button
+                  onClick={() => window.location.href = 'mailto:info@synduct.com?subject=Enterprise Plan Inquiry'}
+                  className="w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-6 bg-[#3771FE] text-white hover:bg-[#2A5CDB]"
+                >
+                  Contact Sales
+                </button>
+                
+                {/* <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
+                  <li>Everything in Pro</li>
+                </ul> */}
+              </div>
+            </div>
+
+            {/* Cancel Subscription Button */}
+            {(() => {
+              const shouldShowCancel = currentSubscription?.subscription?.status === 'active' && 
+                                     !currentSubscription?.subscription?.cancelAtPeriodEnd && 
+                                     currentSubscription?.subscription?.status !== 'canceled';
+              
+              console.log('🔍 Cancel Button Debug:', {
+                status: currentSubscription?.subscription?.status,
+                cancelAtPeriodEnd: currentSubscription?.subscription?.cancelAtPeriodEnd,
+                shouldShowCancel,
+                subscription: currentSubscription?.subscription
+              });
+              
+              return shouldShowCancel ? (
+                <div className="flex justify-end mt-8 mb-4">
+                  <button
+                    type="button"
+                    onClick={handleCancelSubscription}
+                    className="bg-[#F4F7FF] border border-[#B5C9FC] text-[#747474] font-regular px-6 py-2 rounded-[8px] transition-colors text-base hover:bg-[#E8F0FF] hover:text-[#223258] min-w-[140px]"
+                  >
+                    Cancel Subscription
+                  </button>
+                </div>
+              ) : null;
+            })()}
+
+            {/* Error Message */}
+            {error && (
+              <div className="fixed top-4 right-4 z-50 max-w-sm">
+                <div className="bg-white border border-[#C8C8C8] rounded-lg shadow-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <svg className="w-5 h-5 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-[#223258] font-['DM_Sans']">{error}</p>
+                    </div>
+                    <button
+                      onClick={() => setError('')}
+                      className="flex-shrink-0 text-[#223258]/70 hover:text-[#223258] transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Delete Profile Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[10px] p-6 max-w-md w-full border border-[#B5C9FC]">
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-medium text-[#000000] mb-2">Delete Profile</h3>
+              <p className="text-[#747474] text-sm leading-relaxed">
+                We are sorry to see you go. This action will delete your profile and cannot be undone.
+              </p>
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-[#000000] mb-2 font-medium text-sm">
+                Type <span className="font-bold text-[#223258]">DELETE</span> to confirm
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder="Type DELETE to confirm"
+                className="w-full border border-[#B5C9FC] rounded-[8px] px-4 py-2 bg-white text-[#223258] font-medium outline-none focus:ring-2 focus:ring-[#B5C9FC] text-center"
+              />
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteConfirmation('');
+                }}
+                className="flex-1 bg-[#F4F7FF] border border-[#B5C9FC] text-[#747474] font-medium px-4 py-2 rounded-[8px] transition-colors hover:bg-[#E8F0FF] hover:text-[#223258]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={deleteProfile}
+                disabled={deleteConfirmation !== 'DELETE' || deleting}
+                className="flex-1 bg-[#F4F7FF] border border-[#B5C9FC] text-[#223258] font-medium px-4 py-2 rounded-[8px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#E8F0FF] disabled:hover:bg-[#F4F7FF]"
+              >
+                {deleting ? 'Deleting...' : 'Delete Profile'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 } 
