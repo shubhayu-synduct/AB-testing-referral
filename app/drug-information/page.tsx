@@ -299,7 +299,7 @@ export default function DrugInformationPage() {
           </div>
         </div>
         
-        <div className="relative mb-4 md:mb-8" ref={searchContainerRef}>
+        <div className="relative mb-8 md:mb-8" ref={searchContainerRef}>
           <div className="flex items-center border-[2.7px] border-[#3771FE]/[0.27] rounded-lg h-[56px] md:h-[69px] w-full max-w-[1118px] mx-auto pr-3 md:pr-4 bg-white">
             <div className="pl-3 md:pl-4 flex items-center">
               <Search className="text-[#9599A8] stroke-[1.5] w-[18px] h-[18px] md:w-[20px] md:h-[20px]" fill="none" />
@@ -392,8 +392,8 @@ export default function DrugInformationPage() {
           
           {/* No search results notification */}
           {showNoResultsMessage && searchTerm.trim() !== '' && recommendations.length === 0 && (
-            <div className="absolute z-10 mt-1 w-full max-w-[1118px] mx-auto">
-              <div className="text-center py-3 mb-4">
+            <div className="w-full max-w-[1118px] mx-auto mt-2 mb-4">
+              <div className="text-center py-3">
                 <p className="text-[#263969] font-['DM_Sans'] text-[14px]">
                   No search results found. We are continuously working to expand our drug database.
                 </p>

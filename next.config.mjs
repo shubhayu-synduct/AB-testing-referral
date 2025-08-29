@@ -11,15 +11,19 @@ const nextConfig = {
   },
   skipTrailingSlashRedirect: true,
   skipMiddlewareUrlNormalize: true,
+  // Remove console statements in production builds
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
   // Ignore build errors for specific pages
   onDemandEntries: {
     maxInactiveAge: 25 * 1000,
     pagesBufferLength: 2,
   },
-  // Remove ALL console statements in production builds
+  // Remove ALL console statements in production builds (both client and server)
   webpack: (config, { dev, isServer }) => {
-    if (!dev && !isServer) {
-      // Remove ALL console statements in production client builds
+    if (!dev) {
+      // Remove ALL console statements in production builds (both client and server)
       config.optimization.minimizer.forEach((minimizer) => {
         if (minimizer.constructor.name === 'TerserPlugin') {
           minimizer.options.terserOptions = {

@@ -41,7 +41,8 @@ export async function makeAuthenticatedRequest(
     
     const idToken = await user.getIdToken();
     headers['Authorization'] = `Bearer ${idToken}`;
-    logger.apiLog(`Making authenticated request to ${endpoint} for user: ${user.email}`);
+    // Reduced logging to avoid noise
+    logger.debug(`Making authenticated request to ${endpoint}`);
   } catch (error) {
     logger.error('Authentication error:', error);
     throw new Error('Authentication required. Please sign in to access drug information.');
@@ -88,6 +89,16 @@ export async function searchDrugs(
   );
 
   if (!response.ok) {
+    // Handle 422 errors more gracefully (usually validation errors)
+    if (response.status === 422) {
+      logger.debug(`Search validation error for query: "${query}"`);
+      return { drugs: [] };
+    }
+    
+    // Only log other errors
+    if (response.status !== 404) {
+      logger.error(`Search failed: ${response.status} ${response.statusText}`);
+    }
     throw new Error(`Search failed: ${response.status} ${response.statusText}`);
   }
 
@@ -119,6 +130,16 @@ export async function enhancedSearchDrugs(
   );
 
   if (!response.ok) {
+    // Handle 422 errors more gracefully (usually validation errors)
+    if (response.status === 422) {
+      logger.debug(`Search validation error for query: "${query}"`);
+      return { drugs: [], direct_match: null, brand_options: [] };
+    }
+    
+    // Only log other errors
+    if (response.status !== 404) {
+      logger.error(`Enhanced search failed: ${response.status} ${response.statusText}`);
+    }
     throw new Error(`Enhanced search failed: ${response.status} ${response.statusText}`);
   }
 
@@ -188,6 +209,16 @@ export async function getDrugLibrary(
   );
 
   if (!response.ok) {
+    // Handle 422 errors more gracefully (usually validation errors)
+    if (response.status === 422) {
+      logger.debug(`Drug library validation error for letter: "${letter}"`);
+      return { drugs: [] };
+    }
+    
+    // Only log other errors
+    if (response.status !== 404) {
+      logger.error(`Failed to get drug library: ${response.status} ${response.statusText}`);
+    }
     throw new Error(`Failed to get drug library: ${response.status} ${response.statusText}`);
   }
 
