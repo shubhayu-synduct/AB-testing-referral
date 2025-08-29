@@ -60,7 +60,7 @@ export async function fetchDrInfoSummary(
   // console.log("[API] Initiating API request for query:", query);
   
   let hasCalledComplete = false;
-  console.log("[API] About to send fetch request to:", DRINFO_API_URL);
+  // console.log("[API] About to send fetch request to:", DRINFO_API_URL);
   const response = await fetch(DRINFO_API_URL, {
     method: "POST",
     headers: {
@@ -93,7 +93,7 @@ export async function fetchDrInfoSummary(
         headers: Object.fromEntries(response.headers.entries()),
         errorText: errorText
       };
-      console.log(`[API] Request failed:`, errorDetails);
+      // console.log(`[API] Request failed:`, errorDetails);
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
 
@@ -173,9 +173,9 @@ export async function fetchDrInfoSummary(
       }
     }
      } catch (error) {
-       console.error("[API] Error in fetchDrInfoSummary:", error);
+      //  console.error("[API] Error in fetchDrInfoSummary:", error);
        const responseStatus = response.status;
-       console.log('responseStatus', responseStatus);
+      //  console.log('responseStatus', responseStatus);
        
        // Store the actual API response for debugging
        lastApiResponse = {
@@ -206,7 +206,8 @@ export async function fetchDrInfoSummary(
        }
      }
   finally{
-    console.log("[API] Fetch request completed");
+
+    console.log("Request completed");
   }
 }
 
