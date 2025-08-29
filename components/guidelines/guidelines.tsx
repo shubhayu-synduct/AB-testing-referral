@@ -110,7 +110,7 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (user) {
-        console.log('User authenticated:', user.uid);
+        // console.log('User authenticated:', user.uid);
         try {
           const db = getFirebaseFirestore();
           const userId = user.uid;

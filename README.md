@@ -1,4 +1,4 @@
-#### Dr. INFO - Medical Information Platform
+##### Dr. INFO - Medical Information Platform
 
 Dr. INFO is a comprehensive web application designed for healthcare professionals to access evidence-based medical information, clinical guidelines, drug information, and other healthcare resources in one centralized platform.
 
@@ -18,7 +18,7 @@ Dr. INFO is a comprehensive web application designed for healthcare professional
 - **History**: Track and manage your search history#
 
 ###### Tech Stack
-#####
+######
 - **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS
 - **Authentication**: Firebase Authentication
 - **Database**: Firestore
@@ -57,7 +57,7 @@ Dr. INFO is a comprehensive web application designed for healthcare professional
    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
    NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
    ```
-######
+#######
 4. Run the development server:
    ```
    npm run dev
