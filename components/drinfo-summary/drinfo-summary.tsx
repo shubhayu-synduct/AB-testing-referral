@@ -125,6 +125,7 @@ interface DrInfoSummaryData {
   svg_content?: string[];
   responseStatus?: number;
   apiResponse?: any;
+  remaining_limit?: number | string;
 }
 
 const KNOWN_STATUSES: StatusType[] = ['processing', 'searching', 'summarizing', 'formatting', 'complete', 'complete_image'];
@@ -167,6 +168,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
   const [activeTab, setActiveTab] = useState<'answer' | 'images'>('answer');
   const [imageGenerationStatus, setImageGenerationStatus] = useState<'idle' | 'generating' | 'complete'>('idle');
   const [expandedImage, setExpandedImage] = useState<{index: number, svgContent: string} | null>(null);
+  const [remainingLimit, setRemainingLimit] = useState<number | undefined>(undefined);
   const answerIconRef = useRef<HTMLDivElement>(null);
 
   // Modal state and timer
@@ -1355,6 +1357,15 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
             }
           }), {}) : {});
           
+          // Set remaining limit if available and not 'N/A'
+          if (data?.remaining_limit !== undefined && data.remaining_limit !== 'N/A') {
+            // Convert to number if it's a string, otherwise use as is
+            const limit = typeof data.remaining_limit === 'string' ? parseInt(data.remaining_limit, 10) : data.remaining_limit;
+            setRemainingLimit(isNaN(limit) ? undefined : limit);
+          } else {
+            setRemainingLimit(undefined);
+          }
+          
           // console.log('[CITATIONS_DEBUG] Setting activeCitations:', {
           //   hasCitations: !!data?.citations,
           //   citationCount: data?.citations ? Object.keys(data.citations).length : 0,
@@ -1806,6 +1817,15 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                 source_type: normalizeSourceType(citation.source_type)
               }
             }), {}) : {});
+
+            // Update remaining limit if available and not 'N/A'
+            if (data?.remaining_limit !== undefined && data.remaining_limit !== 'N/A') {
+              // Convert to number if it's a string, otherwise use as is
+              const limit = typeof data.remaining_limit === 'string' ? parseInt(data.remaining_limit, 10) : data.remaining_limit;
+              setRemainingLimit(isNaN(limit) ? undefined : limit);
+            } else {
+              setRemainingLimit(undefined);
+            }
 
             setStatus('complete');
             setIsLoading(false);
@@ -2262,6 +2282,15 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                     >
                                       Create a visual abstract for this answer
                                     </button>
+                                  </div>
+                                )}
+                                
+                                {/* Show remaining limit warning */}
+                                {remainingLimit !== undefined && remainingLimit <= 5 && (
+                                  <div className="mt-3 sm:mt-4 p-3">
+                                    <p className="text-sm text-gray-600 font-['DM_Sans'] text-center">
+                                      You only have <span className="font-semibold text-gray-700">{remainingLimit}</span> monthly question{remainingLimit === 1 ? '' : 's'} left!
+                                    </p>
                                   </div>
                                 )}
                               </div>
