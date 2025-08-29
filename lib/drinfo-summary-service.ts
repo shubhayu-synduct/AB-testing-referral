@@ -25,6 +25,7 @@ export interface DrInfoSummaryData {
   thread_id?: string;
   responseStatus?: number;
   apiResponse?: any;
+  remaining_limit?: number | string;
 }
 
 export interface StreamingResponse {
