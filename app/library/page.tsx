@@ -198,7 +198,7 @@ export default function LibraryPage() {
   useEffect(() => {
     console.log('useEffect triggered, user:', user)
     if (user) {
-      console.log('User authenticated, fetching visual abstracts...')
+      // console.log('User authenticated, fetching visual abstracts...')
       fetchVisualAbstracts()
     } else {
       console.log('No user yet, waiting for authentication...')

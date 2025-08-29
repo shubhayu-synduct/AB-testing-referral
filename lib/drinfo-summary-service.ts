@@ -80,7 +80,7 @@ export async function fetchDrInfoSummary(
       direct_image_request: options?.direct_image_request || false  // Add direct image request flag
     })
   });
-  console.log('response', response);
+  // console.log('response', response);
   
   try {
     // console.log('response', response);
