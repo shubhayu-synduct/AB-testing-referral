@@ -109,6 +109,15 @@ export default function DrugInformationPage() {
       setShowNoResultsMessage(false);
       return;
     }
+    
+    // Only proceed if there are at least 2 characters
+    if (term.trim().length < 2) {
+      setRecommendations([]);
+      setShowRecommendations(false);
+      setShowNoResultsMessage(false);
+      return;
+    }
+    
     setShowRecommendations(true);
     
     // Clear any existing no results timeout
@@ -221,6 +230,15 @@ export default function DrugInformationPage() {
       setShowNoResultsMessage(false);
       return;
     }
+    
+    // Only proceed if there are at least 2 characters
+    if (searchTerm.trim().length < 2) {
+      setRecommendations([]);
+      setShowRecommendations(false);
+      setShowNoResultsMessage(false);
+      return;
+    }
+    
     searchTimeoutRef.current = setTimeout(() => {
       fetchRecommendations(searchTerm, false);
     }, 300);
