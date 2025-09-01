@@ -12,7 +12,7 @@ import { getStatusMessage, StatusType } from '@/lib/status-messages'
 import { ReferencesSidebar } from "@/components/references/ReferencesSidebar"
 import { ReferenceGrid } from "@/components/references/ReferenceGrid"
 import { DrugInformationModal } from "@/components/references/DrugInformationModal"
-import { formatWithCitations, formatWithDummyCitations } from '@/lib/formatWithCitations'
+import { formatWithCitations, formatWithDummyCitations, preprocessContentForHtml, addDummyCitations, processStreamingContent } from '@/lib/formatWithCitations'
 import { createCitationTooltip } from '@/lib/citationTooltipUtils'
 import { marked } from 'marked'
 import Link from 'next/link'
@@ -900,6 +900,82 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         text-decoration: underline !important;
       }
 
+      /* Table styling for HTML content */
+      .drinfo-answer-content table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+      
+      .drinfo-answer-content th {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        padding: 12px 16px;
+        text-align: left;
+        font-weight: 600;
+        color: #1e293b;
+        font-family: 'DM Sans', sans-serif;
+      }
+      
+      .drinfo-answer-content td {
+        border: 1px solid #e2e8f0;
+        padding: 12px 16px;
+        text-align: left;
+        color: #334155;
+        font-family: 'DM Sans', sans-serif;
+        vertical-align: top;
+      }
+      
+      .drinfo-answer-content tr:nth-child(even) {
+        background-color: #f8fafc;
+      }
+      
+      .drinfo-answer-content tr:hover {
+        background-color: #f1f5f9;
+      }
+      
+      .drinfo-answer-content thead th {
+        background-color: #e2e8f0;
+        font-weight: 700;
+        color: #0f172a;
+      }
+      
+      /* Mobile responsive table styling */
+      @media (max-width: 768px) {
+        .drinfo-answer-content table {
+          font-size: 12px;
+        }
+        
+        .drinfo-answer-content th,
+        .drinfo-answer-content td {
+          padding: 8px 10px;
+        }
+        
+        .drinfo-answer-content table {
+          overflow-x: auto;
+          display: block;
+        }
+      }
+
+      /* Styling for markdown formatting within tables */
+      .drinfo-answer-content table strong {
+        font-weight: 700;
+        color: #1e293b;
+      }
+      
+      .drinfo-answer-content table em {
+        font-style: italic;
+        color: #475569;
+      }
+      
+      .drinfo-answer-content table strong em {
+        font-weight: 700;
+        font-style: italic;
+        color: #1e293b;
+      }
+
       @media print {
         body {
           -webkit-print-color-adjust: exact !important;
@@ -1557,11 +1633,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     window.open(url);
   };
 
-  const addDummyCitations = (content: string) => {
-    // Add dummy citation numbers in the format [1], [2], etc.
-    let citationCount = 1;
-    return content.replace(/\[citation\]/g, () => `[${citationCount++}]`);
-  };
+
 
   // Helper function to check if content is SVG
   const isSvgContent = (content: string): boolean => {
@@ -2134,11 +2206,21 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                       dangerouslySetInnerHTML={{
                                         __html:
                                           idx === messages.length - 1 && status !== 'complete' && status !== 'complete_image'
-                                            ? formatWithDummyCitations(
-                                                marked.parse(addDummyCitations(msg.content || ''), { async: false })
-                                              )
+                                            ? (() => {
+                                                // During streaming, check if content contains HTML
+                                                const content = msg.content || '';
+                                                if (content.includes('```html') || (content.includes('```') && /<[a-z][\s\S]*>/i.test(content))) {
+                                                  // If HTML content detected, render it directly with citations
+                                                  return formatWithDummyCitations(processStreamingContent(content));
+                                                } else {
+                                                  // Regular markdown content, process normally
+                                                  return formatWithDummyCitations(
+                                                    marked.parse(addDummyCitations(content), { async: false })
+                                                  );
+                                                }
+                                              })()
                                             : formatWithCitations(
-                                                marked.parse(msg.content || '', { async: false }),
+                                                marked.parse(preprocessContentForHtml(msg.content || ''), { async: false }),
                                                 msg.answer?.citations
                                               ),
                                       }}

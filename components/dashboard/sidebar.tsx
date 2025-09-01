@@ -150,7 +150,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                   <img src="/login-logo.svg" alt="DR. INFO Logo" className="h-8" />
                 ) : (
                   <div className="relative w-8 h-8">
-                    <img src="/icon.svg" alt="DR. INFO Logo" className="w-8 h-8" />
+                    <img src="/favicon.png" alt="DR. INFO Logo" className="w-8 h-8" />
                   </div>
                 )}
               </div>
