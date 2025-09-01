@@ -7,7 +7,7 @@ import { ArrowRight, ChevronDown, Copy, Search, ExternalLink, X, FileEdit, Thumb
 import { getStatusMessage, StatusType } from '@/lib/status-messages'
 import { ReferencesSidebar } from "@/components/references/ReferencesSidebar"
 import { ReferenceGrid } from "@/components/references/ReferenceGrid"
-import { formatWithCitations } from '@/lib/formatWithCitations'
+import { formatWithCitations, preprocessContentForHtml, processStreamingContent } from '@/lib/formatWithCitations'
 import { createCitationTooltip } from '@/lib/citationTooltipUtils'
 import { marked } from 'marked'
 import Link from 'next/link'
@@ -670,12 +670,12 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
                           <div
                             className="prose prose-slate prose-ul:text-black marker:text-black max-w-none text-base sm:text-base prose-h2:text-base prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold"
                             style={{ fontFamily: 'DM Sans, sans-serif' }}
-                            dangerouslySetInnerHTML={{
-                              __html: formatWithCitations(
-                                marked.parse(msg.content, { async: false }),
-                                msg.answer?.citations
-                              ),
-                            }}
+                                                          dangerouslySetInnerHTML={{
+                                __html: formatWithCitations(
+                                  marked.parse(preprocessContentForHtml(msg.content), { async: false }),
+                                  msg.answer?.citations
+                                ),
+                              }}
                           />
                         )}
                       </div>
