@@ -285,13 +285,15 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
   const askFollowupQuestion = async () => {
     if (!followupQuestion.trim() || isAskingFollowup) return
     
+    const currentQuestion = followupQuestion
+    setFollowupQuestion('') // Clear the input immediately
     setIsAskingFollowup(true)
     setFollowupError(null)
     
     try {
       setChatHistory(prev => [
         ...prev, 
-        { type: 'followup', question: followupQuestion, answer: '', sources: {}, page_references: {} }
+        { type: 'followup', question: currentQuestion, answer: '', sources: {}, page_references: {} }
       ])
       
       const response = await fetch('/api/guidelines/followup', {
@@ -302,7 +304,7 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
         body: JSON.stringify({
           title: citation.title,
           guidelines_index: citation.guidelines_index,
-          question: followupQuestion
+          question: currentQuestion
         })
       })
       
@@ -327,8 +329,6 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
         
         return updated
       })
-      
-      setFollowupQuestion('')
     } catch (err: any) {
       logger.error('Error asking followup question:', err)
       setFollowupError(err.message || 'Failed to get answer')

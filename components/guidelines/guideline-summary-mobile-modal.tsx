@@ -283,13 +283,15 @@ export default function GuidelineSummaryMobileModal({
   const askFollowupQuestion = async () => {
     if (!followupQuestion.trim() || isAskingFollowup) return;
     
+    const currentQuestion = followupQuestion;
+    setFollowupQuestion(''); // Clear the input immediately
     setIsAskingFollowup(true);
     setFollowupError(null);
     
     try {
       setChatHistory(prev => [
         ...prev, 
-        { type: 'followup', question: followupQuestion, answer: '', sources: {}, page_references: {} }
+        { type: 'followup', question: currentQuestion, answer: '', sources: {}, page_references: {} }
       ]);
       
       const response = await fetch('/api/guidelines/followup', {
@@ -300,7 +302,7 @@ export default function GuidelineSummaryMobileModal({
         body: JSON.stringify({
           title: guidelineTitle,
           guidelines_index: guidelineId.toString(),
-          question: followupQuestion
+          question: currentQuestion
         })
       });
       
@@ -325,8 +327,6 @@ export default function GuidelineSummaryMobileModal({
         
         return updated;
       });
-      
-      setFollowupQuestion('');
     } catch (err: any) {
       logger.error('Error asking followup question:', err);
       setFollowupError(err.message || 'Failed to get answer');
