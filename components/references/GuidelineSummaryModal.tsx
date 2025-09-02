@@ -562,8 +562,8 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
                     <div key={index} className={`mb-4 ${index > 0 ? 'mt-8 border-t pt-6' : ''}`}>
                       {message.question && (
                         <div className="mb-4">
-                          <div className="bg-blue-50 p-3 rounded-lg">
-                            <p style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500, fontSize: '20px', color: '#223258', margin: 0 }}>{message.question}</p>
+                          <div className="p-3 sm:p-4 border rounded-5px" style={{ borderColor: 'rgba(55, 113, 254, 0.5)', fontFamily: 'DM Sans, sans-serif', fontWeight: 500, color: '#223258', backgroundColor: '#E4ECFF' }}>
+                            <p className="m-0">{message.question}</p>
                           </div>
                         </div>
                       )}
@@ -579,7 +579,9 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
                               />
                             </div>
                             <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 300, fontSize: '18px', color: '#262F4D' }}>
-                              {message.type === 'main' ? 'Summary' : 'Answer'}
+                              <span className="font-semibold font-['DM_Sans'] text-base transition-colors duration-200 text-blue-900">
+                                {message.type === 'main' ? 'Summary' : 'Answer'}
+                              </span>
                             </span>
                           </div>
                           <div className='mt-6'>
@@ -591,6 +593,23 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
                                 onCitationClick={(citation, index) => handleReferenceClick(citation, index || 0)}
                               />
                             </div>
+                          </div>
+                        </>
+                      )}
+                      {message.question && !message.answer && (
+                        <>
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="flex items-center text-blue-500">
+                              <Image
+                                src="/answer-icon.svg"
+                                alt="Answer icon"
+                                width={24}
+                                height={24}
+                              />
+                            </div>
+                            <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 300, fontSize: '18px', color: '#262F4D' }}>
+                              <span className="shimmer-text italic">Generating your answer...</span>
+                            </span>
                           </div>
                         </>
                       )}
@@ -904,6 +923,25 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
         }
         .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
           font-weight: 700 !important;
+        }
+
+        /* Shimmer text effect for status message */
+        .shimmer-text {
+          background: linear-gradient(90deg,rgba(31, 41, 55, 0.77), #E5E7EB,rgba(31, 41, 55, 0.82));
+          background-size: 200% 100%;
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          animation: shimmer-text-move 4s ease-in-out infinite;
+        }
+
+        @keyframes shimmer-text-move {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .shimmer-text { animation: none; }
         }
       `}</style>
     </div>
