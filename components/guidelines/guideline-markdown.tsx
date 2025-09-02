@@ -1,6 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import React, { useEffect, useState, useRef } from 'react';
 import remarkGfm from "remark-gfm";
+import rehypeRaw from 'rehype-raw';
 
 // Add type declaration for window.handleCitationClick
 declare global {
@@ -76,6 +77,7 @@ export const GuidelineMarkdown = ({
     <div id="markdown-content" className="guideline-markdown">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw]}
         components={{
           table: ({ children }) => (
             <table className="w-full border-collapse border border-gray-300">{children}</table>
@@ -274,6 +276,61 @@ export const GuidelineMarkdown = ({
         }
         .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
           font-weight: 700 !important;
+        }
+
+        /* HTML table styling to match markdown tables */
+        #markdown-content table {
+          width: 100%;
+          border-collapse: collapse;
+          border: 1px solid #d1d5db;
+          margin: 1rem 0;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 1rem;
+        }
+
+        #markdown-content table thead {
+          background-color: #f3f4f6;
+        }
+
+        #markdown-content table tbody {
+          background-color: white;
+        }
+
+        #markdown-content table tr {
+          border: 1px solid #d1d5db;
+        }
+
+        #markdown-content table th {
+          padding: 0.5rem 1rem;
+          border: 1px solid #d1d5db;
+          text-align: left;
+          font-weight: 600;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 1rem;
+        }
+
+        #markdown-content table td {
+          padding: 0.5rem 1rem;
+          border: 1px solid #d1d5db;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 1rem;
+        }
+
+        /* Styling for markdown formatting within HTML tables */
+        #markdown-content table strong {
+          font-weight: 700;
+          color: #1e293b;
+        }
+
+        #markdown-content table em {
+          font-style: italic;
+          color: #475569;
+        }
+
+        #markdown-content table strong em {
+          font-weight: 700;
+          font-style: italic;
+          color: #1e293b;
         }
       `}</style>
     </div>

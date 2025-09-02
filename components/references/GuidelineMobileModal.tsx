@@ -269,13 +269,15 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
   const askFollowupQuestion = async () => {
     if (!followupQuestion.trim() || isAskingFollowup) return;
     
+    const currentQuestion = followupQuestion;
+    setFollowupQuestion(''); // Clear the input immediately
     setIsAskingFollowup(true);
     setFollowupError(null);
     
     try {
       setChatHistory(prev => [
         ...prev, 
-        { type: 'followup', question: followupQuestion, answer: '', sources: {}, page_references: {} }
+        { type: 'followup', question: currentQuestion, answer: '', sources: {}, page_references: {} }
       ]);
       
       const response = await fetch('/api/guidelines/followup', {
@@ -286,7 +288,7 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
         body: JSON.stringify({
           title: citation.title,
           guidelines_index: citation.guidelines_index,
-          question: followupQuestion
+          question: currentQuestion
         })
       });
       
@@ -311,8 +313,6 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
         
         return updated;
       });
-      
-      setFollowupQuestion('');
     } catch (err: any) {
       logger.error('Error asking followup question:', err);
       setFollowupError(err.message || 'Failed to get answer');
@@ -480,10 +480,8 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
                       <div key={index} className={`mb-3 sm:mb-4 ${index > 0 ? 'mt-6 sm:mt-8 border-t pt-4 sm:pt-6' : ''}`}>
                         {message.question && (
                           <div className="mb-3 sm:mb-4">
-                            <div className="bg-[#F4F7FF] p-2 sm:p-3 rounded-lg">
-                              <p style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500, fontSize: '16px sm:text-lg md:text-xl', color: '#223258', margin: 0 }}>
-                                {message.question}
-                              </p>
+                            <div className="p-3 sm:p-4 border rounded-5px" style={{ borderColor: 'rgba(55, 113, 254, 0.5)', fontFamily: 'DM Sans, sans-serif', fontWeight: 500, color: '#223258', backgroundColor: '#E4ECFF' }}>
+                              <p className="m-0">{message.question}</p>
                             </div>
                           </div>
                         )}
@@ -500,7 +498,9 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
                                 />
                               </div>
                               <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 300, fontSize: '14px sm:text-base md:text-lg', color: '#262F4D' }}>
-                                {message.type === 'main' ? 'Summary' : 'Answer'}
+                                <span className="font-semibold font-['DM_Sans'] text-base transition-colors duration-200 text-blue-900">
+                                  {message.type === 'main' ? 'Summary' : 'Answer'}
+                                </span>
                               </span>
                             </div>
                             <div className="prose prose-sm sm:prose-base max-w-none" style={{ fontFamily: 'DM Sans, sans-serif', color: '#1F2937', fontSize: '14px sm:text-base md:text-lg' }}>
@@ -510,6 +510,24 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
                                 pageReferences={message.page_references || null}
                                 onCitationClick={(citation, index) => handleReferenceClick(citation, index || 0)}
                               />
+                            </div>
+                          </>
+                        )}
+                        {message.question && !message.answer && (
+                          <>
+                            <div className="flex items-center gap-2 mb-2 top-0 bg-white z-10 py-2">
+                              <div className="flex items-center text-[#3771FE]">
+                                <Image
+                                  src="/answer-icon.svg"
+                                  alt="Answer icon"
+                                  width={20}
+                                  height={20}
+                                  className="sm:w-6 sm:h-6"
+                                />
+                              </div>
+                              <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 300, fontSize: '14px sm:text-base md:text-lg', color: '#262F4D' }}>
+                                <span className="shimmer-text italic">Generating your answer...</span>
+                              </span>
                             </div>
                           </>
                         )}
@@ -788,6 +806,25 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
 
         .guideline-title-link:hover {
           color: #3771FE !important;
+        }
+
+        /* Shimmer text effect for status message */
+        .shimmer-text {
+          background: linear-gradient(90deg,rgba(31, 41, 55, 0.77), #E5E7EB,rgba(31, 41, 55, 0.82));
+          background-size: 200% 100%;
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          animation: shimmer-text-move 4s ease-in-out infinite;
+        }
+
+        @keyframes shimmer-text-move {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .shimmer-text { animation: none; }
         }
       `}</style>
     </div>
