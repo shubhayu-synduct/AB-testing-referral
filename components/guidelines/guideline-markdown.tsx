@@ -25,30 +25,33 @@ export const GuidelineMarkdown = ({
 }: GuidelineMarkdownProps) => {
   const [citationCounts, setCitationCounts] = useState<Record<string, number>>({});
   const highlightRef = useRef<HTMLSpanElement>(null);
+  const citationCountsRef = useRef<Record<string, number>>({});
   
   // Track citation occurrences during rendering
   const formatTextWithCitations = (text: string) => {
-    // Create a new citationCounts object that will be updated
-    const newCitationCounts: Record<string, number> = {...citationCounts};
+    // Reset citation counts for this message
+    citationCountsRef.current = {};
     
-    return text.replace(/\[(\d+(?:,\s*\d+)*)\]/g, (match, nums) => {
+    return text.replace(/\[(\d+(?:,\s*\d+)*)\]/g, (match, nums, offset) => {
       const numbers = nums.split(',').map((n: string) => n.trim());
       return numbers.map((num: string) => {
         if (!sources || !sources[num]) return num;
         
-        // Increment the count for this citation
-        if (!newCitationCounts[num]) {
-          newCitationCounts[num] = 0;
-        }
-        newCitationCounts[num]++;
+        // Get current count for this citation
+        const currentCount = citationCountsRef.current[num] || 0;
+        citationCountsRef.current[num] = currentCount + 1;
         
-        // Index is the current count minus 1 (zero-based index)
-        const index = newCitationCounts[num] - 1;
+        // Index is the current count (zero-based index)
+        const index = currentCount;
+        
+        // Create unique identifier based on position and citation number
+        const uniqueId = `${num}_${offset}_${index}`;
         
         return `<span 
           class="reference-number"
           data-ref-number="${num}"
           data-occurrence-index="${index}"
+          data-unique-id="${uniqueId}"
           onclick="window.handleCitationClick && window.handleCitationClick('${num}', ${index})"
           role="button"
           tabindex="0"
@@ -69,7 +72,7 @@ export const GuidelineMarkdown = ({
     return () => {
       delete window.handleCitationClick;
     };
-  }, [content, onCitationClick]);
+  }, [content, onCitationClick, pageReferences]);
 
   if (!content) return null;
 

@@ -148,21 +148,24 @@ export default function GuidelineSummaryMobileModal({
     }
   }, [isOpen, guidelineId, guidelineTitle, summary]);
 
-  const extractReferenceText = useCallback((refNumber: string, refIndex: number) => {
-    if (!summary) return null;
+  const extractReferenceText = useCallback((refNumber: string, refIndex: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
+    // Use messageData if provided (for followup questions), otherwise use summary data
+    const dataSource = messageData || summary
+    if (!dataSource) return null
     
-    const pageRef = summary.page_references[refNumber];
+    const pageRef = dataSource.page_references[refNumber]
     if (!pageRef || !pageRef[refIndex]) {
-      return `Reference extract not available for citation [${refNumber}] (occurrence ${refIndex + 1}).`;
+      return `Reference extract not available for citation [${refNumber}] (occurrence ${refIndex + 1}). The reference exists but the specific extract could not be found.`
     }
     
-    const { start_word, end_word } = pageRef[refIndex];
-    const sourceText = summary.sources[refNumber];
+    const { start_word, end_word } = pageRef[refIndex]
+    const sourceText = dataSource.sources[refNumber]
     
     if (!sourceText) {
-      return `Source text not available for reference [${refNumber}].`;
+      return `Source text not available for reference [${refNumber}]. This citation exists in the document but the source text was not provided by the API.`
     }
 
+    // Clean text but preserve all characters including numbers, punctuation, and case
     const cleanText = (text: string) => {
       return text
         .replace(/\\b/g, '')
@@ -171,19 +174,12 @@ export default function GuidelineSummaryMobileModal({
         .trim();
     };
 
-    const getAlphaOnly = (text: string) => {
-      return text.replace(/[^a-zA-Z\s]/g, '').trim().toLowerCase();
-    };
-
     const cleanedSourceText = cleanText(sourceText);
-    const alphaSourceText = getAlphaOnly(cleanedSourceText);
-    
     const cleanedStartWord = cleanText(start_word);
     const cleanedEndWord = cleanText(end_word);
-    const alphaStartWord = getAlphaOnly(cleanedStartWord);
-    const alphaEndWord = getAlphaOnly(cleanedEndWord);
     
-    const startPos = alphaSourceText.indexOf(alphaStartWord);
+    // Find start position using exact matching
+    const startPos = cleanedSourceText.indexOf(cleanedStartWord);
     
     if (startPos === -1) {
       return {
@@ -194,19 +190,18 @@ export default function GuidelineSummaryMobileModal({
       };
     }
     
-    const originalStartPos = findOriginalPosition(cleanedSourceText, alphaSourceText, startPos);
-    
-    const remainingAlphaText = alphaSourceText.substring(startPos + alphaStartWord.length);
-    const endPosInRemaining = remainingAlphaText.indexOf(alphaEndWord);
+    // Find end position in the remaining text after start word
+    const remainingText = cleanedSourceText.substring(startPos + cleanedStartWord.length);
+    const endPosInRemaining = remainingText.indexOf(cleanedEndWord);
     
     if (endPosInRemaining === -1) {
       const excerptLength = 400;
-      const endOfExcerpt = Math.min(originalStartPos + excerptLength, cleanedSourceText.length);
+      const endOfExcerpt = Math.min(startPos + excerptLength, cleanedSourceText.length);
       
       return {
         fullText: sourceText,
         highlightedRange: { 
-          start: originalStartPos, 
+          start: startPos, 
           end: endOfExcerpt
         },
         isError: true,
@@ -214,41 +209,33 @@ export default function GuidelineSummaryMobileModal({
       };
     }
     
-    const endPos = startPos + alphaStartWord.length + endPosInRemaining;
-    const originalEndPos = findOriginalPosition(cleanedSourceText, alphaSourceText, endPos) + alphaEndWord.length;
-    
-    function findOriginalPosition(originalText: string, alphaText: string, alphaPosition: number) {
-      let alphaCharCount = 0;
-      let originalPos = 0;
-      
-      while (alphaCharCount < alphaPosition && originalPos < originalText.length) {
-        if (/[a-zA-Z\s]/.test(originalText[originalPos])) {
-          alphaCharCount++;
-        }
-        originalPos++;
-      }
-      
-      return originalPos;
-    }
+    // Calculate exact end position (include the full end word)
+    const endPos = startPos + cleanedStartWord.length + endPosInRemaining + cleanedEndWord.length;
     
     return {
-      fullText: sourceText,
+      fullText: cleanedSourceText,
       highlightedRange: { 
-        start: originalStartPos, 
-        end: originalEndPos
+        start: startPos, 
+        end: endPos
       },
       isError: false
     };
   }, [summary]);
 
-  const handleReferenceClick = useCallback((refNumber: string, occurrenceIndex: number) => {
+  const handleReferenceClick = useCallback((refNumber: string, occurrenceIndex: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
+    // Console log for verification
+    console.log(`Citation clicked: [${refNumber}] at occurrence index: ${occurrenceIndex}`);
+    console.log(`Available page_references for [${refNumber}]:`, messageData?.page_references?.[refNumber] || summary?.page_references?.[refNumber]);
+    
     setActiveTab('original');
-    const result = extractReferenceText(refNumber, occurrenceIndex);
+    const result = extractReferenceText(refNumber, occurrenceIndex, messageData);
     
     if (!result) {
+      const fallbackText = `The text extract for reference [${refNumber}] (occurrence ${occurrenceIndex + 1}) is not available. This may be due to incomplete data from the API or a processing error.`
+      
       setActiveReference({
         number: refNumber,
-        text: `The text extract for reference [${refNumber}] (occurrence ${occurrenceIndex + 1}) is not available.`,
+        text: fallbackText,
         index: occurrenceIndex,
         fullText: null,
         highlightedRange: null,
@@ -278,7 +265,7 @@ export default function GuidelineSummaryMobileModal({
         errorMessage: errorMessage
       });
     }
-  }, [extractReferenceText]);
+  }, [extractReferenceText, summary]);
 
   const askFollowupQuestion = async () => {
     if (!followupQuestion.trim() || isAskingFollowup) return;
@@ -311,6 +298,7 @@ export default function GuidelineSummaryMobileModal({
       }
       
       const data = await response.json();
+      console.log('Followup API response:', data);
       
       setChatHistory(prev => {
         const updated = [...prev];
@@ -527,7 +515,7 @@ export default function GuidelineSummaryMobileModal({
                                 content={message.answer}
                                 sources={message.sources || null}
                                 pageReferences={message.page_references || null}
-                                onCitationClick={(citation, index) => handleReferenceClick(citation, index || 0)}
+                                onCitationClick={(citation, index) => handleReferenceClick(citation, index || 0, { sources: message.sources || {}, page_references: message.page_references || {} })}
                               />
                             </div>
                           </>
