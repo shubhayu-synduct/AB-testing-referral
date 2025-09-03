@@ -120,6 +120,7 @@ export default function GuidelineSummaryModal({
         }
         
         const data = await response.json()
+        console.log('Summary API response:', data)
         // Decode unicode in summary before using it
         const decodedSummary = decodeUnicode(data.summary)
         logger.debug('Summary API response:', decodedSummary)
