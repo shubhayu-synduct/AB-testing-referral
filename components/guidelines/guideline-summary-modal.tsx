@@ -123,7 +123,7 @@ export default function GuidelineSummaryModal({
         console.log('Summary API response:', data)
         // Decode unicode in summary before using it
         const decodedSummary = decodeUnicode(data.summary)
-        logger.debug('Summary API response:', decodedSummary)
+        // logger.debug('Summary API response:', decodedSummary)
         setSummary({ ...data, summary: decodedSummary })
         
         // Add the initial summary to the chat history
@@ -230,12 +230,10 @@ export default function GuidelineSummaryModal({
   const handleReferenceClick = useCallback((refNumber: string, occurrenceIndex: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
     // Console log for verification
     console.log(`Citation clicked: [${refNumber}] at occurrence index: ${occurrenceIndex}`);
-    console.log(`Available page_references for [${refNumber}]:`, messageData?.page_references?.[refNumber] || summary?.page_references?.[refNumber]);
-    
     // Always open the citation panel and show the highlighted text
     setIsCitationPanelOpen(true);
     const result = extractReferenceText(refNumber, occurrenceIndex, messageData)
-    
+    console.log("result", result);
     if (!result) {
       const fallbackText = `The text extract for reference [${refNumber}] (occurrence ${occurrenceIndex + 1}) is not available. This may be due to incomplete data from the API or a processing error.`
       
