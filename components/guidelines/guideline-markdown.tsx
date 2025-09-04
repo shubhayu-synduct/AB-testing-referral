@@ -7,6 +7,7 @@ import rehypeRaw from 'rehype-raw';
 declare global {
   interface Window {
     handleCitationClick?: (citation: string, index?: number) => void;
+    messageDataStore?: Map<string, { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }>;
   }
 }
 
@@ -14,62 +15,116 @@ interface GuidelineMarkdownProps {
   content: string | null;
   sources: Record<string, string> | null;
   pageReferences?: Record<string, Array<{start_word: string, end_word: string}>> | null;
-  onCitationClick?: (citation: string, index?: number) => void;
+  onCitationClick?: (citation: string, index?: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => void;
+  messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> };
+  messageId?: string;
 }
 
 export const GuidelineMarkdown = ({ 
   content, 
   sources, 
   pageReferences,
-  onCitationClick 
+  onCitationClick,
+  messageData,
+  messageId
 }: GuidelineMarkdownProps) => {
-  const [citationCounts, setCitationCounts] = useState<Record<string, number>>({});
-  const highlightRef = useRef<HTMLSpanElement>(null);
+  const [processedContent, setProcessedContent] = useState<string>('');
+  const citationCountsRef = useRef<Record<string, number>>({});
   
-  // Track citation occurrences during rendering
-  const formatTextWithCitations = (text: string) => {
-    // Create a new citationCounts object that will be updated
-    const newCitationCounts: Record<string, number> = {...citationCounts};
+  // Initialize global message data store
+  useEffect(() => {
+    if (!window.messageDataStore) {
+      window.messageDataStore = new Map();
+    }
+    if (messageId && messageData) {
+      window.messageDataStore.set(messageId, messageData);
+    }
+  }, [messageId, messageData]);
+  
+  // Process entire markdown content at once
+  const processMarkdownWithCitations = (text: string, currentSources: Record<string, string> | null) => {
+    // Reset citation counts for the entire document
+    citationCountsRef.current = {};
     
-    return text.replace(/\[(\d+(?:,\s*\d+)*)\]/g, (match, nums) => {
-      const numbers = nums.split(',').map((n: string) => n.trim());
-      return numbers.map((num: string) => {
-        if (!sources || !sources[num]) return num;
-        
-        // Increment the count for this citation
-        if (!newCitationCounts[num]) {
-          newCitationCounts[num] = 0;
-        }
-        newCitationCounts[num]++;
-        
-        // Index is the current count minus 1 (zero-based index)
-        const index = newCitationCounts[num] - 1;
-        
-        return `<span 
-          class="reference-number"
-          data-ref-number="${num}"
-          data-occurrence-index="${index}"
-          onclick="window.handleCitationClick && window.handleCitationClick('${num}', ${index})"
-          role="button"
-          tabindex="0"
-        >${num}</span>`;
-      }).join(' ');
+    // Split content by lines to process headings separately
+    const lines = text.split('\n');
+    const processedLines = lines.map(line => {
+      // Check if this line is a heading (starts with #)
+      const isHeading = /^#{1,6}\s/.test(line);
+      
+      if (isHeading) {
+        // For headings, remove citations entirely - just return the heading text without citations
+        return line.replace(/\[\d+(?:,\s*\d+)*\]/g, '');
+      } else {
+        // For non-heading lines, process citations normally
+        return line.replace(/\[(\d+(?:,\s*\d+)*)\]/g, (match, nums, offset) => {
+          const numbers = nums.split(',').map((n: string) => n.trim());
+          return numbers.map((num: string) => {
+            if (!currentSources || !currentSources[num]) return num;
+            
+            // Get current count for this citation in the entire document
+            const currentCount = citationCountsRef.current[num] || 0;
+            citationCountsRef.current[num] = currentCount + 1;
+            
+            // Index is the current count (zero-based index)
+            const index = currentCount;
+            
+            // Create unique identifier based on position and citation number
+            const uniqueId = `${num}_${offset}_${index}`;
+            
+            return `<span 
+              class="reference-number"
+              data-ref-number="${num}"
+              data-occurrence-index="${index}"
+              data-unique-id="${uniqueId}"
+              data-message-id="${messageId || ''}"
+              role="button"
+              tabindex="0"
+            >${num}</span>`;
+          }).join(' ');
+        });
+      }
     });
+    
+    return processedLines.join('\n');
   };
 
   useEffect(() => {
-    // Reset citation counts whenever content changes
-    setCitationCounts({});
-    
-    // Set up the global click handler
-    window.handleCitationClick = (citation: string, index?: number) => {
-      onCitationClick?.(citation, index);
+    // Process the entire markdown content when it changes
+    if (content) {
+      const processed = processMarkdownWithCitations(content, sources);
+      setProcessedContent(processed);
+    }
+  }, [content, sources]);
+
+  useEffect(() => {
+    // Set up event delegation for citation clicks
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.classList.contains('reference-number')) {
+        const refNumber = target.getAttribute('data-ref-number');
+        const occurrenceIndex = target.getAttribute('data-occurrence-index');
+        const clickedMessageId = target.getAttribute('data-message-id');
+        
+        if (refNumber) {
+          const index = occurrenceIndex ? parseInt(occurrenceIndex, 10) : undefined;
+          // Get the correct messageData from the global store
+          const correctMessageData = clickedMessageId && window.messageDataStore 
+            ? window.messageDataStore.get(clickedMessageId) 
+            : messageData;
+          console.log('Citation clicked:', { refNumber, index, clickedMessageId, correctMessageData });
+          onCitationClick?.(refNumber, index, correctMessageData);
+        }
+      }
     };
+
+    // Add event listener to the document
+    document.addEventListener('click', handleClick);
     
     return () => {
-      delete window.handleCitationClick;
+      document.removeEventListener('click', handleClick);
     };
-  }, [content, onCitationClick]);
+  }, [onCitationClick, messageData]);
 
   if (!content) return null;
 
@@ -95,56 +150,15 @@ export const GuidelineMarkdown = ({
           h4: ({ children }) => <h4 className="heading-4">{children}</h4>,
           h5: ({ children }) => <h5 className="heading-5">{children}</h5>,
           h6: ({ children }) => <h6 className="heading-6">{children}</h6>,
-          p: ({ children }) => {
-            if (!children) return null;
-            const text = typeof children === 'string' 
-              ? children 
-              : Array.isArray(children) 
-                ? children.map(child => (typeof child === 'string' ? child : "")).join("")
-                : "";
-            
-            if (typeof text !== 'string') return <p className="markdown-paragraph">{children}</p>;
-            
-            const formattedContent = formatTextWithCitations(text);
-            return <p className="markdown-paragraph" dangerouslySetInnerHTML={{ __html: formattedContent }} />;
-          },
-          li: ({ children }) => {
-            if (Array.isArray(children)) {
-              return (
-                <li className="mb-2"> 
-                  {children.map((child, index) => {
-                    if (typeof child === "string") {
-                      const formattedContent = formatTextWithCitations(child);
-                      return <span key={index} dangerouslySetInnerHTML={{ __html: formattedContent }} />;
-                    }
-                    return <span key={index}>{child}</span>;
-                  })}
-                </li>
-              );
-            }
-
-            const text = typeof children === "string" ? children : "";
-            const formattedContent = formatTextWithCitations(text);
-            return <li className="mb-2" dangerouslySetInnerHTML={{ __html: formattedContent }} />;
-          },
-          strong: ({ children }) => {
-            const text = Array.isArray(children)
-              ? children.map(child => (typeof child === "string" ? child : "")).join("")
-              : children;
-
-            if (typeof text !== "string") {
-              return <strong>{children}</strong>;
-            }
-
-            const formattedContent = formatTextWithCitations(text);
-            return <strong dangerouslySetInnerHTML={{ __html: formattedContent }} />;
-          },
+          p: ({ children }) => <p className="markdown-paragraph">{children}</p>,
+          li: ({ children }) => <li className="mb-2">{children}</li>,
+          strong: ({ children }) => <strong>{children}</strong>,
           ul: ({ children }) => <ul className="ml-4 pl-2 list-disc space-y-2 mb-4">{children}</ul>,
           ol: ({ children }) => <ol className="ml-4 pl-2 list-decimal space-y-2 mb-4">{children}</ol>,
           a: ({ node, ...props }) => <a {...props} onClick={(e) => e.preventDefault()} className="guideline-title-link" />,
         }}
       >
-        {content}
+        {processedContent}
       </ReactMarkdown>
 
       <style jsx global>{`

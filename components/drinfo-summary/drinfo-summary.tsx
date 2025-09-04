@@ -806,6 +806,13 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         cursor: pointer;
         padding: 0 4px;
         box-sizing: border-box;
+        transition: all 0.2s ease;
+      }
+      
+      .citation-number:hover {
+        background-color: #0284c7;
+        color: white;
+        transform: scale(1.1);
       }
       
       .citation-tooltip {
@@ -1128,24 +1135,42 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
             });
         ref.appendChild(tooltip);
         
-        // Add click handler for mobile devices
+        // Add click handler for all devices
         ref.addEventListener('click', (e) => {
-          // Check if it's a mobile device (no hover capability)
-          if (window.matchMedia('(hover: none)').matches) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (citationObj) {
-              // Only open citations sidebar for non-drug citations
+          e.preventDefault();
+          e.stopPropagation();
+          
+          if (citationObj) {
+            // Check if it's a mobile device (no hover capability)
+            if (window.matchMedia('(hover: none)').matches) {
+              // Only open citations sidebar for non-drug citations on mobile
               if (citationObj.source_type !== 'drug_database') {
                 setSelectedCitation(citationObj);
                 setShowCitationsSidebar(true);
               }
               // For drug citations, do nothing on click (keep hover tooltip only)
+            } else {
+              // Desktop: Open URL in new tab if available
+              const url = citationObj.url;
+              if (url && url !== '#') {
+                window.open(url, '_blank', 'noopener,noreferrer');
+              } else if (citationObj.doi) {
+                // If no URL but has DOI, open DOI link
+                window.open(`https://doi.org/${citationObj.doi}`, '_blank', 'noopener,noreferrer');
+              }
+            }
+          } else {
+            // Fallback: try to get URL from data attributes
+            const url = ref.getAttribute('data-citation-url');
+            const doi = ref.getAttribute('data-citation-doi');
+            
+            if (url && url !== '#') {
+              window.open(url, '_blank', 'noopener,noreferrer');
+            } else if (doi) {
+              window.open(`https://doi.org/${doi}`, '_blank', 'noopener,noreferrer');
             }
           }
         });
-        
-        // Remove the click handler for desktop devices - citation numbers should only show tooltips, not open modals
         
         ref.addEventListener('mouseenter', () => {
           // Only handle hover on devices that support hover
