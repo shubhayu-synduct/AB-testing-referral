@@ -46,34 +46,47 @@ export const GuidelineMarkdown = ({
     // Reset citation counts for the entire document
     citationCountsRef.current = {};
     
-    const result = text.replace(/\[(\d+(?:,\s*\d+)*)\]/g, (match, nums, offset) => {
-      const numbers = nums.split(',').map((n: string) => n.trim());
-      return numbers.map((num: string) => {
-        if (!currentSources || !currentSources[num]) return num;
-        
-        // Get current count for this citation in the entire document
-        const currentCount = citationCountsRef.current[num] || 0;
-        citationCountsRef.current[num] = currentCount + 1;
-        
-        // Index is the current count (zero-based index)
-        const index = currentCount;
-        
-        // Create unique identifier based on position and citation number
-        const uniqueId = `${num}_${offset}_${index}`;
-        
-        return `<span 
-          class="reference-number"
-          data-ref-number="${num}"
-          data-occurrence-index="${index}"
-          data-unique-id="${uniqueId}"
-          data-message-id="${messageId || ''}"
-          role="button"
-          tabindex="0"
-        >${num}</span>`;
-      }).join(' ');
+    // Split content by lines to process headings separately
+    const lines = text.split('\n');
+    const processedLines = lines.map(line => {
+      // Check if this line is a heading (starts with #)
+      const isHeading = /^#{1,6}\s/.test(line);
+      
+      if (isHeading) {
+        // For headings, remove citations entirely - just return the heading text without citations
+        return line.replace(/\[\d+(?:,\s*\d+)*\]/g, '');
+      } else {
+        // For non-heading lines, process citations normally
+        return line.replace(/\[(\d+(?:,\s*\d+)*)\]/g, (match, nums, offset) => {
+          const numbers = nums.split(',').map((n: string) => n.trim());
+          return numbers.map((num: string) => {
+            if (!currentSources || !currentSources[num]) return num;
+            
+            // Get current count for this citation in the entire document
+            const currentCount = citationCountsRef.current[num] || 0;
+            citationCountsRef.current[num] = currentCount + 1;
+            
+            // Index is the current count (zero-based index)
+            const index = currentCount;
+            
+            // Create unique identifier based on position and citation number
+            const uniqueId = `${num}_${offset}_${index}`;
+            
+            return `<span 
+              class="reference-number"
+              data-ref-number="${num}"
+              data-occurrence-index="${index}"
+              data-unique-id="${uniqueId}"
+              data-message-id="${messageId || ''}"
+              role="button"
+              tabindex="0"
+            >${num}</span>`;
+          }).join(' ');
+        });
+      }
     });
     
-    return result;
+    return processedLines.join('\n');
   };
 
   useEffect(() => {
