@@ -68,7 +68,7 @@ export default function GuidelineSummaryModal({
     errorMessage: string | null | undefined 
   } | null>(null)
   const [processedMarkdown, setProcessedMarkdown] = useState<string>('')
-  const [isCitationPanelOpen, setIsCitationPanelOpen] = useState(false)
+  const [isCitationPanelOpen, setIsCitationPanelOpen] = useState(true)
   
   // Chat and follow-up questions state
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
@@ -231,8 +231,13 @@ export default function GuidelineSummaryModal({
   const handleReferenceClick = useCallback((refNumber: string, occurrenceIndex?: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
     // Console log for verification
     console.log(`Citation clicked: [${refNumber}] at occurrence index: ${occurrenceIndex}`);
-    // Always open the citation panel and show the highlighted text
+    
+    // Always ensure the citation panel is open - both immediately and after any other state updates
     setIsCitationPanelOpen(true);
+    setTimeout(() => {
+      setIsCitationPanelOpen(true);
+    }, 0);
+    
     const result = extractReferenceText(refNumber, occurrenceIndex || 0, messageData)
     // console.log("result", result);
     if (!result) {
@@ -270,7 +275,12 @@ export default function GuidelineSummaryModal({
         errorMessage: errorMessage
       })
     }
-  }, [extractReferenceText, isCitationPanelOpen, activeReference])
+    
+    // Ensure panel is open after setting the reference (in case of any race conditions)
+    setTimeout(() => {
+      setIsCitationPanelOpen(true);
+    }, 10);
+  }, [extractReferenceText])
 
   const askFollowupQuestion = async () => {
     if (!followupQuestion.trim() || isAskingFollowup) return
@@ -426,6 +436,11 @@ export default function GuidelineSummaryModal({
     } else {
       setIsCitationPanelOpen(true);
     }
+  };
+
+  // Prevent panel from closing when clicking on citations
+  const handleCitationPanelClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
   };
 
   if (!isOpen) return null;
@@ -649,7 +664,10 @@ export default function GuidelineSummaryModal({
           </div>
 
           {/* Original Source Panel - Collapsible like reference */}
-          <div className={`bg-white rounded-xl shadow-sm border border-gray-300 transition-all duration-300 ease-in-out flex flex-col ${isCitationPanelOpen ? 'flex-1 min-w-80' : 'w-16'}`}>
+          <div 
+            className={`bg-white rounded-xl shadow-sm border border-gray-300 transition-all duration-300 ease-in-out flex flex-col ${isCitationPanelOpen ? 'flex-1 min-w-80' : 'w-16'}`}
+            onClick={handleCitationPanelClick}
+          >
             {/* Header */}
             <div className={`flex items-center pt-6 pb-4 border-b border-gray-200 ${isCitationPanelOpen ? 'px-4' : 'px-1'}`} style={{ minHeight: '80px' }}>
               <button

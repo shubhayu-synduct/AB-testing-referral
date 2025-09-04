@@ -71,6 +71,8 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
   const questionInputRef = useRef<HTMLInputElement>(null);
   const highlightRef = useRef<HTMLSpanElement>(null);
   const answerEndRef = useRef<HTMLDivElement>(null);
+  const summaryScrollPosition = useRef<number>(0);
+  const summaryContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (highlightRef.current) {
@@ -83,6 +85,18 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
       answerEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [chatHistory.length]);
+
+  // Restore scroll position when switching back to summary tab
+  useEffect(() => {
+    if (activeTab === 'summary' && summaryScrollPosition.current > 0) {
+      // Use a longer timeout to ensure the DOM is fully rendered
+      setTimeout(() => {
+        if (summaryContainerRef.current) {
+          summaryContainerRef.current.scrollTop = summaryScrollPosition.current;
+        }
+      }, 200);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -213,6 +227,8 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
     console.log(`Citation clicked: [${refNumber}] at occurrence index: ${occurrenceIndex}`);
     console.log(`Available page_references for [${refNumber}]:`, messageData?.page_references?.[refNumber] || summary?.page_references?.[refNumber]);
     
+    // Save current scroll position before switching tabs
+    saveScrollPosition();
     setActiveTab('original');
     const result = extractReferenceText(refNumber, occurrenceIndex || 0, messageData);
     
@@ -324,6 +340,45 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
     return processedText;
   };
 
+  // Save scroll position when switching away from summary tab
+  const saveScrollPosition = () => {
+    if (summaryContainerRef.current) {
+      summaryScrollPosition.current = summaryContainerRef.current.scrollTop;
+    }
+  };
+
+  // Handle swipe gestures for tab switching
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe && activeTab === 'summary') {
+      // Swipe left: summary -> original
+      saveScrollPosition();
+      setActiveTab('original');
+    } else if (isRightSwipe && activeTab === 'original') {
+      // Swipe right: original -> summary
+      setActiveTab('summary');
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -399,7 +454,11 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
             Guideline Summary
           </button>
           <button
-            onClick={() => setActiveTab('original')}
+            onClick={() => {
+              // Save scroll position when switching to original tab
+              saveScrollPosition();
+              setActiveTab('original');
+            }}
             className={`flex-1 px-6 py-3 text-[16px] font-medium transition-colors ${
               activeTab === 'original'
                 ? 'text-[#3771FE] border-b-2 border-[#3771FE] bg-[#D3DFFE]'
@@ -411,7 +470,13 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 h-full pb-20">
+        <div 
+          className="flex-1 overflow-y-auto p-6 h-full pb-20"
+          ref={summaryContainerRef}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
           {activeTab === 'summary' ? (
             <div className="space-y-6">
               {/* Title and Meta */}
