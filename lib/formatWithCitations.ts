@@ -250,7 +250,7 @@ export const formatWithCitations = (text: string, citations?: Record<string, any
           : citation.authors)
       : '';
     const yearText = citation.year ? `(${citation.year})` : '';
-    const titleText = citation.text || '';
+    const titleText = citation.title || '';
     let sourceType = 'Journal';
     if (citation.source_type === 'drug_database') {
       sourceType = 'Drugs';

@@ -31,7 +31,7 @@ export function createCitationTooltip({
 
   // Source type label (Guidelines, Drugs, or Internet)
   let sourceType = 'Journals';  // Default to Internet
-  if (source_type === 'guideline_database') {
+  if (source_type === 'guidelines_database') {
     sourceType = 'Guidelines';
   } else if (source_type === 'drug_database') {
     sourceType = 'Drugs';
