@@ -222,31 +222,31 @@ export default function GuidelineSummaryMobileModal({
     };
   }, [summary]);
 
-  const handleReferenceClick = useCallback((refNumber: string, occurrenceIndex: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
+  const handleReferenceClick = useCallback((refNumber: string, occurrenceIndex?: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
     // Console log for verification
     console.log(`Citation clicked: [${refNumber}] at occurrence index: ${occurrenceIndex}`);
     console.log(`Available page_references for [${refNumber}]:`, messageData?.page_references?.[refNumber] || summary?.page_references?.[refNumber]);
     
     setActiveTab('original');
-    const result = extractReferenceText(refNumber, occurrenceIndex, messageData);
+    const result = extractReferenceText(refNumber, occurrenceIndex || 0, messageData);
     
     if (!result) {
-      const fallbackText = `The text extract for reference [${refNumber}] (occurrence ${occurrenceIndex + 1}) is not available. This may be due to incomplete data from the API or a processing error.`
+      const fallbackText = `The text extract for reference [${refNumber}] (occurrence ${(occurrenceIndex || 0) + 1}) is not available. This may be due to incomplete data from the API or a processing error.`
       
       setActiveReference({
         number: refNumber,
         text: fallbackText,
-        index: occurrenceIndex,
+        index: occurrenceIndex || 0,
         fullText: null,
         highlightedRange: null,
         isError: true,
-        errorMessage: `Could not find text for reference [${refNumber}], occurrence ${occurrenceIndex + 1}.`
+        errorMessage: `Could not find text for reference [${refNumber}], occurrence ${(occurrenceIndex || 0) + 1}.`
       });
     } else if (typeof result === 'string') {
       setActiveReference({
         number: refNumber,
         text: result,
-        index: occurrenceIndex,
+        index: occurrenceIndex || 0,
         fullText: null,
         highlightedRange: null,
         isError: true,
@@ -258,7 +258,7 @@ export default function GuidelineSummaryMobileModal({
       setActiveReference({
         number: refNumber,
         text: fullText || "",
-        index: occurrenceIndex,
+        index: occurrenceIndex || 0,
         fullText: fullText,
         highlightedRange: highlightedRange,
         isError: isError || false,
@@ -515,7 +515,9 @@ export default function GuidelineSummaryMobileModal({
                                 content={message.answer}
                                 sources={message.sources || null}
                                 pageReferences={message.page_references || null}
-                                onCitationClick={(citation, index) => handleReferenceClick(citation, index || 0, { sources: message.sources || {}, page_references: message.page_references || {} })}
+                                messageData={{ sources: message.sources || {}, page_references: message.page_references || {} }}
+                                messageId={`message-${index}`}
+                                onCitationClick={handleReferenceClick}
                               />
                             </div>
                           </>

@@ -155,9 +155,10 @@ export default function GuidelineSummaryModal({
 
   const extractReferenceText = useCallback((refNumber: string, refIndex: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
     // Use messageData if provided (for followup questions), otherwise use summary data
-    const dataSource = messageData || summary
+    console.log('messageData:', messageData);
+    const dataSource = messageData
     if (!dataSource) return null
-    
+    // console.log('dataSource:', dataSource);
     const pageRef = dataSource.page_references[refNumber]
     if (!pageRef || !pageRef[refIndex]) {
       return `Reference extract not available for citation [${refNumber}] (occurrence ${refIndex + 1}). The reference exists but the specific extract could not be found.`
@@ -227,30 +228,30 @@ export default function GuidelineSummaryModal({
     };
   }, [summary])
 
-  const handleReferenceClick = useCallback((refNumber: string, occurrenceIndex: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
+  const handleReferenceClick = useCallback((refNumber: string, occurrenceIndex?: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
     // Console log for verification
     console.log(`Citation clicked: [${refNumber}] at occurrence index: ${occurrenceIndex}`);
     // Always open the citation panel and show the highlighted text
     setIsCitationPanelOpen(true);
-    const result = extractReferenceText(refNumber, occurrenceIndex, messageData)
-    console.log("result", result);
+    const result = extractReferenceText(refNumber, occurrenceIndex || 0, messageData)
+    // console.log("result", result);
     if (!result) {
-      const fallbackText = `The text extract for reference [${refNumber}] (occurrence ${occurrenceIndex + 1}) is not available. This may be due to incomplete data from the API or a processing error.`
+      const fallbackText = `The text extract for reference [${refNumber}] (occurrence ${(occurrenceIndex || 0) + 1}) is not available. This may be due to incomplete data from the API or a processing error.`
       
       setActiveReference({
         number: refNumber,
         text: fallbackText,
-        index: occurrenceIndex,
+        index: occurrenceIndex || 0,
         fullText: null,
         highlightedRange: null,
         isError: true,
-        errorMessage: `Could not find text for reference [${refNumber}], occurrence ${occurrenceIndex + 1}.`
+        errorMessage: `Could not find text for reference [${refNumber}], occurrence ${(occurrenceIndex || 0) + 1}.`
       })
     } else if (typeof result === 'string') {
       setActiveReference({
         number: refNumber,
         text: result,
-        index: occurrenceIndex,
+        index: occurrenceIndex || 0,
         fullText: null,
         highlightedRange: null,
         isError: true,
@@ -262,7 +263,7 @@ export default function GuidelineSummaryModal({
       setActiveReference({
         number: refNumber,
         text: fullText || "",
-        index: occurrenceIndex,
+        index: occurrenceIndex || 0,
         fullText: fullText,
         highlightedRange: highlightedRange,
         isError: isError || false,
@@ -580,7 +581,9 @@ export default function GuidelineSummaryModal({
                                 content={message.answer}
                                 sources={message.sources || null}
                                 pageReferences={message.page_references || null}
-                                onCitationClick={(citation, index) => handleReferenceClick(citation, index || 0, { sources: message.sources || {}, page_references: message.page_references || {} })}
+                                messageData={{ sources: message.sources || {}, page_references: message.page_references || {} }}
+                                messageId={`message-${index}`}
+                                onCitationClick={handleReferenceClick}
                               />
                             </div>
                           </div>

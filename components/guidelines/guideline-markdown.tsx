@@ -7,6 +7,7 @@ import rehypeRaw from 'rehype-raw';
 declare global {
   interface Window {
     handleCitationClick?: (citation: string, index?: number) => void;
+    messageDataStore?: Map<string, { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }>;
   }
 }
 
@@ -14,17 +15,31 @@ interface GuidelineMarkdownProps {
   content: string | null;
   sources: Record<string, string> | null;
   pageReferences?: Record<string, Array<{start_word: string, end_word: string}>> | null;
-  onCitationClick?: (citation: string, index?: number) => void;
+  onCitationClick?: (citation: string, index?: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => void;
+  messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> };
+  messageId?: string;
 }
 
 export const GuidelineMarkdown = ({ 
   content, 
   sources, 
   pageReferences,
-  onCitationClick 
+  onCitationClick,
+  messageData,
+  messageId
 }: GuidelineMarkdownProps) => {
   const [processedContent, setProcessedContent] = useState<string>('');
   const citationCountsRef = useRef<Record<string, number>>({});
+  
+  // Initialize global message data store
+  useEffect(() => {
+    if (!window.messageDataStore) {
+      window.messageDataStore = new Map();
+    }
+    if (messageId && messageData) {
+      window.messageDataStore.set(messageId, messageData);
+    }
+  }, [messageId, messageData]);
   
   // Process entire markdown content at once
   const processMarkdownWithCitations = (text: string, currentSources: Record<string, string> | null) => {
@@ -51,6 +66,7 @@ export const GuidelineMarkdown = ({
           data-ref-number="${num}"
           data-occurrence-index="${index}"
           data-unique-id="${uniqueId}"
+          data-message-id="${messageId || ''}"
           role="button"
           tabindex="0"
         >${num}</span>`;
@@ -75,10 +91,16 @@ export const GuidelineMarkdown = ({
       if (target.classList.contains('reference-number')) {
         const refNumber = target.getAttribute('data-ref-number');
         const occurrenceIndex = target.getAttribute('data-occurrence-index');
+        const clickedMessageId = target.getAttribute('data-message-id');
         
         if (refNumber) {
           const index = occurrenceIndex ? parseInt(occurrenceIndex, 10) : undefined;
-          onCitationClick?.(refNumber, index);
+          // Get the correct messageData from the global store
+          const correctMessageData = clickedMessageId && window.messageDataStore 
+            ? window.messageDataStore.get(clickedMessageId) 
+            : messageData;
+          console.log('Citation clicked:', { refNumber, index, clickedMessageId, correctMessageData });
+          onCitationClick?.(refNumber, index, correctMessageData);
         }
       }
     };
@@ -89,7 +111,7 @@ export const GuidelineMarkdown = ({
     return () => {
       document.removeEventListener('click', handleClick);
     };
-  }, [onCitationClick]);
+  }, [onCitationClick, messageData]);
 
   if (!content) return null;
 
