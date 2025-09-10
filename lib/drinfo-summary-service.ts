@@ -26,6 +26,7 @@ export interface DrInfoSummaryData {
   responseStatus?: number;
   apiResponse?: any;
   remaining_limit?: number | string;
+  questions_followed?: string[];
 }
 
 export interface StreamingResponse {
