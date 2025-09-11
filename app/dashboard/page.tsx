@@ -481,7 +481,11 @@ export default function Dashboard() {
                             <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                           </div>
                         ) : (
-                          <img src="search.svg" alt="Search" width={30} height={30} />
+                          <svg width="30" height="30" viewBox="0 0 46 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="46" height="46" rx="6.57143" fill="#3771FE"/>
+                            <path d="M29.8594 16.5703L13.3594 33.0703" stroke="white" strokeWidth="2.25" strokeLinecap="round"/>
+                            <path d="M20.4297 14.6406H31.6426V24.9263" stroke="white" strokeWidth="2.25" strokeLinecap="round"/>
+                          </svg>
                         )}
                       </button>
                     </div>

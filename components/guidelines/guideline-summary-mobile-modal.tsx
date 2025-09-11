@@ -425,14 +425,18 @@ export default function GuidelineSummaryMobileModal({
               className="w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center bg-[#214498] rounded-[5px] hover:bg-[#1B3B8B] transition-colors"
               style={{ zIndex: 60 }}
             >
-              <Image
-                src="/double_back.svg"
-                alt="Back"
+              <svg
                 width={32}
                 height={32}
+                viewBox="0 0 34 35"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
                 className="w-6 h-6 sm:w-8 sm:h-8"
-                priority
-              />
+              >
+                <rect y="0.5" width="34" height="34" rx="2.5" fill="#01257C"/>
+                <path d="M16.5781 22.5L11.5781 17.5L16.5781 12.5" stroke="white"/>
+                <path d="M22.4218 22.5L17.4219 17.5L22.4219 12.5" stroke="white"/>
+              </svg>
             </button>
             <h1 
               className="text-xl font-semibold absolute left-1/2 transform -translate-x-1/2"
@@ -706,7 +710,11 @@ export default function GuidelineSummaryMobileModal({
                 className="flex-1 bg-transparent border-none outline-none text-sm sm:text-base text-gray-700 placeholder-gray-400 pr-10"
               />
               <div className="absolute right-1.5 top-1/2 -translate-y-1/2 cursor-pointer" onClick={askFollowupQuestion}>
-                <img src="/search.svg" alt="Search" width={28} height={28} />
+                <svg width="28" height="28" viewBox="0 0 46 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="46" height="46" rx="6.57143" fill="#3771FE"/>
+                  <path d="M29.8594 16.5703L13.3594 33.0703" stroke="white" strokeWidth="2.25" strokeLinecap="round"/>
+                  <path d="M20.4297 14.6406H31.6426V24.9263" stroke="white" strokeWidth="2.25" strokeLinecap="round"/>
+                </svg>
               </div>
             </div>
           </div>
