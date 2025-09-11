@@ -82,6 +82,10 @@ export default function LibraryPage() {
   const [selectedGuideline, setSelectedGuideline] = useState<SavedGuideline | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   
+  // Visual Abstract Modal State
+  const [selectedAbstract, setSelectedAbstract] = useState<VisualAbstract | null>(null)
+  const [isAbstractModalOpen, setIsAbstractModalOpen] = useState(false)
+  
   // Chat History State
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([])
   const [chatHistoryLoading, setChatHistoryLoading] = useState(true)
@@ -198,7 +202,7 @@ export default function LibraryPage() {
   useEffect(() => {
     console.log('useEffect triggered, user:', user)
     if (user) {
-      console.log('User authenticated, fetching visual abstracts...')
+      // console.log('User authenticated, fetching visual abstracts...')
       fetchVisualAbstracts()
     } else {
       console.log('No user yet, waiting for authentication...')
@@ -558,6 +562,18 @@ export default function LibraryPage() {
     setSelectedGuideline(null)
   }
 
+  const handleAbstractClick = (abstract: VisualAbstract) => {
+    if (!isSelectMode) {
+      setSelectedAbstract(abstract)
+      setIsAbstractModalOpen(true)
+    }
+  }
+
+  const handleAbstractModalClose = () => {
+    setIsAbstractModalOpen(false)
+    setSelectedAbstract(null)
+  }
+
   const removeBookmark = async (guideline: SavedGuideline) => {
     if (!user) return
     
@@ -829,7 +845,7 @@ export default function LibraryPage() {
                     <Card 
                       key={abstract.id} 
                       className={`bg-white shadow-sm border-[#B5C9FC] hover:shadow-md transition-shadow relative cursor-pointer ${isSelectMode ? 'ring-2 ring-[#223258]/20' : ''}`}
-                      onClick={() => isSelectMode && toggleSelectAbstract(abstract.id)}
+                      onClick={() => isSelectMode ? toggleSelectAbstract(abstract.id) : handleAbstractClick(abstract)}
                     >
                       {/* Selection Checkbox */}
                       {isSelectMode && (
@@ -879,7 +895,7 @@ export default function LibraryPage() {
                       <CardContent className="p-6">
                         <div className="mb-4">
                           <div 
-                            className="w-full h-48 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden"
+                            className="w-full h-56 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden"
                             dangerouslySetInnerHTML={{ __html: abstract.svg.svg_data }}
                           />
                         </div>
@@ -1253,6 +1269,57 @@ export default function LibraryPage() {
             url={selectedGuideline.url}
           />
         )
+      )}
+
+      {/* Visual Abstract Modal */}
+      {selectedAbstract && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-white rounded-lg relative max-w-[95vw] max-h-[95vh] overflow-auto">
+            {/* Close button positioned absolutely */}
+            <button
+              onClick={handleAbstractModalClose}
+              className="absolute top-2 right-2 z-10 bg-white/90 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white transition-colors"
+            >
+              <X className="h-5 w-5 text-gray-700" />
+            </button>
+            
+            {/* Scrollable image container */}
+            <div className="flex items-center justify-center p-2 min-h-full overflow-auto">
+              <div 
+                className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden min-w-max"
+                dangerouslySetInnerHTML={{ __html: selectedAbstract.svg.svg_data }}
+              />
+            </div>
+            
+            {/* Bottom info bar */}
+            <div className="px-3 py-2 bg-gray-50 border-t border-gray-200 flex items-center justify-between sticky bottom-0">
+              <div className="flex items-center text-sm text-[#223258]/70">
+                <Calendar className="h-4 w-4 mr-2" />
+                {formatTimestamp(selectedAbstract.svg.timestamp)}
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const blob = new Blob([selectedAbstract.svg.svg_data], { type: 'image/svg+xml' })
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = `visual-abstract-${selectedAbstract.id}.svg`
+                  document.body.appendChild(a)
+                  a.click()
+                  document.body.removeChild(a)
+                  URL.revokeObjectURL(url)
+                }}
+                className="bg-[#002A7C] hover:bg-[#1B3B8B] border-[#002A7C] text-white"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </DashboardLayout>
   )

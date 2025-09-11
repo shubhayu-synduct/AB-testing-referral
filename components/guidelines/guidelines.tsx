@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Search, BookOpen, ChevronRight, Loader2, ChevronDown, Bookmark, Star, ArrowUpRight } from 'lucide-react'
 import GuidelineSummaryModal from './guideline-summary-modal'
 import GuidelineSummaryMobileModal from './guideline-summary-mobile-modal'
@@ -43,6 +44,8 @@ interface GuidelinesProps {
 }
 
 export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [guidelines, setGuidelines] = useState<Guideline[]>(initialGuidelines || [])
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -59,6 +62,8 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
   const [bookmarkedGuidelines, setBookmarkedGuidelines] = useState<Bookmark[]>([])
   const [showBookmarks, setShowBookmarks] = useState(false)
   const [bookmarkingGuidelines, setBookmarkingGuidelines] = useState<Set<number>>(new Set())
+  const [lastSearchQuery, setLastSearchQuery] = useState<string>('')
+
   const { user } = useAuth()
 
   // Dynamic category order based on user's country
@@ -89,6 +94,49 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
     );
   };
 
+  // Function to update URL parameters
+  const updateUrlParams = useCallback((searchQuery: string, hasSearched: boolean) => {
+    const params = new URLSearchParams(searchParams.toString())
+    
+    if (hasSearched && searchQuery.trim()) {
+      params.set('q', searchQuery.trim())
+    } else {
+      params.delete('q')
+    }
+    
+    const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname
+    router.replace(newUrl, { scroll: false })
+  }, [router, searchParams])
+
+  // Function to get search results
+  const getSearchResults = useCallback(async (query: string, country: string, specialties: string[], otherSpecialty: string): Promise<Guideline[]> => {
+    try {
+      const response = await fetch('/api/guidelines/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: query.trim(),
+          country: country || 'None',
+          specialties: specialties,
+          otherSpecialty: otherSpecialty
+        })
+      })
+      
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Search failed with status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      return Array.isArray(data) ? data : []
+    } catch (error) {
+      logger.error('Error in getSearchResults:', error)
+      throw error
+    }
+  }, [])
+
   const loadUserBookmarks = async () => {
     if (!user?.uid) return;
     
@@ -107,10 +155,40 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
     }
   }
 
+  // Handle URL parameters on component mount
+  useEffect(() => {
+    const urlQuery = searchParams.get('q')
+    const guidelineId = searchParams.get('guideline')
+    const guidelineTitle = searchParams.get('title')
+    
+    if (urlQuery) {
+      setSearchTerm(urlQuery)
+      setHasSearched(true)
+      setLastSearchQuery(urlQuery)
+    }
+    
+    // Handle guideline modal from URL
+    if (guidelineId && guidelineTitle) {
+      const decodedTitle = decodeURIComponent(guidelineTitle)
+      const guideline: Guideline = {
+        id: parseInt(guidelineId),
+        title: decodedTitle,
+        description: '',
+        category: '',
+        last_updated: new Date().toISOString(),
+        url: '',
+        society: '',
+        link: ''
+      }
+      setSelectedGuideline(guideline)
+      setIsModalOpen(true)
+    }
+  }, [searchParams])
+
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (user) {
-        console.log('User authenticated:', user.uid);
+        // console.log('User authenticated:', user.uid);
         try {
           const db = getFirebaseFirestore();
           const userId = user.uid;
@@ -138,9 +216,15 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
             // Load user bookmarks
             await loadUserBookmarks();
             
-            // Automatically fetch guidelines based on user's country and specialties
-            if (country || specialties.length > 0 || otherSpecialty) {
-              await fetchInitialGuidelines(country, specialties, otherSpecialty);
+            // Check if there's a URL search parameter and perform search
+            const urlQuery = searchParams.get('q')
+            if (urlQuery) {
+              await performSearch(urlQuery, country, specialties, otherSpecialty)
+            } else {
+              // Automatically fetch guidelines based on user's country and specialties
+              if (country || specialties.length > 0 || otherSpecialty) {
+                await fetchInitialGuidelines(country, specialties, otherSpecialty);
+              }
             }
           }
         } catch (error) {
@@ -148,11 +232,70 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
         }
       } else {
         console.log('No user authenticated');
+        // Handle URL search even when not authenticated
+        const urlQuery = searchParams.get('q')
+        if (urlQuery) {
+          performSearch(urlQuery, '', [], '')
+        }
       }
     };
 
     fetchUserProfile();
-  }, [user]);
+  }, [user]); // Removed searchParams dependency to prevent re-running on modal close
+
+  // Unified search function
+  const performSearch = useCallback(async (query: string, country: string, specialties: string[], otherSpecialty: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const results = await getSearchResults(query, country, specialties, otherSpecialty);
+      setGuidelines(results);
+      setRetryCount(0);
+    } catch (err: any) {
+      logger.error('Error performing search:', err);
+      setError(err.message || 'Search failed. Please try again.');
+      setGuidelines([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [getSearchResults]);
+
+  // Separate effect to handle search parameter changes without re-fetching user profile
+  useEffect(() => {
+    const handleSearchFromUrl = async () => {
+      const urlQuery = searchParams.get('q')
+      const guidelineId = searchParams.get('guideline')
+      const guidelineTitle = searchParams.get('title')
+      
+      // Only perform search if:
+      // 1. There's a query
+      // 2. No modal parameters (to avoid re-searching when closing modal)
+      // 3. The query is different from the last search (to avoid duplicate searches)
+      // 4. User country is loaded
+      if (urlQuery && !guidelineId && !guidelineTitle && userCountry && urlQuery !== lastSearchQuery) {
+        // Get the current user's otherSpecialty from the profile
+        let otherSpecialty = '';
+        if (user) {
+          try {
+            const db = getFirebaseFirestore();
+            const userId = user.uid;
+            const userDoc = await getDoc(doc(db, "users", userId));
+            if (userDoc.exists()) {
+              otherSpecialty = userDoc.data()?.profile?.otherSpecialty || '';
+            }
+          } catch (error) {
+            // Ignore error, continue without otherSpecialty
+          }
+        }
+        
+        setLastSearchQuery(urlQuery)
+        await performSearch(urlQuery, userCountry, userSpecialties, otherSpecialty)
+      }
+    };
+
+    handleSearchFromUrl();
+  }, [searchParams, userCountry, userSpecialties, user, performSearch, lastSearchQuery]); // Only when search params change
 
   useEffect(() => {
     track('GuidelinesPageVisited', {
@@ -184,29 +327,10 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
         query = 'clinical guidelines';
       }
       
-      const response = await fetch('/api/guidelines/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: query.trim(),
-          country: country || 'None',
-          specialties: specialties,
-          otherSpecialty: otherSpecialty
-        })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to fetch guidelines with status: ${response.status}`);
-      }
-      
-      const data = await response.json();
+      const results = await getSearchResults(query, country, specialties, otherSpecialty);
       
       // Curate the results to show all guidelines
-      const allGuidelines = Array.isArray(data) ? data : [];
-      const curated = curateGuidelines(allGuidelines);
+      const curated = curateGuidelines(results);
       setCuratedGuidelines(curated);
     } catch (err: any) {
       logger.error('Error fetching initial guidelines:', err);
@@ -252,56 +376,31 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
   };
 
   const handlePopularSearch = async (term: string) => {
-    try {
-      setIsLoading(true)
-      setError(null)
-      setHasSearched(true)
-      setShowBookmarks(false)
-      
-      // Get the current user's otherSpecialty from the profile
-      let otherSpecialty = '';
-      if (user) {
-        try {
-          const db = getFirebaseFirestore();
-          const userId = user.uid;
-          const userDoc = await getDoc(doc(db, "users", userId));
-          if (userDoc.exists()) {
-            otherSpecialty = userDoc.data()?.profile?.otherSpecialty || '';
-          }
-        } catch (error) {
-          // Ignore error, continue without otherSpecialty
+    setSearchTerm(term)
+    setHasSearched(true)
+    setShowBookmarks(false)
+    setLastSearchQuery(term)
+    
+    // Get the current user's otherSpecialty from the profile
+    let otherSpecialty = '';
+    if (user) {
+      try {
+        const db = getFirebaseFirestore();
+        const userId = user.uid;
+        const userDoc = await getDoc(doc(db, "users", userId));
+        if (userDoc.exists()) {
+          otherSpecialty = userDoc.data()?.profile?.otherSpecialty || '';
         }
+      } catch (error) {
+        // Ignore error, continue without otherSpecialty
       }
-      
-      const response = await fetch('/api/guidelines/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: term,
-          country: userCountry || 'None',
-          specialties: userSpecialties,
-          otherSpecialty: otherSpecialty
-        })
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || `Search failed with status: ${response.status}`)
-      }
-      
-      const data = await response.json()
-      logger.debug('API response:', data);
-      setGuidelines(Array.isArray(data) ? data : [])
-      setRetryCount(0)
-    } catch (err: any) {
-      logger.error('Error searching guidelines:', err)
-      setError(err.message || 'Search failed. Please try again.')
-      setGuidelines([])
-    } finally {
-      setIsLoading(false)
     }
+    
+    // Update URL parameters
+    updateUrlParams(term, true)
+    
+    // Perform search
+    await performSearch(term, userCountry, userSpecialties, otherSpecialty)
   }
 
   const handleSearch = async () => {
@@ -309,59 +408,35 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
       setGuidelines(initialGuidelines || [])
       setHasSearched(false)
       setShowBookmarks(false)
+      setLastSearchQuery('')
+      updateUrlParams('', false)
       return
     }
     
-    try {
-      setIsLoading(true)
-      setError(null)
-      setHasSearched(true)
-      setShowBookmarks(false)
-      
-      // Get the current user's otherSpecialty from the profile
-      let otherSpecialty = '';
-      if (user) {
-        try {
-          const db = getFirebaseFirestore();
-          const userId = user.uid;
-          const userDoc = await getDoc(doc(db, "users", userId));
-          if (userDoc.exists()) {
-            otherSpecialty = userDoc.data()?.profile?.otherSpecialty || '';
-          }
-        } catch (error) {
-          // Ignore error, continue without otherSpecialty
+    setHasSearched(true)
+    setShowBookmarks(false)
+    setLastSearchQuery(searchTerm)
+    
+    // Get the current user's otherSpecialty from the profile
+    let otherSpecialty = '';
+    if (user) {
+      try {
+        const db = getFirebaseFirestore();
+        const userId = user.uid;
+        const userDoc = await getDoc(doc(db, "users", userId));
+        if (userDoc.exists()) {
+          otherSpecialty = userDoc.data()?.profile?.otherSpecialty || '';
         }
+      } catch (error) {
+        // Ignore error, continue without otherSpecialty
       }
-      
-      const response = await fetch('/api/guidelines/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: searchTerm,
-          country: userCountry || 'None',
-          specialties: userSpecialties,
-          otherSpecialty: otherSpecialty
-        })
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || `Search failed with status: ${response.status}`)
-      }
-      
-      const data = await response.json()
-      logger.debug('API response:', data);
-      setGuidelines(Array.isArray(data) ? data : [])
-      setRetryCount(0)
-    } catch (err: any) {
-      logger.error('Error searching guidelines:', err)
-      setError(err.message || 'Search failed. Please try again.')
-      setGuidelines([])
-    } finally {
-      setIsLoading(false)
     }
+    
+    // Update URL parameters
+    updateUrlParams(searchTerm, true)
+    
+    // Perform search
+    await performSearch(searchTerm, userCountry, userSpecialties, otherSpecialty)
   }
 
   const handleRetry = () => {
@@ -375,16 +450,34 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
     setGuidelines([])
     setError(null)
     setShowBookmarks(false)
+    setLastSearchQuery('')
+    updateUrlParams('', false)
   }
 
   const handleGuidelineClick = (guideline: Guideline) => {
     setSelectedGuideline(guideline)
     setIsModalOpen(true)
+    
+    // Update URL to include guideline modal
+    const currentParams = new URLSearchParams(searchParams.toString())
+    currentParams.set('guideline', guideline.id.toString())
+    currentParams.set('title', encodeURIComponent(guideline.title))
+    
+    const newUrl = `?${currentParams.toString()}`
+    router.push(newUrl, { scroll: false })
   }
 
   const handleModalClose = () => {
     setIsModalOpen(false)
     setSelectedGuideline(null)
+    
+    // Remove guideline parameters from URL when closing modal
+    const currentParams = new URLSearchParams(searchParams.toString())
+    currentParams.delete('guideline')
+    currentParams.delete('title')
+    
+    const newUrl = currentParams.toString() ? `?${currentParams.toString()}` : window.location.pathname
+    router.replace(newUrl, { scroll: false })
   }
 
   const toggleBookmark = async (guideline: Guideline) => {
@@ -707,11 +800,7 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
               {['hypertension', 'arthritis', 'obesity', 'pneumonia', 'diabetes', 'asthma', 'cancer'].map((term) => (
                 <button
                   key={term}
-                          onClick={() => {
-          setSearchTerm(term);
-          // Use the term directly in search instead of relying on state update
-          handlePopularSearch(term);
-        }}
+                  onClick={() => handlePopularSearch(term)}
                   className="px-3 py-1.5 text-xs sm:text-sm bg-[#F4F7FF] border border-[#B5C9FC] text-[#223258] rounded-[6px] hover:bg-[#E8F0FF] hover:border-[#3771FE] transition-colors"
                   style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500 }}
                 >

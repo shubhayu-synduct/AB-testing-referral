@@ -53,7 +53,7 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
     errorMessage: string | null | undefined 
   } | null>(null)
   const [processedMarkdown, setProcessedMarkdown] = useState<string>('')
-  const [isCitationPanelOpen, setIsCitationPanelOpen] = useState(false)
+  const [isCitationPanelOpen, setIsCitationPanelOpen] = useState(true)
   
   // Chat and follow-up questions state
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
@@ -137,21 +137,24 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
     }
   }, [open, citation, summary])
 
-  const extractReferenceText = useCallback((refNumber: string, refIndex: number) => {
-    if (!summary) return null
+  const extractReferenceText = useCallback((refNumber: string, refIndex: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
+    // Use messageData if provided (for followup questions), otherwise use summary data
+    const dataSource = messageData || summary
+    if (!dataSource) return null
     
-    const pageRef = summary.page_references[refNumber]
+    const pageRef = dataSource.page_references[refNumber]
     if (!pageRef || !pageRef[refIndex]) {
       return `Reference extract not available for citation [${refNumber}] (occurrence ${refIndex + 1}). The reference exists but the specific extract could not be found.`
     }
     
     const { start_word, end_word } = pageRef[refIndex]
-    const sourceText = summary.sources[refNumber]
+    const sourceText = dataSource.sources[refNumber]
     
     if (!sourceText) {
       return `Source text not available for reference [${refNumber}]. This citation exists in the document but the source text was not provided by the API.`
     }
 
+    // Clean text but preserve all characters including numbers, punctuation, and case
     const cleanText = (text: string) => {
       return text
         .replace(/\\b/g, '')
@@ -160,19 +163,12 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
         .trim();
     };
 
-    const getAlphaOnly = (text: string) => {
-      return text.replace(/[^a-zA-Z\s]/g, '').trim().toLowerCase();
-    };
-
     const cleanedSourceText = cleanText(sourceText);
-    const alphaSourceText = getAlphaOnly(cleanedSourceText);
-    
     const cleanedStartWord = cleanText(start_word);
     const cleanedEndWord = cleanText(end_word);
-    const alphaStartWord = getAlphaOnly(cleanedStartWord);
-    const alphaEndWord = getAlphaOnly(cleanedEndWord);
     
-    const startPos = alphaSourceText.indexOf(alphaStartWord);
+    // Find start position using exact matching
+    const startPos = cleanedSourceText.indexOf(cleanedStartWord);
     
     if (startPos === -1) {
       return {
@@ -183,19 +179,18 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
       };
     }
     
-    const originalStartPos = findOriginalPosition(cleanedSourceText, alphaSourceText, startPos);
-    
-    const remainingAlphaText = alphaSourceText.substring(startPos + alphaStartWord.length);
-    const endPosInRemaining = remainingAlphaText.indexOf(alphaEndWord);
+    // Find end position in the remaining text after start word
+    const remainingText = cleanedSourceText.substring(startPos + cleanedStartWord.length);
+    const endPosInRemaining = remainingText.indexOf(cleanedEndWord);
     
     if (endPosInRemaining === -1) {
       const excerptLength = 400;
-      const endOfExcerpt = Math.min(originalStartPos + excerptLength, cleanedSourceText.length);
+      const endOfExcerpt = Math.min(startPos + excerptLength, cleanedSourceText.length);
       
       return {
         fullText: sourceText,
         highlightedRange: { 
-          start: originalStartPos, 
+          start: startPos, 
           end: endOfExcerpt
         },
         isError: true,
@@ -203,65 +198,49 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
       };
     }
     
-    const endPos = startPos + alphaStartWord.length + endPosInRemaining;
-    const originalEndPos = findOriginalPosition(cleanedSourceText, alphaSourceText, endPos) + alphaEndWord.length;
-    
-    function findOriginalPosition(originalText: string, alphaText: string, alphaPosition: number) {
-      let alphaCharCount = 0;
-      let originalPos = 0;
-      
-      while (alphaCharCount < alphaPosition && originalPos < originalText.length) {
-        if (/[a-zA-Z\s]/.test(originalText[originalPos])) {
-          alphaCharCount++;
-        }
-        originalPos++;
-      }
-      
-      return originalPos;
-    }
+    // Calculate exact end position (include the full end word)
+    const endPos = startPos + cleanedStartWord.length + endPosInRemaining + cleanedEndWord.length;
     
     return {
-      fullText: sourceText,
+      fullText: cleanedSourceText,
       highlightedRange: { 
-        start: originalStartPos, 
-        end: originalEndPos
+        start: startPos, 
+        end: endPos
       },
       isError: false
     };
   }, [summary])
 
-  const handleReferenceClick = useCallback((refNumber: string, occurrenceIndex: number) => {
-    // Toggle: if the same reference is clicked again, close the panel and clear activeReference
-    if (
-      isCitationPanelOpen &&
-      activeReference &&
-      activeReference.number === refNumber &&
-      activeReference.index === occurrenceIndex
-    ) {
-      setIsCitationPanelOpen(false);
-      setActiveReference(null);
-      return;
-    }
+  const handleReferenceClick = useCallback((refNumber: string, occurrenceIndex?: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
+    // Console log for verification
+    console.log(`Citation clicked: [${refNumber}] at occurrence index: ${occurrenceIndex}`);
+    console.log(`Available page_references for [${refNumber}]:`, messageData?.page_references?.[refNumber] || summary?.page_references?.[refNumber]);
+    
+    // Always ensure the citation panel is open - both immediately and after any other state updates
     setIsCitationPanelOpen(true);
-    const result = extractReferenceText(refNumber, occurrenceIndex)
+    setTimeout(() => {
+      setIsCitationPanelOpen(true);
+    }, 0);
+    
+    const result = extractReferenceText(refNumber, occurrenceIndex || 0, messageData)
     
     if (!result) {
-      const fallbackText = `The text extract for reference [${refNumber}] (occurrence ${occurrenceIndex + 1}) is not available. This may be due to incomplete data from the API or a processing error.`
+      const fallbackText = `The text extract for reference [${refNumber}] (occurrence ${(occurrenceIndex || 0) + 1}) is not available. This may be due to incomplete data from the API or a processing error.`
       
       setActiveReference({
         number: refNumber,
         text: fallbackText,
-        index: occurrenceIndex,
+        index: occurrenceIndex || 0,
         fullText: null,
         highlightedRange: null,
         isError: true,
-        errorMessage: `Could not find text for reference [${refNumber}], occurrence ${occurrenceIndex + 1}.`
+        errorMessage: `Could not find text for reference [${refNumber}], occurrence ${(occurrenceIndex || 0) + 1}.`
       })
     } else if (typeof result === 'string') {
       setActiveReference({
         number: refNumber,
         text: result,
-        index: occurrenceIndex,
+        index: occurrenceIndex || 0,
         fullText: null,
         highlightedRange: null,
         isError: true,
@@ -273,25 +252,32 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
       setActiveReference({
         number: refNumber,
         text: fullText || "",
-        index: occurrenceIndex,
+        index: occurrenceIndex || 0,
         fullText: fullText,
         highlightedRange: highlightedRange,
         isError: isError || false,
         errorMessage: errorMessage
       })
     }
-  }, [extractReferenceText, isCitationPanelOpen, activeReference])
+    
+    // Ensure panel is open after setting the reference (in case of any race conditions)
+    setTimeout(() => {
+      setIsCitationPanelOpen(true);
+    }, 10);
+  }, [extractReferenceText])
 
   const askFollowupQuestion = async () => {
     if (!followupQuestion.trim() || isAskingFollowup) return
     
+    const currentQuestion = followupQuestion
+    setFollowupQuestion('') // Clear the input immediately
     setIsAskingFollowup(true)
     setFollowupError(null)
     
     try {
       setChatHistory(prev => [
         ...prev, 
-        { type: 'followup', question: followupQuestion, answer: '', sources: {}, page_references: {} }
+        { type: 'followup', question: currentQuestion, answer: '', sources: {}, page_references: {} }
       ])
       
       const response = await fetch('/api/guidelines/followup', {
@@ -302,7 +288,7 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
         body: JSON.stringify({
           title: citation.title,
           guidelines_index: citation.guidelines_index,
-          question: followupQuestion
+          question: currentQuestion
         })
       })
       
@@ -311,6 +297,7 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
       }
       
       const data = await response.json()
+      console.log('Followup API response:', data);
       
       setChatHistory(prev => {
         const updated = [...prev]
@@ -327,8 +314,6 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
         
         return updated
       })
-      
-      setFollowupQuestion('')
     } catch (err: any) {
       logger.error('Error asking followup question:', err)
       setFollowupError(err.message || 'Failed to get answer')
@@ -435,6 +420,11 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
     } else {
       setIsCitationPanelOpen(true);
     }
+  };
+
+  // Prevent panel from closing when clicking on citations
+  const handleCitationPanelClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
   };
 
   if (!open) return null;
@@ -562,8 +552,8 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
                     <div key={index} className={`mb-4 ${index > 0 ? 'mt-8 border-t pt-6' : ''}`}>
                       {message.question && (
                         <div className="mb-4">
-                          <div className="bg-blue-50 p-3 rounded-lg">
-                            <p style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500, fontSize: '20px', color: '#223258', margin: 0 }}>{message.question}</p>
+                          <div className="p-3 sm:p-4 border rounded-5px" style={{ borderColor: 'rgba(55, 113, 254, 0.5)', fontFamily: 'DM Sans, sans-serif', fontWeight: 500, color: '#223258', backgroundColor: '#E4ECFF' }}>
+                            <p className="m-0">{message.question}</p>
                           </div>
                         </div>
                       )}
@@ -579,7 +569,9 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
                               />
                             </div>
                             <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 300, fontSize: '18px', color: '#262F4D' }}>
-                              {message.type === 'main' ? 'Summary' : 'Answer'}
+                              <span className="font-semibold font-['DM_Sans'] text-base transition-colors duration-200 text-blue-900">
+                                {message.type === 'main' ? 'Summary' : 'Answer'}
+                              </span>
                             </span>
                           </div>
                           <div className='mt-6'>
@@ -588,9 +580,28 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
                                 content={message.answer}
                                 sources={message.sources || null}
                                 pageReferences={message.page_references || null}
-                                onCitationClick={(citation, index) => handleReferenceClick(citation, index || 0)}
+                                messageData={{ sources: message.sources || {}, page_references: message.page_references || {} }}
+                                messageId={`message-${index}`}
+                                onCitationClick={handleReferenceClick}
                               />
                             </div>
+                          </div>
+                        </>
+                      )}
+                      {message.question && !message.answer && (
+                        <>
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="flex items-center text-blue-500">
+                              <Image
+                                src="/answer-icon.svg"
+                                alt="Answer icon"
+                                width={24}
+                                height={24}
+                              />
+                            </div>
+                            <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 300, fontSize: '18px', color: '#262F4D' }}>
+                              <span className="shimmer-text italic">Generating your answer...</span>
+                            </span>
                           </div>
                         </>
                       )}
@@ -637,7 +648,10 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
           </div>
 
           {/* Original Source Panel - Collapsible like reference */}
-          <div className={`bg-white rounded-xl shadow-sm border border-gray-300 transition-all duration-300 ease-in-out flex flex-col ${isCitationPanelOpen ? 'flex-1 min-w-80' : 'w-16'}`}>
+          <div 
+            className={`bg-white rounded-xl shadow-sm border border-gray-300 transition-all duration-300 ease-in-out flex flex-col ${isCitationPanelOpen ? 'flex-1 min-w-80' : 'w-16'}`}
+            onClick={handleCitationPanelClick}
+          >
             {/* Header */}
             <div className={`flex items-center pt-6 pb-4 border-b border-gray-200 ${isCitationPanelOpen ? 'px-4' : 'px-1'}`} style={{ minHeight: '80px' }}>
               <button
@@ -904,6 +918,25 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
         }
         .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
           font-weight: 700 !important;
+        }
+
+        /* Shimmer text effect for status message */
+        .shimmer-text {
+          background: linear-gradient(90deg,rgba(31, 41, 55, 0.77), #E5E7EB,rgba(31, 41, 55, 0.82));
+          background-size: 200% 100%;
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          animation: shimmer-text-move 4s ease-in-out infinite;
+        }
+
+        @keyframes shimmer-text-move {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .shimmer-text { animation: none; }
         }
       `}</style>
     </div>

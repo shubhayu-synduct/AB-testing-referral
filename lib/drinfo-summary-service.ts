@@ -6,7 +6,7 @@ import { logger } from './logger';
 // const DRINFO_API_URL = "https://synduct-aisummary.drinfo.ai/chat/stream";
  const DRINFO_API_URL = "https://synduct-ai-summary-stage-images.drinfo.ai/chat/stream";
 // const DRINFO_API_URL = "http://localhost:8000/chat/stream";
-// const DRINFO_API_URL = "https://ai-summary-stage.duckdns.org/chat/stream";
+// const DRINFO_API_URL = "https://synduct-ai-summary-stage.drinfo.ai/chat/stream";
 export interface Citation {
   title: string;
   url: string;
@@ -25,6 +25,8 @@ export interface DrInfoSummaryData {
   thread_id?: string;
   responseStatus?: number;
   apiResponse?: any;
+  remaining_limit?: number | string;
+  questions_followed?: string[];
 }
 
 export interface StreamingResponse {
@@ -59,7 +61,7 @@ export async function fetchDrInfoSummary(
   // console.log("[API] Initiating API request for query:", query);
   
   let hasCalledComplete = false;
-  console.log("[API] About to send fetch request to:", DRINFO_API_URL);
+  // console.log("[API] About to send fetch request to:", DRINFO_API_URL);
   const response = await fetch(DRINFO_API_URL, {
     method: "POST",
     headers: {
@@ -79,7 +81,7 @@ export async function fetchDrInfoSummary(
       direct_image_request: options?.direct_image_request || false  // Add direct image request flag
     })
   });
-  console.log('response', response);
+  // console.log('response', response);
   
   try {
     // console.log('response', response);
@@ -92,7 +94,7 @@ export async function fetchDrInfoSummary(
         headers: Object.fromEntries(response.headers.entries()),
         errorText: errorText
       };
-      console.log(`[API] Request failed:`, errorDetails);
+      // console.log(`[API] Request failed:`, errorDetails);
       throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
 
@@ -172,9 +174,9 @@ export async function fetchDrInfoSummary(
       }
     }
      } catch (error) {
-       console.error("[API] Error in fetchDrInfoSummary:", error);
+      //  console.error("[API] Error in fetchDrInfoSummary:", error);
        const responseStatus = response.status;
-       console.log('responseStatus', responseStatus);
+      //  console.log('responseStatus', responseStatus);
        
        // Store the actual API response for debugging
        lastApiResponse = {
@@ -205,7 +207,8 @@ export async function fetchDrInfoSummary(
        }
      }
   finally{
-    console.log("[API] Fetch request completed");
+
+    console.log("Request completed");
   }
 }
 

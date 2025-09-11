@@ -1171,7 +1171,7 @@ export default function Onboarding() {
                       style={{ backgroundColor: !termsAgreed ? '#DEE8FF' : undefined, minWidth: '20px', minHeight: '20px' }}
                     />
                     <label htmlFor="terms-agreement" className="cursor-pointer" style={{ fontFamily: 'DM Sans', fontSize: '12px', fontWeight: 400, color: '#000' }}>
-                      I agree to the <a href="https://synduct.com/terms-and-conditions/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Terms of Use</a> and <a href="https://synduct.com/privacy-policy/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Privacy Policy</a>
+                      I agree to the <a href="https://drinfo.ai/termsofservice/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Terms of Use</a> and <a href="https://drinfo.ai/privacy-policy/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Privacy Policy</a>
                     </label>
               </div>
               {error && <div className="bg-red-50 text-red-600 p-2 rounded-[5px] text-sm">{error}</div>}

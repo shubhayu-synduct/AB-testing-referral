@@ -12,7 +12,7 @@ import { getStatusMessage, StatusType } from '@/lib/status-messages'
 import { ReferencesSidebar } from "@/components/references/ReferencesSidebar"
 import { ReferenceGrid } from "@/components/references/ReferenceGrid"
 import { DrugInformationModal } from "@/components/references/DrugInformationModal"
-import { formatWithCitations, formatWithDummyCitations } from '@/lib/formatWithCitations'
+import { formatWithCitations, formatWithDummyCitations, preprocessContentForHtml, addDummyCitations, processStreamingContent } from '@/lib/formatWithCitations'
 import { createCitationTooltip } from '@/lib/citationTooltipUtils'
 import { marked } from 'marked'
 import Link from 'next/link'
@@ -46,6 +46,7 @@ interface ChatMessage {
     citations?: Record<string, Citation>;
     svg_content?: string[]; // Changed from string to string[]
     apiResponse?: any; // Added API response field
+    questions_followed?: string[]; // Added follow-up questions field
   };
   feedback?: {
     likes: number;
@@ -125,6 +126,8 @@ interface DrInfoSummaryData {
   svg_content?: string[];
   responseStatus?: number;
   apiResponse?: any;
+  remaining_limit?: number | string;
+  questions_followed?: string[];
 }
 
 const KNOWN_STATUSES: StatusType[] = ['processing', 'searching', 'summarizing', 'formatting', 'complete', 'complete_image'];
@@ -167,6 +170,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
   const [activeTab, setActiveTab] = useState<'answer' | 'images'>('answer');
   const [imageGenerationStatus, setImageGenerationStatus] = useState<'idle' | 'generating' | 'complete'>('idle');
   const [expandedImage, setExpandedImage] = useState<{index: number, svgContent: string} | null>(null);
+  const [remainingLimit, setRemainingLimit] = useState<number | undefined>(undefined);
   const answerIconRef = useRef<HTMLDivElement>(null);
 
   // Modal state and timer
@@ -440,7 +444,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
             citations,
             svg_content: lastAssistantMsg.answer.svg_content,
             status: 'complete',
-            references: []
+            references: [],
+            questions_followed: lastAssistantMsg.answer.questions_followed || []
           });
           
           if (citations && Object.keys(citations).length > 0) {
@@ -804,6 +809,13 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         cursor: pointer;
         padding: 0 4px;
         box-sizing: border-box;
+        transition: all 0.2s ease;
+      }
+      
+      .citation-number:hover {
+        background-color: #0284c7;
+        color: white;
+        transform: scale(1.1);
       }
       
       .citation-tooltip {
@@ -896,6 +908,82 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       .drug-name-clickable:hover {
         color: #3771FE !important;
         text-decoration: underline !important;
+      }
+
+      /* Table styling for HTML content */
+      .drinfo-answer-content table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+      
+      .drinfo-answer-content th {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        padding: 12px 16px;
+        text-align: left;
+        font-weight: 600;
+        color: #1e293b;
+        font-family: 'DM Sans', sans-serif;
+      }
+      
+      .drinfo-answer-content td {
+        border: 1px solid #e2e8f0;
+        padding: 12px 16px;
+        text-align: left;
+        color: #334155;
+        font-family: 'DM Sans', sans-serif;
+        vertical-align: top;
+      }
+      
+      .drinfo-answer-content tr:nth-child(even) {
+        background-color: #f8fafc;
+      }
+      
+      .drinfo-answer-content tr:hover {
+        background-color: #f1f5f9;
+      }
+      
+      .drinfo-answer-content thead th {
+        background-color: #e2e8f0;
+        font-weight: 700;
+        color: #0f172a;
+      }
+      
+      /* Mobile responsive table styling */
+      @media (max-width: 768px) {
+        .drinfo-answer-content table {
+          font-size: 12px;
+        }
+        
+        .drinfo-answer-content th,
+        .drinfo-answer-content td {
+          padding: 8px 10px;
+        }
+        
+        .drinfo-answer-content table {
+          overflow-x: auto;
+          display: block;
+        }
+      }
+
+      /* Styling for markdown formatting within tables */
+      .drinfo-answer-content table strong {
+        font-weight: 700;
+        color: #1e293b;
+      }
+      
+      .drinfo-answer-content table em {
+        font-style: italic;
+        color: #475569;
+      }
+      
+      .drinfo-answer-content table strong em {
+        font-weight: 700;
+        font-style: italic;
+        color: #1e293b;
       }
 
       @media print {
@@ -1050,24 +1138,42 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
             });
         ref.appendChild(tooltip);
         
-        // Add click handler for mobile devices
+        // Add click handler for all devices
         ref.addEventListener('click', (e) => {
-          // Check if it's a mobile device (no hover capability)
-          if (window.matchMedia('(hover: none)').matches) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (citationObj) {
-              // Only open citations sidebar for non-drug citations
+          e.preventDefault();
+          e.stopPropagation();
+          
+          if (citationObj) {
+            // Check if it's a mobile device (no hover capability)
+            if (window.matchMedia('(hover: none)').matches) {
+              // Only open citations sidebar for non-drug citations on mobile
               if (citationObj.source_type !== 'drug_database') {
                 setSelectedCitation(citationObj);
                 setShowCitationsSidebar(true);
               }
               // For drug citations, do nothing on click (keep hover tooltip only)
+            } else {
+              // Desktop: Open URL in new tab if available
+              const url = citationObj.url;
+              if (url && url !== '#') {
+                window.open(url, '_blank', 'noopener,noreferrer');
+              } else if (citationObj.doi) {
+                // If no URL but has DOI, open DOI link
+                window.open(`https://doi.org/${citationObj.doi}`, '_blank', 'noopener,noreferrer');
+              }
+            }
+          } else {
+            // Fallback: try to get URL from data attributes
+            const url = ref.getAttribute('data-citation-url');
+            const doi = ref.getAttribute('data-citation-doi');
+            
+            if (url && url !== '#') {
+              window.open(url, '_blank', 'noopener,noreferrer');
+            } else if (doi) {
+              window.open(`https://doi.org/${doi}`, '_blank', 'noopener,noreferrer');
             }
           }
         });
-        
-        // Remove the click handler for desktop devices - citation numbers should only show tooltips, not open modals
         
         ref.addEventListener('mouseenter', () => {
           // Only handle hover on devices that support hover
@@ -1336,7 +1442,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                       svg_content: msg.answer?.svg_content || (data?.svg_content ? 
                         (Array.isArray(data.svg_content) ? data.svg_content.filter((content: any) => content !== null && content !== undefined) : [data.svg_content])
                       : []),
-                      apiResponse: data?.apiResponse // Store the API response details
+                      apiResponse: data?.apiResponse, // Store the API response details
+                      questions_followed: data?.questions_followed || [] // Store the follow-up questions
                     },
                   }
                 : msg
@@ -1354,6 +1461,21 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
               source_type: citation.source_type || 'internet'
             }
           }), {}) : {});
+          
+          // Update completeData with questions_followed
+          setCompleteData(prev => ({
+            ...prev,
+            questions_followed: data?.questions_followed || []
+          }));
+          
+          // Set remaining limit if available and not 'N/A'
+          if (data?.remaining_limit !== undefined && data.remaining_limit !== 'N/A') {
+            // Convert to number if it's a string, otherwise use as is
+            const limit = typeof data.remaining_limit === 'string' ? parseInt(data.remaining_limit, 10) : data.remaining_limit;
+            setRemainingLimit(isNaN(limit) ? undefined : limit);
+          } else {
+            setRemainingLimit(undefined);
+          }
           
           // console.log('[CITATIONS_DEBUG] Setting activeCitations:', {
           //   hasCitations: !!data?.citations,
@@ -1375,7 +1497,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
           // Check if it's an internet connection error
           let fallback = 'Servers are overloaded. Please try again later.';
           if(data?.responseStatus === 429){
-            fallback = 'Too many requests. Please wait until your daily limit resets or <a href="/dashboard/profile?tab=subscription" target="_blank" rel="noopener noreferrer" class="underline text-blue-600 hover:text-blue-800">upgrade to Pro</a> for unlimited access.';
+            fallback = 'Too many requests. Please wait until your monthly limit resets or <a href="/dashboard/profile?tab=subscription" target="_blank" rel="noopener noreferrer" class="underline text-blue-600 hover:text-blue-800">upgrade to Pro</a> for unlimited access.';
           }
           console.log('Internet',navigator.onLine)
           if (!navigator.onLine) {
@@ -1546,11 +1668,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     window.open(url);
   };
 
-  const addDummyCitations = (content: string) => {
-    // Add dummy citation numbers in the format [1], [2], etc.
-    let citationCount = 1;
-    return content.replace(/\[citation\]/g, () => `[${citationCount++}]`);
-  };
+
 
   // Helper function to check if content is SVG
   const isSvgContent = (content: string): boolean => {
@@ -1806,6 +1924,15 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                 source_type: normalizeSourceType(citation.source_type)
               }
             }), {}) : {});
+
+            // Update remaining limit if available and not 'N/A'
+            if (data?.remaining_limit !== undefined && data.remaining_limit !== 'N/A') {
+              // Convert to number if it's a string, otherwise use as is
+              const limit = typeof data.remaining_limit === 'string' ? parseInt(data.remaining_limit, 10) : data.remaining_limit;
+              setRemainingLimit(isNaN(limit) ? undefined : limit);
+            } else {
+              setRemainingLimit(undefined);
+            }
 
             setStatus('complete');
             setIsLoading(false);
@@ -2114,11 +2241,21 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                       dangerouslySetInnerHTML={{
                                         __html:
                                           idx === messages.length - 1 && status !== 'complete' && status !== 'complete_image'
-                                            ? formatWithDummyCitations(
-                                                marked.parse(addDummyCitations(msg.content || ''), { async: false })
-                                              )
+                                            ? (() => {
+                                                // During streaming, check if content contains HTML
+                                                const content = msg.content || '';
+                                                if (content.includes('```html') || (content.includes('```') && /<[a-z][\s\S]*>/i.test(content))) {
+                                                  // If HTML content detected, render it directly with citations
+                                                  return formatWithDummyCitations(processStreamingContent(content));
+                                                } else {
+                                                  // Regular markdown content, process normally
+                                                  return formatWithDummyCitations(
+                                                    marked.parse(addDummyCitations(content), { async: false })
+                                                  );
+                                                }
+                                              })()
                                             : formatWithCitations(
-                                                marked.parse(msg.content || '', { async: false }),
+                                                marked.parse(preprocessContentForHtml(msg.content || ''), { async: false }),
                                                 msg.answer?.citations
                                               ),
                                       }}
@@ -2201,8 +2338,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                           })() && (
                             <div className="mt-4 sm:mt-6">
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-                                <div className="reference-skeleton col-span-2 sm:col-span-1 h-[95px] sm:h-[105px] lg:h-[125px]" />
-                                <div className="reference-skeleton hidden sm:block h-[95px] sm:h-[105px] lg:h-[125px]" />
+                                <div className="reference-skeleton h-[95px] sm:h-[105px] lg:h-[125px]" />
+                                <div className="reference-skeleton h-[95px] sm:h-[105px] lg:h-[125px]" />
                                 <div className="reference-skeleton hidden sm:block h-[95px] sm:h-[105px] lg:h-[125px]" />
                               </div>
                             </div>
@@ -2240,9 +2377,62 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                   messageId={msg.id}
                                 />
                                 
+                                {/* Show follow-up questions if available - ONLY for the latest question */}
+                                {idx === messages.length - 1 && completeData?.questions_followed && completeData.questions_followed.length > 0 && (
+                                  <div className="mt-4 sm:mt-6">
+                                    <h4 className="text-base font-semibold mb-3 flex items-center" style={{
+                                      color: '#223258',
+                                      fontFamily: 'DM Sans, sans-serif',
+                                      fontWeight: 500,
+                                      fontSize: '16px'
+                                    }}>
+                                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2" style={{ color: '#223258' }}>
+                                      <path d="M7 9H17M7 13H17M21 20L17.6757 18.3378C17.4237 18.2118 17.2977 18.1488 17.1656 18.1044C17.0484 18.065 16.9277 18.0365 16.8052 18.0193C16.6672 18 16.5263 18 16.2446 18H6.2C5.07989 18 4.51984 18 4.09202 17.782C3.71569 17.5903 3.40973 17.2843 3.21799 16.908C3 16.4802 3 15.9201 3 14.8V7.2C3 6.07989 3 5.51984 3.21799 5.09202C3.40973 4.71569 3.71569 4.40973 4.09202 4.21799C4.51984 4 5.0799 4 6.2 4H17.8C18.9201 4 19.4802 4 19.908 4.21799C20.2843 4.40973 20.5903 4.71569 20.782 5.09202C21 5.51984 21 6.0799 21 7.2V20Z" />
+                                      </svg>
+                                      Suggested Follow-up Questions
+                                    </h4>
+                                    <div className="space-y-0">
+                                      {completeData.questions_followed.map((question: string, questionIdx: number) => (
+                                        <div key={questionIdx} className="flex items-center justify-between py-0.5 border-b border-gray-200 last:border-b-0">
+                                          <button
+                                            onClick={() => {
+                                              // Send the question directly to backend as a follow-up
+                                              handleSearchWithContent(question, true, activeMode === 'instant' ? 'swift' : 'study', false);
+                                            }}
+                                            className="flex-1 text-left hover:text-blue-600 transition-colors duration-200"
+                                            style={{
+                                              fontFamily: 'DM Sans, sans-serif',
+                                              fontWeight: 400,
+                                              fontSize: '14px',
+                                              color: '#223258'
+                                            }}
+                                          >
+                                            <span className="font-semibold mr-2" style={{ color: '#223258' }}>
+                                              {questionIdx + 1}.
+                                            </span>
+                                            {question}
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              // Send the question directly to backend as a follow-up
+                                              handleSearchWithContent(question, true, activeMode === 'instant' ? 'swift' : 'study', false);
+                                            }}
+                                            className="w-8 h-8 flex items-center justify-center ml-3 hover:bg-gray-100 rounded-full transition-colors duration-200"
+                                          >
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#223258' }}>
+                                              <line x1="12" y1="5" x2="12" y2="19"></line>
+                                              <line x1="5" y1="12" x2="19" y2="12"></line>
+                                            </svg>
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
                                 {/* Show infographic option for long text answers - NOW BELOW FEEDBACK */}
                                 {shouldShowInfographicOption(msg.content || '', idx, messages.length) && (
-                                  <div className="mt-4 sm:mt-6">
+                                  <div className="mt-4 sm:mt-4">
                                     <button
                                       onClick={() => {
                                         const infographicRequest = `Create a visual abstract for this answer::::::${msg.content}`;
@@ -2262,6 +2452,15 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                     >
                                       Create a visual abstract for this answer
                                     </button>
+                                  </div>
+                                )}
+                                
+                                {/* Show remaining limit warning */}
+                                {remainingLimit !== undefined && remainingLimit <= 5 && (
+                                  <div className="mt-3 sm:mt-4 p-3">
+                                    <p className="text-sm text-gray-600 font-['DM_Sans'] text-center">
+                                      You only have <span className="font-semibold text-gray-700">{remainingLimit}</span> monthly question{remainingLimit === 1 ? '' : 's'} left!
+                                    </p>
                                   </div>
                                 )}
                               </div>

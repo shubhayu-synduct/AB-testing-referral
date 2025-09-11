@@ -7,7 +7,7 @@ import { getStatusMessage, StatusType } from '@/lib/status-messages'
 import { ReferencesSidebar } from "@/components/references/ReferencesSidebar"
 import { ReferenceGrid } from "@/components/references/ReferenceGrid"
 import { DrugInformationModal } from "@/components/references/DrugInformationModal"
-import { formatWithCitations, formatWithDummyCitations } from '@/lib/formatWithCitations'
+import { formatWithCitations, formatWithDummyCitations, preprocessContentForHtml, addDummyCitations, processStreamingContent } from '@/lib/formatWithCitations'
 import { createCitationTooltip } from '@/lib/citationTooltipUtils'
 import { marked } from 'marked'
 import Link from 'next/link'
@@ -641,6 +641,82 @@ export function NotSignedInDrInfoSummary() {
         .shimmer-text { animation: none; }
       }
 
+      /* Table styling for HTML content */
+      .prose table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+      
+      .prose th {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        padding: 12px 16px;
+        text-align: left;
+        font-weight: 600;
+        color: #1e293b;
+        font-family: 'DM Sans', sans-serif;
+      }
+      
+      .prose td {
+        border: 1px solid #e2e8f0;
+        padding: 12px 16px;
+        text-align: left;
+        color: #334155;
+        font-family: 'DM Sans', sans-serif;
+        vertical-align: top;
+      }
+      
+      .prose tr:nth-child(even) {
+        background-color: #f8fafc;
+      }
+      
+      .prose tr:hover {
+        background-color: #f1f5f9;
+      }
+      
+      .prose thead th {
+        background-color: #e2e8f0;
+        font-weight: 700;
+        color: #0f172a;
+      }
+      
+      /* Mobile responsive table styling */
+      @media (max-width: 768px) {
+        .prose table {
+          font-size: 12px;
+        }
+        
+        .prose th,
+        .prose td {
+          padding: 8px 10px;
+        }
+        
+        .prose table {
+          overflow-x: auto;
+          display: block;
+        }
+      }
+
+      /* Styling for markdown formatting within tables */
+      .prose table strong {
+        font-weight: 700;
+        color: #1e293b;
+      }
+      
+      .prose table em {
+        font-style: italic;
+        color: #475569;
+      }
+      
+      .prose table strong em {
+        font-weight: 700;
+        font-style: italic;
+        color: #1e293b;
+      }
+
       /* Reference grid shimmer placeholder */
       .reference-skeleton {
         position: relative;
@@ -790,11 +866,21 @@ export function NotSignedInDrInfoSummary() {
                                     dangerouslySetInnerHTML={{
                                       __html:
                                         idx === messages.length - 1 && status !== 'complete' && status !== 'complete_image'
-                                          ? formatWithDummyCitations(
-                                              marked.parse(msg.content || '', { async: false })
-                                            )
+                                          ? (() => {
+                                              // During streaming, check if content contains HTML
+                                              const content = msg.content || '';
+                                              if (content.includes('```html') || (content.includes('```') && /<[a-z][\s\S]*>/i.test(content))) {
+                                                // If HTML content detected, render it directly with citations
+                                                return formatWithDummyCitations(processStreamingContent(content));
+                                              } else {
+                                                // Regular markdown content, process normally
+                                                return formatWithDummyCitations(
+                                                  marked.parse(addDummyCitations(content), { async: false })
+                                                );
+                                              }
+                                            })()
                                           : formatWithCitations(
-                                              marked.parse(msg.content || '', { async: false }),
+                                              marked.parse(preprocessContentForHtml(msg.content || ''), { async: false }),
                                               msg.answer?.citations
                                             ),
                                     }}
@@ -823,8 +909,8 @@ export function NotSignedInDrInfoSummary() {
                               })() && (
                                 <div className="mt-4 sm:mt-6">
                                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-                                    <div className="reference-skeleton col-span-2 sm:col-span-1 h-[95px] sm:h-[105px] lg:h-[125px]" />
-                                    <div className="reference-skeleton hidden sm:block h-[95px] sm:h-[105px] lg:h-[125px]" />
+                                    <div className="reference-skeleton h-[95px] sm:h-[105px] lg:h-[125px]" />
+                                    <div className="reference-skeleton h-[95px] sm:h-[105px] lg:h-[125px]" />
                                     <div className="reference-skeleton hidden sm:block h-[95px] sm:h-[105px] lg:h-[125px]" />
                                   </div>
                                 </div>

@@ -310,6 +310,9 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
           <p className="text-gray-600 text-sm md:text-base font-['DM_Sans']">
             Paste your research abstract or medical text content to convert it into a visual abstract.
           </p>
+          <p className="text-gray-500 text-sm font-['DM_Sans'] mt-2">
+            Tip: Prompt your indications to create personalized infographics
+          </p>
         </div>
         
         <form onSubmit={handleGenerate} className="space-y-4">

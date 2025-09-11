@@ -150,7 +150,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                   <img src="/login-logo.svg" alt="DR. INFO Logo" className="h-8" />
                 ) : (
                   <div className="relative w-8 h-8">
-                    <img src="/icon.svg" alt="DR. INFO Logo" className="w-8 h-8" />
+                    <img src="/favicon.png" alt="DR. INFO Logo" className="w-8 h-8" />
                   </div>
                 )}
               </div>
@@ -362,7 +362,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                     </button>
                     
                     {/* Upgrade Plan */}
-                    <button
+                    {/* <button
                       className="flex items-center w-full px-3 py-2 text-[#223258] hover:bg-[#E4ECFF] rounded-[8px] mb-1 font-semibold"
                       onClick={() => {
                         router.push("/dashboard/profile?tab=subscription");
@@ -374,7 +374,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                     >
                       <svg className="mr-3 h-5 w-5" fill="none" stroke="#223258" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
                       Upgrade Plan
-                    </button>
+                    </button> */}
                     
                     {/* Sign Out */}
                     <button

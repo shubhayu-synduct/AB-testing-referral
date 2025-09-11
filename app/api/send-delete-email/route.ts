@@ -176,8 +176,8 @@ export async function POST(request: Request) {
                   <h2 class="section-title">Privacy Policy & Legal Information</h2>
                   <p class="section-text">Your account deletion is processed in accordance with our Privacy Policy and Terms of Service:</p>
                   <ul class="feature-list">
-                    <li><a href="https://synduct.com/privacy-policy/" class="link">Privacy Policy</a></li>
-                    <li><a href="https://synduct.com/terms-and-conditions/" class="link">Terms and Conditions</a></li>
+                    <li><a href="https://drinfo.ai/privacy-policy/" class="link">Privacy Policy</a></li>
+                    <li><a href="https://drinfo.ai/termsofservice/" class="link">Terms and Conditions</a></li>
                   </ul>
                   <p class="section-text"><span class="footer-label">Note:</span> Some data may be retained for legal compliance purposes (e.g., financial records for tax purposes) as required by applicable law.</p>
                 </div>

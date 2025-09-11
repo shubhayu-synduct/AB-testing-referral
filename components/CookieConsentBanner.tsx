@@ -360,12 +360,21 @@ export function CookieConsentBanner({ onConsentUpdate, forceShow }: CookieConsen
                 <p className="text-xs text-blue-100 font-['DM_Sans']">
                   Read our{' '}
                   <a 
-                    href="https://synduct.com/privacy-policy/" 
+                    href="https://drinfo.ai/privacy-policy/" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="underline hover:text-white transition-colors"
                   >
                     privacy policy
+                  </a>
+                  {' '}and{' '}
+                  <a 
+                    href="https://drinfo.ai/cookie-policy/" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="underline hover:text-white transition-colors"
+                  >
+                    cookie policy
                   </a>
                 </p>
               </div>
