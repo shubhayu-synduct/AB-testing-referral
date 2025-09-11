@@ -897,7 +897,6 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       }
 
       .drug-name-clickable {
-        text-decoration: underline !important;
         color: #214498 !important;
         cursor: pointer;
         transition: color 0.2s ease;
@@ -907,7 +906,6 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       
       .drug-name-clickable:hover {
         color: #3771FE !important;
-        text-decoration: underline !important;
       }
 
       /* Table styling for HTML content */
