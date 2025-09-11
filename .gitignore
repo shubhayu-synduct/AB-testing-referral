@@ -29,3 +29,6 @@ next-env.d.ts
 test-loading.html
 loading-icon.tsx
 *.DS_Store
+app/cookie-test
+app/test-delete-email
+app/api/send-emails/test-day1

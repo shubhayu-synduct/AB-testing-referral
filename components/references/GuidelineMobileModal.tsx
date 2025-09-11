@@ -71,6 +71,8 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
   const questionInputRef = useRef<HTMLInputElement>(null);
   const highlightRef = useRef<HTMLSpanElement>(null);
   const answerEndRef = useRef<HTMLDivElement>(null);
+  const summaryScrollPosition = useRef<number>(0);
+  const summaryContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (highlightRef.current) {
@@ -83,6 +85,18 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
       answerEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [chatHistory.length]);
+
+  // Restore scroll position when switching back to summary tab
+  useEffect(() => {
+    if (activeTab === 'summary' && summaryScrollPosition.current > 0) {
+      // Use a longer timeout to ensure the DOM is fully rendered
+      setTimeout(() => {
+        if (summaryContainerRef.current) {
+          summaryContainerRef.current.scrollTop = summaryScrollPosition.current;
+        }
+      }, 200);
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -134,21 +148,24 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
     }
   }, [open, citation, summary]);
 
-  const extractReferenceText = useCallback((refNumber: string, refIndex: number) => {
-    if (!summary) return null;
+  const extractReferenceText = useCallback((refNumber: string, refIndex: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
+    // Use messageData if provided (for followup questions), otherwise use summary data
+    const dataSource = messageData || summary
+    if (!dataSource) return null
     
-    const pageRef = summary.page_references[refNumber];
+    const pageRef = dataSource.page_references[refNumber]
     if (!pageRef || !pageRef[refIndex]) {
-      return `Reference extract not available for citation [${refNumber}] (occurrence ${refIndex + 1}).`;
+      return `Reference extract not available for citation [${refNumber}] (occurrence ${refIndex + 1}). The reference exists but the specific extract could not be found.`
     }
     
-    const { start_word, end_word } = pageRef[refIndex];
-    const sourceText = summary.sources[refNumber];
+    const { start_word, end_word } = pageRef[refIndex]
+    const sourceText = dataSource.sources[refNumber]
     
     if (!sourceText) {
-      return `Source text not available for reference [${refNumber}].`;
+      return `Source text not available for reference [${refNumber}]. This citation exists in the document but the source text was not provided by the API.`
     }
 
+    // Clean text but preserve all characters including numbers, punctuation, and case
     const cleanText = (text: string) => {
       return text
         .replace(/\\b/g, '')
@@ -157,19 +174,12 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
         .trim();
     };
 
-    const getAlphaOnly = (text: string) => {
-      return text.replace(/[^a-zA-Z\s]/g, '').trim().toLowerCase();
-    };
-
     const cleanedSourceText = cleanText(sourceText);
-    const alphaSourceText = getAlphaOnly(cleanedSourceText);
-    
     const cleanedStartWord = cleanText(start_word);
     const cleanedEndWord = cleanText(end_word);
-    const alphaStartWord = getAlphaOnly(cleanedStartWord);
-    const alphaEndWord = getAlphaOnly(cleanedEndWord);
     
-    const startPos = alphaSourceText.indexOf(alphaStartWord);
+    // Find start position using exact matching
+    const startPos = cleanedSourceText.indexOf(cleanedStartWord);
     
     if (startPos === -1) {
       return {
@@ -180,19 +190,18 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
       };
     }
     
-    const originalStartPos = findOriginalPosition(cleanedSourceText, alphaSourceText, startPos);
-    
-    const remainingAlphaText = alphaSourceText.substring(startPos + alphaStartWord.length);
-    const endPosInRemaining = remainingAlphaText.indexOf(alphaEndWord);
+    // Find end position in the remaining text after start word
+    const remainingText = cleanedSourceText.substring(startPos + cleanedStartWord.length);
+    const endPosInRemaining = remainingText.indexOf(cleanedEndWord);
     
     if (endPosInRemaining === -1) {
       const excerptLength = 400;
-      const endOfExcerpt = Math.min(originalStartPos + excerptLength, cleanedSourceText.length);
+      const endOfExcerpt = Math.min(startPos + excerptLength, cleanedSourceText.length);
       
       return {
         fullText: sourceText,
         highlightedRange: { 
-          start: originalStartPos, 
+          start: startPos, 
           end: endOfExcerpt
         },
         isError: true,
@@ -200,52 +209,44 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
       };
     }
     
-    const endPos = startPos + alphaStartWord.length + endPosInRemaining;
-    const originalEndPos = findOriginalPosition(cleanedSourceText, alphaSourceText, endPos) + alphaEndWord.length;
-    
-    function findOriginalPosition(originalText: string, alphaText: string, alphaPosition: number) {
-      let alphaCharCount = 0;
-      let originalPos = 0;
-      
-      while (alphaCharCount < alphaPosition && originalPos < originalText.length) {
-        if (/[a-zA-Z\s]/.test(originalText[originalPos])) {
-          alphaCharCount++;
-        }
-        originalPos++;
-      }
-      
-      return originalPos;
-    }
+    // Calculate exact end position (include the full end word)
+    const endPos = startPos + cleanedStartWord.length + endPosInRemaining + cleanedEndWord.length;
     
     return {
-      fullText: sourceText,
+      fullText: cleanedSourceText,
       highlightedRange: { 
-        start: originalStartPos, 
-        end: originalEndPos
+        start: startPos, 
+        end: endPos
       },
       isError: false
     };
   }, [summary]);
 
-  const handleReferenceClick = useCallback((refNumber: string, occurrenceIndex: number) => {
+  const handleReferenceClick = useCallback((refNumber: string, occurrenceIndex?: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
+    // Console log for verification
+    console.log(`Citation clicked: [${refNumber}] at occurrence index: ${occurrenceIndex}`);
+    console.log(`Available page_references for [${refNumber}]:`, messageData?.page_references?.[refNumber] || summary?.page_references?.[refNumber]);
+    
+    // Save current scroll position before switching tabs
+    saveScrollPosition();
     setActiveTab('original');
-    const result = extractReferenceText(refNumber, occurrenceIndex);
+    const result = extractReferenceText(refNumber, occurrenceIndex || 0, messageData);
     
     if (!result) {
       setActiveReference({
         number: refNumber,
-        text: `The text extract for reference [${refNumber}] (occurrence ${occurrenceIndex + 1}) is not available.`,
-        index: occurrenceIndex,
+        text: `The text extract for reference [${refNumber}] (occurrence ${(occurrenceIndex || 0) + 1}) is not available.`,
+        index: occurrenceIndex || 0,
         fullText: null,
         highlightedRange: null,
         isError: true,
-        errorMessage: `Could not find text for reference [${refNumber}], occurrence ${occurrenceIndex + 1}.`
+        errorMessage: `Could not find text for reference [${refNumber}], occurrence ${(occurrenceIndex || 0) + 1}.`
       });
     } else if (typeof result === 'string') {
       setActiveReference({
         number: refNumber,
         text: result,
-        index: occurrenceIndex,
+        index: occurrenceIndex || 0,
         fullText: null,
         highlightedRange: null,
         isError: true,
@@ -257,7 +258,7 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
       setActiveReference({
         number: refNumber,
         text: fullText || "",
-        index: occurrenceIndex,
+        index: occurrenceIndex || 0,
         fullText: fullText,
         highlightedRange: highlightedRange,
         isError: isError || false,
@@ -269,13 +270,15 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
   const askFollowupQuestion = async () => {
     if (!followupQuestion.trim() || isAskingFollowup) return;
     
+    const currentQuestion = followupQuestion;
+    setFollowupQuestion(''); // Clear the input immediately
     setIsAskingFollowup(true);
     setFollowupError(null);
     
     try {
       setChatHistory(prev => [
         ...prev, 
-        { type: 'followup', question: followupQuestion, answer: '', sources: {}, page_references: {} }
+        { type: 'followup', question: currentQuestion, answer: '', sources: {}, page_references: {} }
       ]);
       
       const response = await fetch('/api/guidelines/followup', {
@@ -286,7 +289,7 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
         body: JSON.stringify({
           title: citation.title,
           guidelines_index: citation.guidelines_index,
-          question: followupQuestion
+          question: currentQuestion
         })
       });
       
@@ -295,6 +298,7 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
       }
       
       const data = await response.json();
+      console.log('Followup API response:', data);
       
       setChatHistory(prev => {
         const updated = [...prev];
@@ -311,8 +315,6 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
         
         return updated;
       });
-      
-      setFollowupQuestion('');
     } catch (err: any) {
       logger.error('Error asking followup question:', err);
       setFollowupError(err.message || 'Failed to get answer');
@@ -336,6 +338,45 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
     });
     
     return processedText;
+  };
+
+  // Save scroll position when switching away from summary tab
+  const saveScrollPosition = () => {
+    if (summaryContainerRef.current) {
+      summaryScrollPosition.current = summaryContainerRef.current.scrollTop;
+    }
+  };
+
+  // Handle swipe gestures for tab switching
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe && activeTab === 'summary') {
+      // Swipe left: summary -> original
+      saveScrollPosition();
+      setActiveTab('original');
+    } else if (isRightSwipe && activeTab === 'original') {
+      // Swipe right: original -> summary
+      setActiveTab('summary');
+    }
   };
 
   if (!open) return null;
@@ -413,7 +454,11 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
             Guideline Summary
           </button>
           <button
-            onClick={() => setActiveTab('original')}
+            onClick={() => {
+              // Save scroll position when switching to original tab
+              saveScrollPosition();
+              setActiveTab('original');
+            }}
             className={`flex-1 px-6 py-3 text-[16px] font-medium transition-colors ${
               activeTab === 'original'
                 ? 'text-[#3771FE] border-b-2 border-[#3771FE] bg-[#D3DFFE]'
@@ -425,7 +470,13 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 h-full pb-20">
+        <div 
+          className="flex-1 overflow-y-auto p-6 h-full pb-20"
+          ref={summaryContainerRef}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
           {activeTab === 'summary' ? (
             <div className="space-y-6">
               {/* Title and Meta */}
@@ -463,7 +514,11 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
               <div>
                 {isLoading ? (
                   <div className="flex flex-col justify-center items-center h-40">
-                    <div className="animate-spin rounded-full h-10 sm:h-12 w-10 sm:w-12 border-t-2 border-b-2 border-[#3771FE] mb-3 sm:mb-4"></div>
+                    <div className="flex space-x-1 justify-center mb-4">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
                     <div className="text-sm sm:text-base text-gray-500" style={{ fontFamily: 'DM Sans, sans-serif' }}>
                       Generating AI Summary for this Guideline ...
                     </div>
@@ -476,10 +531,8 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
                       <div key={index} className={`mb-3 sm:mb-4 ${index > 0 ? 'mt-6 sm:mt-8 border-t pt-4 sm:pt-6' : ''}`}>
                         {message.question && (
                           <div className="mb-3 sm:mb-4">
-                            <div className="bg-[#F4F7FF] p-2 sm:p-3 rounded-lg">
-                              <p style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500, fontSize: '16px sm:text-lg md:text-xl', color: '#223258', margin: 0 }}>
-                                {message.question}
-                              </p>
+                            <div className="p-3 sm:p-4 border rounded-5px" style={{ borderColor: 'rgba(55, 113, 254, 0.5)', fontFamily: 'DM Sans, sans-serif', fontWeight: 500, color: '#223258', backgroundColor: '#E4ECFF' }}>
+                              <p className="m-0">{message.question}</p>
                             </div>
                           </div>
                         )}
@@ -496,7 +549,9 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
                                 />
                               </div>
                               <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 300, fontSize: '14px sm:text-base md:text-lg', color: '#262F4D' }}>
-                                {message.type === 'main' ? 'Summary' : 'Answer'}
+                                <span className="font-semibold font-['DM_Sans'] text-base transition-colors duration-200 text-blue-900">
+                                  {message.type === 'main' ? 'Summary' : 'Answer'}
+                                </span>
                               </span>
                             </div>
                             <div className="prose prose-sm sm:prose-base max-w-none" style={{ fontFamily: 'DM Sans, sans-serif', color: '#1F2937', fontSize: '14px sm:text-base md:text-lg' }}>
@@ -504,8 +559,28 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
                                 content={message.answer}
                                 sources={message.sources || null}
                                 pageReferences={message.page_references || null}
-                                onCitationClick={(citation, index) => handleReferenceClick(citation, index || 0)}
+                                messageData={{ sources: message.sources || {}, page_references: message.page_references || {} }}
+                                messageId={`message-${index}`}
+                                onCitationClick={handleReferenceClick}
                               />
+                            </div>
+                          </>
+                        )}
+                        {message.question && !message.answer && (
+                          <>
+                            <div className="flex items-center gap-2 mb-2 top-0 bg-white z-10 py-2">
+                              <div className="flex items-center text-[#3771FE]">
+                                <Image
+                                  src="/answer-icon.svg"
+                                  alt="Answer icon"
+                                  width={20}
+                                  height={20}
+                                  className="sm:w-6 sm:h-6"
+                                />
+                              </div>
+                              <span style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 300, fontSize: '14px sm:text-base md:text-lg', color: '#262F4D' }}>
+                                <span className="shimmer-text italic">Generating your answer...</span>
+                              </span>
                             </div>
                           </>
                         )}
@@ -784,6 +859,25 @@ export const GuidelineMobileModal: React.FC<GuidelineMobileModalProps> = ({ open
 
         .guideline-title-link:hover {
           color: #3771FE !important;
+        }
+
+        /* Shimmer text effect for status message */
+        .shimmer-text {
+          background: linear-gradient(90deg,rgba(31, 41, 55, 0.77), #E5E7EB,rgba(31, 41, 55, 0.82));
+          background-size: 200% 100%;
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          animation: shimmer-text-move 4s ease-in-out infinite;
+        }
+
+        @keyframes shimmer-text-move {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .shimmer-text { animation: none; }
         }
       `}</style>
     </div>

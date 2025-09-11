@@ -109,6 +109,95 @@ select {
   display: block;
 }
 
+/* Table styling for HTML content in markdown */
+.prose table,
+.drinfo-answer-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.prose th,
+.drinfo-answer-content th {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #1e293b;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.prose td,
+.drinfo-answer-content td {
+  border: 1px solid #e2e8f0;
+  padding: 12px 16px;
+  text-align: left;
+  color: #334155;
+  font-family: 'DM Sans', sans-serif;
+  vertical-align: top;
+}
+
+.prose tr:nth-child(even),
+.drinfo-answer-content tr:nth-child(even) {
+  background-color: #f8fafc;
+}
+
+.prose tr:hover,
+.drinfo-answer-content tr:hover {
+  background-color: #f1f5f9;
+}
+
+.prose thead th,
+.drinfo-answer-content thead th {
+  background-color: #e2e8f0;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* Mobile responsive table styling */
+@media (max-width: 768px) {
+  .prose table,
+  .drinfo-answer-content table {
+    font-size: 12px;
+  }
+  
+  .prose th,
+  .prose td,
+  .drinfo-answer-content th,
+  .drinfo-answer-content td {
+    padding: 8px 10px;
+  }
+  
+  .prose table,
+  .drinfo-answer-content table {
+    overflow-x: auto;
+    display: block;
+  }
+}
+
+/* Styling for markdown formatting within tables */
+.prose table strong,
+.drinfo-answer-content table strong {
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.prose table em,
+.drinfo-answer-content table em {
+  font-style: italic;
+  color: #475569;
+}
+
+.prose table strong em,
+.drinfo-answer-content table strong em {
+  font-weight: 700;
+  font-style: italic;
+  color: #1e293b;
+}
+
 .svg-content svg {
   width: 100%;
   height: auto;

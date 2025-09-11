@@ -7,7 +7,7 @@ import { ArrowRight, ChevronDown, Copy, Search, ExternalLink, X, FileEdit, Thumb
 import { getStatusMessage, StatusType } from '@/lib/status-messages'
 import { ReferencesSidebar } from "@/components/references/ReferencesSidebar"
 import { ReferenceGrid } from "@/components/references/ReferenceGrid"
-import { formatWithCitations } from '@/lib/formatWithCitations'
+import { formatWithCitations, preprocessContentForHtml, processStreamingContent } from '@/lib/formatWithCitations'
 import { createCitationTooltip } from '@/lib/citationTooltipUtils'
 import { marked } from 'marked'
 import Link from 'next/link'
@@ -570,8 +570,12 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
       <div className="p-2 sm:p-4 md:p-6 h-[100dvh] flex flex-col relative overflow-hidden">
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center space-y-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="text-blue-600 font-medium">Loading shared chat...</span>
+            <div className="flex space-x-1">
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            </div>
+            {/* <span className="text-blue-600 font-medium">Loading shared chat</span> */}
           </div>
         </div>
       </div>
@@ -614,7 +618,12 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
               <div key={msg.id} className="mb-4">
                 {msg.type === 'user' ? (
                   <div className="p-3 sm:p-4 border rounded-5px" style={{ borderColor: 'rgba(55, 113, 254, 0.5)', fontFamily: 'DM Sans, sans-serif', fontWeight: 500, fontSize: '16px sm:text-[18px]', color: '#223258', backgroundColor: '#E4ECFF' }}>
-                    <p className="m-0">{msg.content}</p>
+                    <p className="m-0">
+                      {msg.content.includes('Create a visual abstract for this answer::::::') 
+                        ? 'Create a visual abstract for this answer' 
+                        : msg.content
+                      }
+                    </p>
                   </div>
                 ) : (
                   <>
@@ -661,12 +670,12 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
                           <div
                             className="prose prose-slate prose-ul:text-black marker:text-black max-w-none text-base sm:text-base prose-h2:text-base prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold"
                             style={{ fontFamily: 'DM Sans, sans-serif' }}
-                            dangerouslySetInnerHTML={{
-                              __html: formatWithCitations(
-                                marked.parse(msg.content, { async: false }),
-                                msg.answer?.citations
-                              ),
-                            }}
+                                                          dangerouslySetInnerHTML={{
+                                __html: formatWithCitations(
+                                  marked.parse(preprocessContentForHtml(msg.content), { async: false }),
+                                  msg.answer?.citations
+                                ),
+                              }}
                           />
                         )}
                       </div>

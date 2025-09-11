@@ -7,6 +7,8 @@ import { useAuth } from "@/hooks/use-auth"
 import { Check } from "lucide-react"
 import Image from "next/image"
 import { logger } from "@/lib/logger"
+import { handleUserSignup } from "@/lib/signup-integration"
+import { CookieConsentBanner } from "@/components/CookieConsentBanner"
 
 export default function Onboarding() {
   const router = useRouter()
@@ -17,8 +19,6 @@ export default function Onboarding() {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
-    yearOfBirth: "",
-    gender: "",
     occupation: "",
     otherOccupation: "",
     placeOfWork: "",
@@ -27,19 +27,21 @@ export default function Onboarding() {
     institution: "",
     specialties: [] as string[],
     otherSpecialty: "",
-    address: "",
     country: ""
   })
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
+  const [autoFilledNames, setAutoFilledNames] = useState({ firstName: false, lastName: false })
+  const [cookieConsent, setCookieConsent] = useState<any>(null)
+  const [isMedicalProfessional, setIsMedicalProfessional] = useState(false)
+  const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const [showSpecialtiesDropdown, setShowSpecialtiesDropdown] = useState(false)
   const [showExperienceDropdown, setShowExperienceDropdown] = useState(false)
   const [showProfessionDropdown, setShowProfessionDropdown] = useState(false)
   const [showPlaceOfWorkDropdown, setShowPlaceOfWorkDropdown] = useState(false)
   const [showCountryDropdown, setShowCountryDropdown] = useState(false)
-  const [showSexDropdown, setShowSexDropdown] = useState(false)
   const [specialtiesSearchTerm, setSpecialtiesSearchTerm] = useState('');
   const [countrySearchTerm, setCountrySearchTerm] = useState('');
   const specialtiesRef = useRef<HTMLDivElement>(null)
@@ -47,7 +49,6 @@ export default function Onboarding() {
   const professionRef = useRef<HTMLDivElement>(null)
   const placeOfWorkRef = useRef<HTMLDivElement>(null)
   const countryRef = useRef<HTMLDivElement>(null)
-  const sexRef = useRef<HTMLDivElement>(null)
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -56,7 +57,7 @@ export default function Onboarding() {
     }
   }, [user, authLoading])
 
-  // Check email verification - be lenient for OAuth providers
+  // Check email verification and auto-fill names from OAuth providers
   useEffect(() => {
     if (!authLoading && user) {
       // Check if user signed in via OAuth providers (they should be trusted)
@@ -71,10 +72,69 @@ export default function Onboarding() {
         providers: user.providerData.map(p => p.providerId)
       })
       
+      // Auto-fill names from OAuth display name if available
+      if (isOAuthUser && user.displayName && !formData.firstName && !formData.lastName) {
+        const displayName = user.displayName.trim();
+        const nameParts = displayName.split(' ');
+        
+        if (nameParts.length >= 2) {
+          const firstName = nameParts[0];
+          const lastName = nameParts.slice(1).join(' '); // Handle multiple last names
+          
+          setFormData(prev => ({
+            ...prev,
+            firstName,
+            lastName
+          }));
+          setAutoFilledNames({ firstName: true, lastName: true });
+        } else if (nameParts.length === 1) {
+          // Only first name available
+          setFormData(prev => ({
+            ...prev,
+            firstName: nameParts[0]
+          }));
+          setAutoFilledNames({ firstName: true, lastName: false });
+        }
+      }
+      
+      // Extract cookie consent from localStorage
+      try {
+        const savedCookieConsent = localStorage.getItem('drinfo-cookie-consent');
+        if (savedCookieConsent) {
+          const parsed = JSON.parse(savedCookieConsent);
+          setCookieConsent(parsed);
+          logger.debug("Extracted cookie consent from localStorage:", parsed);
+        } else {
+          logger.debug("No cookie consent found in localStorage");
+        }
+      } catch (error) {
+        logger.error("Error parsing cookie consent from localStorage:", error);
+      }
+      
       // Note: We no longer block access for unverified emails
       // Instead, we'll show a reminder within the onboarding flow
     }
   }, [user, authLoading])
+
+  // Handle redirect to waitlist after 5-second delay
+  useEffect(() => {
+    if (redirectTimeoutRef.current) {
+      clearTimeout(redirectTimeoutRef.current);
+    }
+
+    if (registrationSuccess && !isMedicalProfessional) {
+      redirectTimeoutRef.current = setTimeout(() => {
+        logger.info("5-second delay completed, redirecting non-medical user to waitlist")
+        router.push('/waitlist')
+      }, 5000) // 5 seconds delay to ensure Firebase data is saved
+    }
+
+    return () => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+    };
+  }, [registrationSuccess, isMedicalProfessional, router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -87,7 +147,6 @@ export default function Onboarding() {
   const validateRequiredFields = () => {
     const requiredFields = {
       firstName: "First Name",
-      lastName: "Last Name",
       occupation: "Occupation",
       experience: "Experience",
       placeOfWork: "Place of Work",
@@ -104,20 +163,6 @@ export default function Onboarding() {
         hasErrors = true
       }
     })
-
-    // Age validation: only if year of birth is provided
-    if (formData.yearOfBirth) {
-      const dob = new Date(formData.yearOfBirth)
-      const today = new Date()
-      const age = today.getFullYear() - dob.getFullYear()
-      const m = today.getMonth() - dob.getMonth()
-      const d = today.getDate() - dob.getDate()
-      let is18 = age > 18 || (age === 18 && (m > 0 || (m === 0 && d >= 0)))
-      if (!is18) {
-        errors.yearOfBirth = "You must be at least 18 years old to register."
-        hasErrors = true
-      }
-    }
 
     // Additional validation for "other" fields
     if (formData.occupation === "other" && !formData.otherOccupation) {
@@ -159,24 +204,42 @@ export default function Onboarding() {
         throw new Error("Firestore not initialized")
       }
 
+      // Check if user is medical professional
+      const isMedicalProfessional = [
+        'Physician',
+        'Medical fellow', 
+        'Medical consultant', 
+        'Medical intern/resident', 
+        'Medical student',
+        'Dentist'
+      ].includes(formData.occupation)
+      
+      setIsMedicalProfessional(isMedicalProfessional)
+
       // Create user profile data
       const userProfileData = {
         email: user.email,
         onboardingCompleted: true,
         updatedAt: new Date().toISOString(),
         // Add additional profile fields
-        displayName: `${formData.firstName} ${formData.lastName}`,
+        displayName: formData.lastName ? `${formData.firstName} ${formData.lastName}` : formData.firstName,
         firstName: formData.firstName,
-        lastName: formData.lastName,
+        lastName: formData.lastName || "",
         country: formData.country,
+        // Add cookie consent data
+        cookieConsent: cookieConsent || {
+          necessary: true,
+          analytics: false,
+          marketing: false,
+          functional: false,
+          consentedAt: new Date().toISOString(),
+          consentType: 'none' // 'none', 'necessary', 'all', 'custom'
+        },
         profile: {
           firstName: formData.firstName,
-          lastName: formData.lastName,
+          lastName: formData.lastName || "",
           country: formData.country,
           email: user.email,
-          address: formData.address,
-          yearOfBirth: formData.yearOfBirth,
-          gender: formData.gender,
           occupation: formData.occupation === "other" ? formData.otherOccupation : formData.occupation,
           placeOfWork: formData.placeOfWork === "other" ? formData.otherPlaceOfWork : formData.placeOfWork,
           experience: formData.experience,
@@ -191,7 +254,30 @@ export default function Onboarding() {
       // Update user document
       await updateDoc(doc(db, "users", user.uid), userProfileData)
 
+      // Add user to email automation system if not already added
+      try {
+        await handleUserSignup({
+          email: user.email || '',
+          userId: user.uid,
+          name: `${formData.firstName} ${formData.lastName}`
+        })
+        logger.info("Onboarding user added to email automation system")
+      } catch (automationError) {
+        logger.error("Failed to add onboarding user to email automation:", automationError)
+        // Don't fail the onboarding if email automation fails
+      }
+
+      // Set registration success first for all users
       setRegistrationSuccess(true)
+      
+      // Set flag to redirect non-medical users after 5-second delay
+      if (!isMedicalProfessional) {
+        // The redirect is now handled by the useEffect hook with 5-second delay
+        logger.info("Non-medical user registered, will redirect to waitlist after 5 seconds")
+      } else {
+        logger.info("Medical professional registered successfully")
+      }
+
     } catch (err: any) {
       logger.error("Error during onboarding:", err)
       setError(err.message || "An error occurred during onboarding")
@@ -278,9 +364,7 @@ export default function Onboarding() {
         setShowCountryDropdown(false);
         setCountrySearchTerm('');
       }
-      if (sexRef.current && event.target instanceof Node && !sexRef.current.contains(event.target)) {
-        setShowSexDropdown(false);
-      }
+
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -332,15 +416,15 @@ export default function Onboarding() {
   ];
 
   const professionOptions = [
-    { value: "physician", label: "Physician" },
-    { value: "fellow", label: "Fellow" },
-    { value: "consultant", label: "Consultant" },
-    { value: "intern-resident", label: "Intern/Resident" },
-    { value: "student", label: "Student" },
-    { value: "pharmacist", label: "Pharmacist" },
-    { value: "advanced-practice-nurse", label: "Advanced Practice Nurse" },
-    { value: "dentist", label: "Dentist" },
-    { value: "medical-librarian", label: "Medical Librarian" },
+    { value: "Physician", label: "Physician" },
+    { value: "Medical fellow", label: "Medical Fellow" },
+    { value: "Medical consultant", label: "Medical Consultant" },
+    { value: "Medical intern/resident", label: "Medical Intern/Resident" },
+    { value: "Medical student", label: "Medical Student" },
+    { value: "Pharmacist", label: "Pharmacist" },
+    { value: "Advanced practice nurse", label: "Advanced Practice Nurse" },
+    { value: "Dentist", label: "Dentist" },
+    { value: "Medical librarian", label: "Medical Librarian" },
     { value: "other", label: "Other" },
   ];
 
@@ -352,11 +436,7 @@ export default function Onboarding() {
     { value: "other", label: "Other" },
   ];
 
-  const sexOptions = [
-    { value: "male", label: "Male" },
-    { value: "female", label: "Female" },
-    { value: "other", label: "Other" },
-  ];
+
 
   const countryOptions: Record<string, string> = {
     "afghanistan": "Afghanistan",
@@ -566,7 +646,12 @@ export default function Onboarding() {
     )
   }
 
-  if (registrationSuccess) {
+  if (registrationSuccess && !isMedicalProfessional) {
+    router.push('/waitlist')
+    return null
+  }
+
+  if (registrationSuccess && isMedicalProfessional) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6 pb-8">
         <div className="w-full max-w-sm">
@@ -615,7 +700,32 @@ export default function Onboarding() {
             <button
               className="w-full bg-[#C6D7FF]/50 text-[#3771FE] py-2 px-4 border border-[#3771FE]/50 rounded-[5px] font-dm-sans font-medium hover:bg-[#C6D7FF]/70 transition-colors duration-200"
               style={{ fontFamily: 'DM Sans', fontSize: 14 }}
-              onClick={() => router.push('/dashboard')}
+              onClick={async () => {
+                try {
+                  // Send Day 1 welcome email
+                  const response = await fetch('/api/send-welcome-email', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      userName: user?.displayName || formData.firstName || 'Healthcare Professional',
+                      userEmail: user?.email || ''
+                    })
+                  });
+
+                  if (response.ok) {
+                    logger.info("Day 1 welcome email sent successfully");
+                  } else {
+                    logger.error("Failed to send welcome email");
+                  }
+                } catch (error) {
+                  logger.error("Error sending welcome email:", error);
+                }
+
+                // Navigate to dashboard regardless of email success/failure
+                router.push('/dashboard');
+              }}
             >
               Let's Get Started...
             </button>
@@ -650,9 +760,18 @@ export default function Onboarding() {
         <div className="bg-[#F4F7FF] border border-[#3771FE]/50 px-4 sm:px-6 md:px-8 py-4 sm:py-5 rounded-[5px]">
           {/* Single Step: Customer Information Form */}
           <div className="space-y-3 sm:space-y-4">
+              {/* Personalized Experience Message */}
+              <div className="text-center mb-2">
+                <p className="text-gray-500 text-xs" style={{ fontFamily: 'DM Sans', fontWeight: 400 }}>
+                  Please fill in these fields to get a personalized, tailor-made experience
+                </p>
+              </div>
+              
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>First Name <span className="text-black">*</span></label>
+                  <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>
+                    First Name <span className="text-black">*</span>
+                  </label>
                   <input
                     type="text"
                     name="firstName"
@@ -666,11 +785,13 @@ export default function Onboarding() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>Last Name <span className="text-black">*</span></label>
+                  <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>
+                    Last Name
+                  </label>
                   <input
                     type="text"
                     name="lastName"
-                    placeholder="Last Name"
+                    placeholder="Last Name (Optional)"
                     value={formData.lastName}
                     onChange={handleInputChange}
                     className={`px-3 py-2 sm:py-2.5 border ${fieldErrors.lastName ? 'border-red-500' : 'border-[#3771FE]/50'} rounded-[5px] text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-full bg-white placeholder-text custom-dropdown-selected custom-dropdown-field`}
@@ -681,66 +802,7 @@ export default function Onboarding() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>Date of Birth</label>
-                  <input
-                    type="date"
-                    name="yearOfBirth"
-                    placeholder="Year of Birth"
-                    max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
-                    value={formData.yearOfBirth}
-                    onChange={handleInputChange}
-                    className={`px-3 py-2 sm:py-2.5 border ${fieldErrors.yearOfBirth ? 'border-red-500' : 'border-[#3771FE]/50'} rounded-[5px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm w-full bg-white ${!formData.yearOfBirth ? 'text-gray-400' : 'text-[#223258]'} placeholder-text`}
-                  />
-                  {fieldErrors.yearOfBirth && (
-                    <p className="text-red-500 text-xs mt-1">{fieldErrors.yearOfBirth}</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>Sex</label>
-                  <div className="relative" ref={sexRef}>
-                    <div
-                      className={`w-full min-h-[40px] px-2 py-1 border ${fieldErrors.gender ? 'border-red-500' : 'border-[#3771FE]/50'} rounded-[5px] bg-white flex items-center justify-between gap-1 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent placeholder-text`}
-                      tabIndex={0}
-                      onClick={() => setShowSexDropdown(true)}
-                      style={{ cursor: 'text', position: 'relative' }}
-                    >
-                      {formData.gender === "" && (
-                        <span className="text-gray-400 select-none" style={{ fontSize: '12px', color: '#9ca3af' }}>Select Sex</span>
-                      )}
-                      {formData.gender !== "" && (
-                        <span className="text-[#223258] select-none" style={{ fontSize: '12px' }}>
-                          {formData.gender.charAt(0).toUpperCase() + formData.gender.slice(1)}
-                        </span>
-                      )}
-                    </div>
-                    {showSexDropdown && (
-                      <div className="absolute z-10 left-0 right-0 bg-white border border-[#3771FE]/50 rounded-b-[5px] shadow-lg max-h-48 overflow-y-auto mt-1">
-                        {sexOptions.filter(opt => opt.value !== formData.gender).map(opt => (
-                          <div
-                            key={opt.value}
-                            className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
-                            style={{ fontSize: '12px', color: '#223258' }}
-                            onClick={() => {
-                              setFormData(prev => ({
-                                ...prev,
-                                gender: opt.value
-                              }));
-                              setShowSexDropdown(false);
-                            }}
-                          >
-                            {opt.label}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {fieldErrors.gender && (
-                    <p className="text-red-500 text-xs mt-1">{fieldErrors.gender}</p>
-                  )}
-                </div>
-              </div>
+
 
               {/* Profession and Years of Experience in one row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
@@ -1033,20 +1095,7 @@ export default function Onboarding() {
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>Address (Street, City, Postal Code)</label>
-                <input
-                  type="text"
-                  name="address"
-                  placeholder="Address (Street, City, Postal Code)"
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  className={`w-full px-3 py-2 sm:py-2.5 border ${fieldErrors.address ? 'border-red-500' : 'border-[#3771FE]/50'} rounded-[5px] text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white placeholder-text custom-dropdown-selected`}
-                />
-                {fieldErrors.address && (
-                  <p className="text-red-500 text-xs mt-1">{fieldErrors.address}</p>
-                )}
-              </div>
+
 
               <div>
                 <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>Country <span className="text-black">*</span></label>
@@ -1122,7 +1171,7 @@ export default function Onboarding() {
                       style={{ backgroundColor: !termsAgreed ? '#DEE8FF' : undefined, minWidth: '20px', minHeight: '20px' }}
                     />
                     <label htmlFor="terms-agreement" className="cursor-pointer" style={{ fontFamily: 'DM Sans', fontSize: '12px', fontWeight: 400, color: '#000' }}>
-                      I agree to the <a href="https://synduct.com/terms-and-conditions/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Terms of Use</a> and <a href="https://synduct.com/privacy-policy/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Privacy Policy</a>
+                      I agree to the <a href="https://drinfo.ai/termsofservice/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Terms of Use</a> and <a href="https://drinfo.ai/privacy-policy/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Privacy Policy</a>
                     </label>
               </div>
               {error && <div className="bg-red-50 text-red-600 p-2 rounded-[5px] text-sm">{error}</div>}
@@ -1131,9 +1180,9 @@ export default function Onboarding() {
 
               <button
                 onClick={handleCompleteRegistration}
-                disabled={!formData.country || !formData.firstName || !formData.lastName || !formData.specialties.length || !formData.experience || !formData.placeOfWork || !formData.occupation || !termsAgreed}
+                disabled={!formData.country || !formData.firstName || !formData.specialties.length || !formData.experience || !formData.placeOfWork || !formData.occupation || !termsAgreed}
                 className={`w-full py-2 sm:py-2.5 px-4 rounded-[5px] font-dm-sans font-medium transition-colors duration-200 text-sm ${
-                  formData.country && formData.firstName && formData.lastName && formData.specialties.length && formData.experience && formData.placeOfWork && formData.occupation && termsAgreed
+                  formData.country && formData.firstName && formData.specialties.length && formData.experience && formData.placeOfWork && formData.occupation && termsAgreed
                     ? 'bg-[#C6D7FF]/50 text-[#3771FE] border border-[#3771FE]/50 hover:bg-[#C6D7FF]/60'
                     : 'bg-[#C6D7FF]/50 text-[#3771FE] border border-[#3771FE]/50 cursor-not-allowed opacity-50'
                 }`}
@@ -1143,6 +1192,10 @@ export default function Onboarding() {
             </div>
           </div>
         </div>
+
+        {/* Cookie Consent Banner - Only shows when no consent is found */}
+        <CookieConsentBanner />
+        
       </div>
 
   )

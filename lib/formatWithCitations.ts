@@ -1,9 +1,84 @@
 import { logger } from './logger';
 
+// --- HTML extraction from markdown code blocks ---
+function extractAndRenderHtml(content: string): string {
+  // Look for HTML content wrapped in markdown code blocks
+  // This handles cases like ```html <table>...</table> ```
+  // Also handle cases where the content might already be HTML
+  
+  // First, handle HTML code blocks with language specification
+  content = content.replace(/```html\s*([\s\S]*?)\s*```/g, (match, htmlContent) => {
+    // Extract the HTML content and render it directly
+    const extracted = htmlContent.trim();
+    
+    // Process markdown formatting within the HTML content
+    const processed = processMarkdownInHtml(extracted);
+    return processed;
+  });
+  
+  // Also handle generic code blocks that might contain HTML
+  content = content.replace(/```\s*([\s\S]*?)\s*```/g, (match, codeContent) => {
+    // Check if the code content looks like HTML (contains HTML tags)
+    if (/<[a-z][\s\S]*>/i.test(codeContent.trim())) {
+      // If it looks like HTML, extract and render it
+      const extracted = codeContent.trim();
+      
+      // Process markdown formatting within the HTML content
+      const processed = processMarkdownInHtml(extracted);
+      return processed;
+    }
+    // If it's not HTML, keep it as a code block
+    return match;
+  });
+  
+  return content;
+}
+
+// --- Process markdown formatting within HTML content ---
+function processMarkdownInHtml(htmlContent: string): string {
+  // Process combined bold+italic FIRST: **__text__** -> <strong><strong>text</strong></strong>
+  htmlContent = htmlContent.replace(/\*\*__([^_]+)__\*\*/g, '<strong><strong>$1</strong></strong>');
+  
+  // Process bold formatting: **text** or __text__ -> <strong>text</strong>
+  htmlContent = htmlContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  htmlContent = htmlContent.replace(/__(.*?)__/g, '<strong>$1</strong>');
+  
+  // Process italic formatting: *text* or _text_ -> <em>text</em>
+  htmlContent = htmlContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  htmlContent = htmlContent.replace(/_(.*?)_/g, '<em>$1</em>');
+  
+  return htmlContent;
+}
+
+// --- Smart content processing for streaming ---
+export function processStreamingContent(content: string): string {
+  // Check if content contains HTML code blocks
+  if (content.includes('```html') || (content.includes('```') && /<[a-z][\s\S]*>/i.test(content))) {
+    // If HTML content is detected, extract and render it directly
+    // This bypasses markdown parsing for HTML content during streaming
+    console.log('[STREAMING] HTML content detected, bypassing markdown parsing');
+    return extractAndRenderHtml(content);
+  } else {
+    // If no HTML content, process as regular markdown
+    console.log('[STREAMING] No HTML content, processing as markdown');
+    return content;
+  }
+}
+
+// --- Pre-process content to extract HTML before markdown parsing ---
+export function preprocessContentForHtml(content: string): string {
+  // Extract HTML content from markdown code blocks before markdown parsing
+  return extractAndRenderHtml(content);
+}
+
 // --- Dummy citation rendering for streaming phase ---
 export function formatWithDummyCitations(html: string): string {
+  
+  // First extract and render any HTML content - this ensures tables render during streaming
+  const htmlExtracted = extractAndRenderHtml(html);
+  
   // Match [1], [1,2], [1, 2, 3], etc. (allowing spaces)
-  return html.replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (match, p1) => {
+  const result = htmlExtracted.replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (match, p1) => {
     const numbers = p1.split(/\s*,\s*/).map((n: string) => n.trim());
     return `<sup class="citation-reference-group" style="display:inline-flex;align-items:center;gap:2px;" data-citation-number="${numbers.join(',')}">
       ${numbers.map((num: string) =>
@@ -12,10 +87,28 @@ export function formatWithDummyCitations(html: string): string {
       <span class="citation-tooltip">Reference details will appear after answer is complete.</span>
     </sup>`;
   });
+  
+  return result;
+}
+
+// --- Add dummy citations with HTML extraction ---
+export function addDummyCitations(content: string): string {
+  
+  // First extract and render any HTML content
+  const htmlExtracted = extractAndRenderHtml(content);
+  
+  // Then add dummy citation numbers in the format [1], [2], etc.
+  let citationCount = 1;
+  const result = htmlExtracted.replace(/\[citation\]/g, () => `[${citationCount++}]`);
+  
+  return result;
 }
 
 // --- Real citation rendering for after streaming ---
 export const formatWithCitations = (text: string, citations?: Record<string, any>) => {
+  // First extract and render any HTML content
+  text = extractAndRenderHtml(text);
+  
   if (!citations) {
     return formatWithDummyCitations(text);
   }
@@ -29,16 +122,18 @@ export const formatWithCitations = (text: string, citations?: Record<string, any
   // Updated regex to handle multi-word drug names with spaces
   const drugMatches = text.match(/<strong><strong>([a-zA-Z][a-zA-Z0-9\s\-'()]+)<\/strong><\/strong>\s*\[(\d+)\]/g);
   logger.debug('Found potential drug matches:', drugMatches);
+  logger.debug('Updated drug regex will match both **__Substance__** [num] and <strong><strong>Substance</strong></strong> [num] formats');
   
   // Collect all matches first, then process in reverse order to avoid index conflicts
   const matchesToProcess: Array<{match: string, drugName: string, num: string, index: number}> = [];
   let match;
-  // Updated regex to include \s for spaces in drug names
-  const drugRegex = /<strong><strong>([a-zA-Z][a-zA-Z0-9\s\-'()]+)<\/strong><\/strong>\s*\[(\d+)\]/g;
+  // Updated regex to handle both HTML and markdown formats for drug names
+  const drugRegex = /(?:\*\*__([a-zA-Z][a-zA-Z0-9\s\-'()]+)__\*\*|<strong><strong>([a-zA-Z][a-zA-Z0-9\s\-'()]+)<\/strong><\/strong>)\s*\[(\d+)\]/g;
   
   while ((match = drugRegex.exec(text)) !== null) {
-    const drugName = match[1];
-    const num = match[2];
+    // Handle both capture groups - either markdown format (group 1) or HTML format (group 2)
+    const drugName = match[1] || match[2];
+    const num = match[3];
     const citation = citations[num];
     
     logger.debug('Found drug match:', { drugName, num, citation, sourceType: citation?.source_type });
@@ -157,7 +252,7 @@ export const formatWithCitations = (text: string, citations?: Record<string, any
           : citation.authors)
       : '';
     const yearText = citation.year ? `(${citation.year})` : '';
-    const titleText = citation.text || '';
+    const titleText = citation.title || '';
     let sourceType = 'Journal';
     if (citation.source_type === 'drug_database') {
       sourceType = 'Drugs';

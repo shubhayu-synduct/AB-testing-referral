@@ -12,7 +12,7 @@ import { getStatusMessage, StatusType } from '@/lib/status-messages'
 import { ReferencesSidebar } from "@/components/references/ReferencesSidebar"
 import { ReferenceGrid } from "@/components/references/ReferenceGrid"
 import { DrugInformationModal } from "@/components/references/DrugInformationModal"
-import { formatWithCitations, formatWithDummyCitations } from '@/lib/formatWithCitations'
+import { formatWithCitations, formatWithDummyCitations, preprocessContentForHtml, addDummyCitations, processStreamingContent } from '@/lib/formatWithCitations'
 import { createCitationTooltip } from '@/lib/citationTooltipUtils'
 import { marked } from 'marked'
 import Link from 'next/link'
@@ -20,6 +20,7 @@ import { MovingBorder } from "@/components/ui/moving-border"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { logger } from '@/lib/logger'
+import { useDrinfoSummaryTour } from '@/components/TourContext'
 
 interface DrInfoSummaryProps {
   user: any;
@@ -44,6 +45,8 @@ interface ChatMessage {
     }>;
     citations?: Record<string, Citation>;
     svg_content?: string[]; // Changed from string to string[]
+    apiResponse?: any; // Added API response field
+    questions_followed?: string[]; // Added follow-up questions field
   };
   feedback?: {
     likes: number;
@@ -120,7 +123,11 @@ interface DrInfoSummaryData {
     title: string;
     content: string;
   }>;
-  svg_content?: string[]; // Changed from string to string[]
+  svg_content?: string[];
+  responseStatus?: number;
+  apiResponse?: any;
+  remaining_limit?: number | string;
+  questions_followed?: string[];
 }
 
 const KNOWN_STATUSES: StatusType[] = ['processing', 'searching', 'summarizing', 'formatting', 'complete', 'complete_image'];
@@ -163,6 +170,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
   const [activeTab, setActiveTab] = useState<'answer' | 'images'>('answer');
   const [imageGenerationStatus, setImageGenerationStatus] = useState<'idle' | 'generating' | 'complete'>('idle');
   const [expandedImage, setExpandedImage] = useState<{index: number, svgContent: string} | null>(null);
+  const [remainingLimit, setRemainingLimit] = useState<number | undefined>(undefined);
   const answerIconRef = useRef<HTMLDivElement>(null);
 
   // Modal state and timer
@@ -436,7 +444,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
             citations,
             svg_content: lastAssistantMsg.answer.svg_content,
             status: 'complete',
-            references: []
+            references: [],
+            questions_followed: lastAssistantMsg.answer.questions_followed || []
           });
           
           if (citations && Object.keys(citations).length > 0) {
@@ -610,23 +619,52 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }
   }, [sessionId, isChatLoading, query, hasFetched, lastQuestion]);
 
-  // Add new controlled scroll effect
+  // Single, working scroll effect for streaming content
   useEffect(() => {
-    if (isStreaming && status !== 'complete') {
-      // During streaming, scroll to the bottom of the content
-      const contentDiv = document.querySelector('.prose');
-      if (contentDiv) {
-        contentDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
-      }
+    // Only scroll during streaming or when messages change
+    if (status !== 'complete' && status !== 'complete_image' && messages.length > 0) {
+      // Use requestAnimationFrame for smooth performance
+      requestAnimationFrame(() => {
+        // Scroll the content container to bottom
+        if (contentRef.current) {
+          contentRef.current.scrollTop = contentRef.current.scrollHeight;
+        }
+        
+        // Also scroll the window to ensure the follow-up area is visible
+        const followUpArea = document.querySelector('.follow-up-question-search');
+        if (followUpArea) {
+          followUpArea.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'end',
+            inline: 'nearest'
+          });
+        }
+      });
     }
-  }, [isStreaming, status, messages, streamedContent]);
+  }, [messages, status]); // Depend on messages and status
 
-  // Add a separate effect to handle content container scrolling
+  // Always scroll to end after any new message (answer) is added
   useEffect(() => {
-    if (contentRef.current && isStreaming && status !== 'complete') {
-      contentRef.current.scrollTop = contentRef.current.scrollHeight;
+    if (messages.length > 0) {
+      // Use requestAnimationFrame for smooth performance
+      requestAnimationFrame(() => {
+        // Scroll the content container to bottom
+        if (contentRef.current) {
+          contentRef.current.scrollTop = contentRef.current.scrollHeight;
+        }
+        
+        // Also scroll the window to ensure the follow-up area is visible
+        const followUpArea = document.querySelector('.follow-up-question-search');
+        if (followUpArea) {
+          followUpArea.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'end',
+            inline: 'nearest'
+          });
+        }
+      });
     }
-  }, [streamedContent, isStreaming, status]);
+  }, [messages]); // Only depend on messages
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -771,6 +809,13 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         cursor: pointer;
         padding: 0 4px;
         box-sizing: border-box;
+        transition: all 0.2s ease;
+      }
+      
+      .citation-number:hover {
+        background-color: #0284c7;
+        color: white;
+        transform: scale(1.1);
       }
       
       .citation-tooltip {
@@ -852,7 +897,6 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       }
 
       .drug-name-clickable {
-        text-decoration: underline !important;
         color: #214498 !important;
         cursor: pointer;
         transition: color 0.2s ease;
@@ -862,7 +906,82 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       
       .drug-name-clickable:hover {
         color: #3771FE !important;
-        text-decoration: underline !important;
+      }
+
+      /* Table styling for HTML content */
+      .drinfo-answer-content table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1rem 0;
+        font-size: 14px;
+        line-height: 1.4;
+      }
+      
+      .drinfo-answer-content th {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        padding: 12px 16px;
+        text-align: left;
+        font-weight: 600;
+        color: #1e293b;
+        font-family: 'DM Sans', sans-serif;
+      }
+      
+      .drinfo-answer-content td {
+        border: 1px solid #e2e8f0;
+        padding: 12px 16px;
+        text-align: left;
+        color: #334155;
+        font-family: 'DM Sans', sans-serif;
+        vertical-align: top;
+      }
+      
+      .drinfo-answer-content tr:nth-child(even) {
+        background-color: #f8fafc;
+      }
+      
+      .drinfo-answer-content tr:hover {
+        background-color: #f1f5f9;
+      }
+      
+      .drinfo-answer-content thead th {
+        background-color: #e2e8f0;
+        font-weight: 700;
+        color: #0f172a;
+      }
+      
+      /* Mobile responsive table styling */
+      @media (max-width: 768px) {
+        .drinfo-answer-content table {
+          font-size: 12px;
+        }
+        
+        .drinfo-answer-content th,
+        .drinfo-answer-content td {
+          padding: 8px 10px;
+        }
+        
+        .drinfo-answer-content table {
+          overflow-x: auto;
+          display: block;
+        }
+      }
+
+      /* Styling for markdown formatting within tables */
+      .drinfo-answer-content table strong {
+        font-weight: 700;
+        color: #1e293b;
+      }
+      
+      .drinfo-answer-content table em {
+        font-style: italic;
+        color: #475569;
+      }
+      
+      .drinfo-answer-content table strong em {
+        font-weight: 700;
+        font-style: italic;
+        color: #1e293b;
       }
 
       @media print {
@@ -1017,24 +1136,42 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
             });
         ref.appendChild(tooltip);
         
-        // Add click handler for mobile devices
+        // Add click handler for all devices
         ref.addEventListener('click', (e) => {
-          // Check if it's a mobile device (no hover capability)
-          if (window.matchMedia('(hover: none)').matches) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (citationObj) {
-              // Only open citations sidebar for non-drug citations
+          e.preventDefault();
+          e.stopPropagation();
+          
+          if (citationObj) {
+            // Check if it's a mobile device (no hover capability)
+            if (window.matchMedia('(hover: none)').matches) {
+              // Only open citations sidebar for non-drug citations on mobile
               if (citationObj.source_type !== 'drug_database') {
                 setSelectedCitation(citationObj);
                 setShowCitationsSidebar(true);
               }
               // For drug citations, do nothing on click (keep hover tooltip only)
+            } else {
+              // Desktop: Open URL in new tab if available
+              const url = citationObj.url;
+              if (url && url !== '#') {
+                window.open(url, '_blank', 'noopener,noreferrer');
+              } else if (citationObj.doi) {
+                // If no URL but has DOI, open DOI link
+                window.open(`https://doi.org/${citationObj.doi}`, '_blank', 'noopener,noreferrer');
+              }
+            }
+          } else {
+            // Fallback: try to get URL from data attributes
+            const url = ref.getAttribute('data-citation-url');
+            const doi = ref.getAttribute('data-citation-doi');
+            
+            if (url && url !== '#') {
+              window.open(url, '_blank', 'noopener,noreferrer');
+            } else if (doi) {
+              window.open(`https://doi.org/${doi}`, '_blank', 'noopener,noreferrer');
             }
           }
         });
-        
-        // Remove the click handler for desktop devices - citation numbers should only show tooltips, not open modals
         
         ref.addEventListener('mouseenter', () => {
           // Only handle hover on devices that support hover
@@ -1302,7 +1439,9 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                       }), {}) : {},
                       svg_content: msg.answer?.svg_content || (data?.svg_content ? 
                         (Array.isArray(data.svg_content) ? data.svg_content.filter((content: any) => content !== null && content !== undefined) : [data.svg_content])
-                      : [])
+                      : []),
+                      apiResponse: data?.apiResponse, // Store the API response details
+                      questions_followed: data?.questions_followed || [] // Store the follow-up questions
                     },
                   }
                 : msg
@@ -1321,6 +1460,21 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
             }
           }), {}) : {});
           
+          // Update completeData with questions_followed
+          setCompleteData(prev => ({
+            ...prev,
+            questions_followed: data?.questions_followed || []
+          }));
+          
+          // Set remaining limit if available and not 'N/A'
+          if (data?.remaining_limit !== undefined && data.remaining_limit !== 'N/A') {
+            // Convert to number if it's a string, otherwise use as is
+            const limit = typeof data.remaining_limit === 'string' ? parseInt(data.remaining_limit, 10) : data.remaining_limit;
+            setRemainingLimit(isNaN(limit) ? undefined : limit);
+          } else {
+            setRemainingLimit(undefined);
+          }
+          
           // console.log('[CITATIONS_DEBUG] Setting activeCitations:', {
           //   hasCitations: !!data?.citations,
           //   citationCount: data?.citations ? Object.keys(data.citations).length : 0,
@@ -1337,7 +1491,16 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
           }, 2000);
         } catch (error) {
           logger.error('Error updating messages:', error);
-          const fallback = 'Servers are overloaded. Please try again later.';
+          
+          // Check if it's an internet connection error
+          let fallback = 'Servers are overloaded. Please try again later.';
+          if(data?.responseStatus === 429){
+            fallback = 'Too many requests. Please wait until your monthly limit resets or <a href="/dashboard/profile?tab=subscription" target="_blank" rel="noopener noreferrer" class="underline text-blue-600 hover:text-blue-800">upgrade to Pro</a> for unlimited access.';
+          }
+          console.log('Internet',navigator.onLine)
+          if (!navigator.onLine) {
+            fallback = 'Connection lost. Please check your internet and try again.';
+          }
           // Add a small randomized delay (2-3 seconds) before showing the fallback answer
           const randomDelayMs = 2000 + Math.floor(Math.random() * 1000);
           await new Promise((resolve) => setTimeout(resolve, randomDelayMs));
@@ -1354,12 +1517,18 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                       ...(msg.answer || { mainSummary: '', sections: [], citations: {} }),
                       mainSummary: fallback,
                       sections: [],
-                      citations: msg.answer?.citations || {}
+                      citations: msg.answer?.citations || {},
+                      apiResponse: data?.apiResponse // Store the API response details
                     }
                   }
                 : msg
             );
           });
+          
+          // Log the API response details for debugging
+          if (data?.apiResponse) {
+            console.log('[API_RESPONSE] Response details after fallback:', data.apiResponse);
+          }
           setStatus('complete');
           setIsLoading(false);
           setIsStreaming(false);
@@ -1497,11 +1666,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     window.open(url);
   };
 
-  const addDummyCitations = (content: string) => {
-    // Add dummy citation numbers in the format [1], [2], etc.
-    let citationCount = 1;
-    return content.replace(/\[citation\]/g, () => `[${citationCount++}]`);
-  };
+
 
   // Helper function to check if content is SVG
   const isSvgContent = (content: string): boolean => {
@@ -1529,7 +1694,9 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     // Only show for the last assistant message and when streaming is complete
     const isLastMessage = msgIndex === totalMessages - 1;
     const isStreamingComplete = status === 'complete' || status === 'complete_image';
-    return wordCount > 200 && isLastMessage && isStreamingComplete;
+    // Don't show for instant mode
+    const isNotInstantMode = activeMode !== 'instant';
+    return wordCount > 200 && isLastMessage && isStreamingComplete && isNotInstantMode;
   };
 
   // Function to download SVG as PNG
@@ -1756,6 +1923,15 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
               }
             }), {}) : {});
 
+            // Update remaining limit if available and not 'N/A'
+            if (data?.remaining_limit !== undefined && data.remaining_limit !== 'N/A') {
+              // Convert to number if it's a string, otherwise use as is
+              const limit = typeof data.remaining_limit === 'string' ? parseInt(data.remaining_limit, 10) : data.remaining_limit;
+              setRemainingLimit(isNaN(limit) ? undefined : limit);
+            } else {
+              setRemainingLimit(undefined);
+            }
+
             setStatus('complete');
             setIsLoading(false);
             
@@ -1791,15 +1967,158 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }
   };
 
+  const tourContext = useDrinfoSummaryTour();
+  const [showTourPrompt, setShowTourPrompt] = useState(false);
+  
+  // Custom scroll function to scroll to bottom of answer and citation grid
+  const scrollToAnswerBottom = () => {
+    // First, scroll to the very bottom of the answer content
+    setTimeout(() => {
+      // Scroll to the very bottom of the content container
+      const contentRef = document.querySelector('.flex-1.overflow-y-auto');
+      if (contentRef) {
+        contentRef.scrollTop = contentRef.scrollHeight;
+      }
+      
+      // Also scroll the window to the bottom
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior: 'smooth'
+      });
+      
+      // Scroll to the follow-up question area to ensure we're at the very bottom
+      const followUpArea = document.querySelector('.follow-up-question-search');
+      if (followUpArea) {
+        followUpArea.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        });
+      }
+      
+      // Additional scroll to citation grid
+      const citationGrid = document.querySelector('.drinfo-citation-grid-step');
+      if (citationGrid) {
+        citationGrid.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        });
+      }
+    }, 100);
+  };
+
+  // Modified tour start function with 2-second delay
+  const startTourWithDelay = () => {
+    if (!tourContext) return;
+    
+    setShowTourPrompt(false);
+    scrollToAnswerBottom();
+    
+    // Delay tour start by 2 seconds to allow scrolling to complete
+    setTimeout(() => {
+      tourContext.startTour();
+    }, 2000);
+  };
+
+  useEffect(() => {
+    // Check if tour should be shown based on saved preferences
+    if (tourContext && tourContext.shouldShowTour) {
+      const shouldShow = tourContext.shouldShowTour();
+      if (!shouldShow) {
+        setShowTourPrompt(false);
+        return;
+      }
+    }
+
+    const timeout = setTimeout(() => {
+      setShowTourPrompt(true);
+    }, 25000);
+    return () => clearTimeout(timeout);
+  }, [tourContext]);
+
   return (
     <div className="p-2 sm:p-4 md:p-6 h-[100dvh] flex flex-col relative overflow-hidden">
+      {showTourPrompt && (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black bg-opacity-40">
+          <div 
+            className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center border"
+            style={{
+              borderRadius: "8px",
+              border: "1px solid #E4ECFF",
+              boxShadow: "0 4px 20px rgba(55, 113, 254, 0.15)",
+            }}
+          >
+            <h2 
+              className="text-lg font-semibold mb-2"
+              style={{
+                color: "#223258",
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: "600"
+              }}
+            >
+              Take a quick tour?
+            </h2>
+            <p 
+              className="mb-4"
+              style={{
+                color: "#223258",
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: "400"
+              }}
+            >
+              Would you like a quick tour of the answer and feedback features?
+            </p>
+            <div className="flex justify-center gap-4">
+              <button 
+                className="px-4 py-2 rounded transition-colors"
+                onClick={startTourWithDelay}
+                style={{
+                  backgroundColor: "#3771FE",
+                  color: "#fff",
+                  borderRadius: "6px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  padding: "8px 16px",
+                  border: "none",
+                  fontFamily: "DM Sans, sans-serif"
+                }}
+              >
+                Yes, show me
+              </button>
+              <button 
+                className="px-4 py-2 rounded transition-colors"
+                onClick={() => { 
+                  setShowTourPrompt(false); 
+                  // Save preference as skipped when user clicks "No, thanks"
+                  if (tourContext && tourContext.saveTourPreference) {
+                    tourContext.saveTourPreference('skipped');
+                  }
+                }}
+                style={{
+                  backgroundColor: "#E4ECFF",
+                  color: "#3771FE",
+                  borderRadius: "6px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  padding: "8px 16px",
+                  border: "1px solid #3771FE",
+                  fontFamily: "DM Sans, sans-serif"
+                }}
+              >
+                No, thanks
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Top Bar with Share Button */}
       <div className="flex justify-between items-center mb-4 px-2 sm:px-4">
         <div className="flex-1"></div>
         <button
           onClick={handleShare}
           disabled={!sessionId || messages.length === 0}
-          className="flex items-center space-x-2 px-4 py-2 bg-white border border-[#C8C8C8] text-[#223258] rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+          className="flex items-center space-x-2 px-4 py-2 bg-white border border-[#C8C8C8] text-[#223258] rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium drinfo-share-step"
         >
                       <img src="/Share icon.svg" alt="Share" className="w-5 h-5" />
           <span className="hidden sm:inline">Share</span>
@@ -1811,8 +2130,11 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         {isChatLoading ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="flex flex-col items-center space-y-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="text-blue-600 font-medium">Loading ...</span>
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
             </div>
           </div>
         ) : (
@@ -1832,7 +2154,12 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                     <div key={msg.id} className="mb-4">
                       {msg.type === 'user' ? (
                         <div className="p-3 sm:p-4 border rounded-5px" style={{ borderColor: 'rgba(55, 113, 254, 0.5)', fontFamily: 'DM Sans, sans-serif', fontWeight: 500, fontSize: '16px sm:text-[18px]', color: '#223258', backgroundColor: '#E4ECFF' }}>
-                          <p className="m-0">{msg.content}</p>
+                          <p className="m-0">
+                            {msg.content.includes('Create a visual abstract for this answer::::::') 
+                              ? 'Create a visual abstract for this answer' 
+                              : msg.content
+                            }
+                          </p>
                         </div>
                       ) : (
                         <>
@@ -1907,46 +2234,33 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                   ) : (
                                     // Render text content as before
                                     <div
-                                      className="prose prose-slate prose-ul:text-black marker:text-black max-w-none text-base sm:text-base prose-h2:text-base prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold"
+                                      className="prose prose-slate prose-ul:text-black marker:text-black max-w-none text-base sm:text-base prose-h2:text-base prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold drinfo-answer-content"
                                       style={{ fontFamily: 'DM Sans, sans-serif' }}
                                       dangerouslySetInnerHTML={{
                                         __html:
                                           idx === messages.length - 1 && status !== 'complete' && status !== 'complete_image'
-                                            ? formatWithDummyCitations(
-                                                marked.parse(addDummyCitations(msg.content || ''), { async: false })
-                                              )
+                                            ? (() => {
+                                                // During streaming, check if content contains HTML
+                                                const content = msg.content || '';
+                                                if (content.includes('```html') || (content.includes('```') && /<[a-z][\s\S]*>/i.test(content))) {
+                                                  // If HTML content detected, render it directly with citations
+                                                  return formatWithDummyCitations(processStreamingContent(content));
+                                                } else {
+                                                  // Regular markdown content, process normally
+                                                  return formatWithDummyCitations(
+                                                    marked.parse(addDummyCitations(content), { async: false })
+                                                  );
+                                                }
+                                              })()
                                             : formatWithCitations(
-                                                marked.parse(msg.content || '', { async: false }),
+                                                marked.parse(preprocessContentForHtml(msg.content || ''), { async: false }),
                                                 msg.answer?.citations
                                               ),
                                       }}
                                     />
                                   )}
                                   
-                                  {/* Show infographic option for long text answers */}
-                                  {shouldShowInfographicOption(msg.content || '', idx, messages.length) && (
-                                    <div className="mt-4 sm:mt-6">
-                                      <button
-                                        onClick={() => {
-                                          const infographicRequest = `Create a visual abstract for this answer: ${msg.content}`;
-                                          // Send directly to backend without filling follow-up search bar
-                                          handleSearchWithContent(infographicRequest, true, activeMode === 'instant' ? 'swift' : 'study', true);
-                                        }}
-                                        className="w-auto px-6 py-3 sm:px-8 sm:py-4 border rounded-lg transition-all duration-200 hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
-                                        style={{ 
-                                          borderColor: 'rgba(55, 113, 254, 0.5)', 
-                                          fontFamily: 'DM Sans, sans-serif', 
-                                          fontWeight: 500, 
-                                          fontSize: '16px', 
-                                          color: '#223258', 
-                                          backgroundColor: '#E4ECFF',
-                                          borderRadius: '8px'
-                                        }}
-                                      >
-                                        Create a visual abstract for this answer
-                                      </button>
-                                    </div>
-                                  )}
+                                  {/* Show infographic option for long text answers - MOVED BELOW FEEDBACK */}
                                 </>
                               ) : (
                                 <div className="prose prose-slate max-w-none text-base sm:text-base">
@@ -2022,8 +2336,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                           })() && (
                             <div className="mt-4 sm:mt-6">
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-                                <div className="reference-skeleton col-span-2 sm:col-span-1 h-[95px] sm:h-[105px] lg:h-[125px]" />
-                                <div className="reference-skeleton hidden sm:block h-[95px] sm:h-[105px] lg:h-[125px]" />
+                                <div className="reference-skeleton h-[95px] sm:h-[105px] lg:h-[125px]" />
+                                <div className="reference-skeleton h-[95px] sm:h-[105px] lg:h-[125px]" />
                                 <div className="reference-skeleton hidden sm:block h-[95px] sm:h-[105px] lg:h-[125px]" />
                               </div>
                             </div>
@@ -2055,13 +2369,98 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                   conversationId={sessionId || ''}
                                   threadId={msg.threadId}
                                   answerText={msg.content || ''}
-                                  // Only show retry for the last assistant message
-                                  {...(idx === messages.length - 1 ? {
-                                    onReload: () => handleReload(msg.id),
-                                    isReloading: reloadingMessageId === msg.id
-                                  } : {})}
+                                  // Always pass onReload for the last assistant message
+                                  onReload={idx === messages.length - 1 ? () => handleReload(msg.id) : undefined}
+                                  isReloading={reloadingMessageId === msg.id}
                                   messageId={msg.id}
                                 />
+                                
+                                {/* Show follow-up questions if available - ONLY for the latest question */}
+                                {idx === messages.length - 1 && completeData?.questions_followed && completeData.questions_followed.length > 0 && (
+                                  <div className="mt-4 sm:mt-6">
+                                    <h4 className="text-base font-semibold mb-3 flex items-center" style={{
+                                      color: '#223258',
+                                      fontFamily: 'DM Sans, sans-serif',
+                                      fontWeight: 500,
+                                      fontSize: '16px'
+                                    }}>
+                                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2" style={{ color: '#223258' }}>
+                                      <path d="M7 9H17M7 13H17M21 20L17.6757 18.3378C17.4237 18.2118 17.2977 18.1488 17.1656 18.1044C17.0484 18.065 16.9277 18.0365 16.8052 18.0193C16.6672 18 16.5263 18 16.2446 18H6.2C5.07989 18 4.51984 18 4.09202 17.782C3.71569 17.5903 3.40973 17.2843 3.21799 16.908C3 16.4802 3 15.9201 3 14.8V7.2C3 6.07989 3 5.51984 3.21799 5.09202C3.40973 4.71569 3.71569 4.40973 4.09202 4.21799C4.51984 4 5.0799 4 6.2 4H17.8C18.9201 4 19.4802 4 19.908 4.21799C20.2843 4.40973 20.5903 4.71569 20.782 5.09202C21 5.51984 21 6.0799 21 7.2V20Z" />
+                                      </svg>
+                                      Suggested Follow-up Questions
+                                    </h4>
+                                    <div className="space-y-0">
+                                      {completeData.questions_followed.map((question: string, questionIdx: number) => (
+                                        <div key={questionIdx} className="flex items-center justify-between py-0.5 border-b border-gray-200 last:border-b-0">
+                                          <button
+                                            onClick={() => {
+                                              // Send the question directly to backend as a follow-up
+                                              handleSearchWithContent(question, true, activeMode === 'instant' ? 'swift' : 'study', false);
+                                            }}
+                                            className="flex-1 text-left hover:text-blue-600 transition-colors duration-200"
+                                            style={{
+                                              fontFamily: 'DM Sans, sans-serif',
+                                              fontWeight: 400,
+                                              fontSize: '14px',
+                                              color: '#223258'
+                                            }}
+                                          >
+                                            <span className="font-semibold mr-2" style={{ color: '#223258' }}>
+                                              {questionIdx + 1}.
+                                            </span>
+                                            {question}
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              // Send the question directly to backend as a follow-up
+                                              handleSearchWithContent(question, true, activeMode === 'instant' ? 'swift' : 'study', false);
+                                            }}
+                                            className="w-8 h-8 flex items-center justify-center ml-3 hover:bg-gray-100 rounded-full transition-colors duration-200"
+                                          >
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#223258' }}>
+                                              <line x1="12" y1="5" x2="12" y2="19"></line>
+                                              <line x1="5" y1="12" x2="19" y2="12"></line>
+                                            </svg>
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Show infographic option for long text answers - NOW BELOW FEEDBACK */}
+                                {shouldShowInfographicOption(msg.content || '', idx, messages.length) && (
+                                  <div className="mt-4 sm:mt-4">
+                                    <button
+                                      onClick={() => {
+                                        const infographicRequest = `Create a visual abstract for this answer::::::${msg.content}`;
+                                        // Send directly to backend without filling follow-up search bar
+                                        handleSearchWithContent(infographicRequest, true, activeMode === 'instant' ? 'swift' : 'study', true);
+                                      }}
+                                      className="w-auto px-6 py-3 sm:px-8 sm:py-4 border rounded-lg transition-all duration-200 hover:bg-blue-50 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 drinfo-visual-abstract-step"
+                                      style={{ 
+                                        borderColor: 'rgba(55, 113, 254, 0.5)', 
+                                        fontFamily: 'DM Sans, sans-serif', 
+                                        fontWeight: 500, 
+                                        fontSize: '16px', 
+                                        color: '#223258', 
+                                        backgroundColor: '#E4ECFF',
+                                        borderRadius: '8px'
+                                      }}
+                                    >
+                                      Create a visual abstract for this answer
+                                    </button>
+                                  </div>
+                                )}
+                                
+                                {/* Show remaining limit warning */}
+                                {remainingLimit !== undefined && remainingLimit <= 5 && (
+                                  <div className="mt-3 sm:mt-4 p-3">
+                                    <p className="text-sm text-gray-600 font-['DM_Sans'] text-center">
+                                      You only have <span className="font-semibold text-gray-700">{remainingLimit}</span> monthly question{remainingLimit === 1 ? '' : 's'} left!
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )}
@@ -2078,7 +2477,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                 <div ref={inputAnchorRef} style={{ marginBottom: '120px sm:140px' }} />
                 <div className="sticky bottom-0 bg-gray-50 pt-2 pb-4 z-10">
                   <div className="max-w-4xl mx-auto px-2 sm:px-4">
-                    <div className="relative w-full bg-white rounded border-2 border-[#3771fe44] shadow-[0px_0px_11px_#0000000c] p-3 md:p-4">
+                    <div className="relative w-full bg-white rounded border-2 border-[#3771fe44] shadow-[0px_0px_11px_#0000000c] p-3 md:p-4 follow-up-question-search">
                       <div className="relative">
                         <textarea
                           value={followUpQuestion}
@@ -2122,8 +2521,11 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                         </button>
                       </div>
                     </div>
-                    <div className="w-full py-3 text-center text-[14px] text-gray-400">
-                      <p>Generated by AI, apply professional/physicians' judgment. <a href="https://synduct.com/terms-and-conditions/" target="_blank" rel="noopener noreferrer" className="font-regular underline text-black hover:text-[#3771FE] transition-colors duration-200">Click here</a> for further information.</p>
+                    <div className="w-full py-3 md:py-4 text-center text-xs md:text-sm text-gray-400 px-4">
+                      <p>Do not insert protected health information or personal data.</p>
+                        <Link href="https://synduct.com/terms-and-conditions/" className="text-black hover:text-[#3771FE] underline inline-block" target="_blank" rel="noopener noreferrer">
+                          Terms and Conditions
+                        </Link>
                     </div>
                   </div>
                 </div>

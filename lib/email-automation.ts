@@ -213,6 +213,7 @@ if (typeof window !== 'undefined') {
         daysSinceSignup,
         nextEmailDay: (userData.emailDay || 0) + 1,
         isActive: daysSinceSignup <= 7 && userData.emailAutomationStatus === 'active',
+        isCompleted: userData.emailAutomationStatus === 'completed',
         status: userData.emailAutomationStatus || 'active',
         totalEmailsSent: userData.totalEmailsSent || 0,
         lastEmailSent: userData.lastEmailSent,
@@ -270,6 +271,7 @@ if (typeof window !== 'undefined') {
       const stats = {
         totalUsers: users.length,
         activeUsers: users.filter(u => u.emailAutomationStatus === 'active').length,
+        completedUsers: users.filter(u => u.emailAutomationStatus === 'completed').length,
         unsubscribedUsers: users.filter(u => u.emailAutomationStatus === 'unsubscribed').length,
         totalEmailsSent: users.reduce((sum, u) => sum + (u.totalEmailsSent || 0), 0),
         usersByDay: {} as Record<number, number>

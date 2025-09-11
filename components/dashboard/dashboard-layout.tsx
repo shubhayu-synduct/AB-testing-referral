@@ -1,10 +1,14 @@
 "use client"
 
-import React, { useEffect,useState } from "react"
+import React, { useEffect, useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
 import { Sidebar } from "./sidebar"
 import Image from "next/image"
+import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { getFirebaseFirestore } from '@/lib/firebase'
+import { logger } from '@/lib/logger'
+import { CookieConsentBanner } from "@/components/CookieConsentBanner"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -20,12 +24,100 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     }
     return false
   })
+  const [showCookieBanner, setShowCookieBanner] = useState(false)
   const pathname = usePathname()
 
   // Keep sidebar open/close state in sync with localStorage
   useEffect(() => {
     localStorage.setItem('sidebarOpen', isOpen.toString())
   }, [isOpen])
+
+  // Check Firebase for cookie consent status
+  useEffect(() => {
+    if (!user) return;
+
+    const checkCookieConsent = async () => {
+      try {
+        const db = getFirebaseFirestore();
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        // console.log("Checking cookie consent for user:", user.uid);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const cookieConsent = userData.cookieConsent;
+          
+          // console.log("User document exists, cookieConsent:", cookieConsent);
+          // console.log("User data:", userData);
+          
+          // Check if user has given necessary or all consent
+          if (cookieConsent && (cookieConsent.consentType === 'necessary' || cookieConsent.consentType === 'all')) {
+            // console.log("User has valid consent, hiding banner");
+            setShowCookieBanner(false);
+          } else {
+            console.log("User has no valid consent, showing banner");
+            setShowCookieBanner(true);
+          }
+          
+          // Debug: Log the state change
+          // console.log("Setting showCookieBanner to:", true);
+        } else {
+          console.log("User document doesn't exist, showing banner");
+          // User document doesn't exist, show cookie banner
+          setShowCookieBanner(true);
+        }
+      } catch (err) {
+        console.error("Error checking cookie consent:", err);
+        logger.error("Error checking cookie consent:", err);
+        // On error, show cookie banner as fallback
+        setShowCookieBanner(true);
+      }
+    };
+
+    checkCookieConsent();
+  }, [user]);
+
+  // Check user profession and redirect non-medical users to waitlist
+  useEffect(() => {
+    if (!user) return;
+
+    const checkUserProfession = async () => {
+      try {
+        const db = getFirebaseFirestore();
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const profile = userData?.profile || userData;
+          
+          // Check if user has completed onboarding and has a profession
+          if (userData?.onboardingCompleted && profile?.occupation) {
+            // Define medical professions (these are allowed access)
+            const medicalProfessions = [
+              'Physician', 'Medical fellow', 'Medical consultant', 
+              'Medical intern/resident', 'Medical student', 'Dentist'
+            ];
+            
+            const isMedicalProfessional = medicalProfessions.includes(profile.occupation);
+            
+            // If NOT a medical professional, redirect to waitlist
+            if (!isMedicalProfessional) {
+              console.log('Non-medical user detected, redirecting to waitlist');
+              router.push('/waitlist');
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error checking user profession:", err);
+        logger.error("Error checking user profession:", err);
+        // On error, allow access (fail-safe)
+      }
+    };
+
+    checkUserProfession();
+  }, [user, router]);
 
   // TEMPORARILY DISABLE COMPETING REDIRECT - AuthProvider handles this
   // useEffect(() => {
@@ -35,13 +127,39 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   //   }
   // }, [user, loading, router])
 
+  // Function to update Firebase with cookie consent
+  const updateFirebaseConsent = async (consentData: any) => {
+    if (!user) return;
+    
+    try {
+      const db = getFirebaseFirestore();
+      const userDocRef = doc(db, "users", user.uid);
+      
+      // Update or create user document with cookie consent
+      await setDoc(userDocRef, {
+        cookieConsent: {
+          ...consentData,
+          updatedAt: Date.now()
+        }
+      }, { merge: true });
+      
+      logger.debug("Cookie consent updated in Firebase:", consentData);
+      
+      // Hide the banner after successful Firebase update
+      setShowCookieBanner(false);
+    } catch (err) {
+      logger.error("Error updating Firebase with cookie consent:", err);
+      // Keep banner visible if Firebase update fails
+    }
+  };
+
   const getPageTitle = () => {
     if (pathname === '/dashboard/history') {
       return 'History'
     } else if (pathname === '/dashboard/profile') {
       return 'Profile'
     } else if (pathname.startsWith('/dashboard/')) {
-      return 'Dr. Info Summary'
+      return 'DR. INFO Summary'
     } else if (pathname === '/dashboard') {
       return (
         <Image 
@@ -83,8 +201,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     return (
       <div className="min-h-screen bg-gradient-to-r from-blue-50 to-white flex flex-col items-center justify-center p-6">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <div className="flex space-x-1 justify-center mb-4">
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+          </div>
         </div>
       </div>
     )
@@ -157,6 +278,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <main className="flex-1 overflow-auto md:mt-0 mt-14">
         {children}
       </main>
+      
+      {/* Cookie Consent Banner - Show based on Firebase status */}
+      {showCookieBanner && <CookieConsentBanner onConsentUpdate={updateFirebaseConsent} forceShow={true} />}
     </div>
   )
 } 

@@ -6,7 +6,7 @@ import { logger } from './logger';
 // const DRINFO_API_URL = "https://synduct-aisummary.drinfo.ai/chat/stream";
  const DRINFO_API_URL = "https://synduct-ai-summary-stage-images.drinfo.ai/chat/stream";
 // const DRINFO_API_URL = "http://localhost:8000/chat/stream";
-// const DRINFO_API_URL = "https://ai-summary-stage.duckdns.org/chat/stream";
+// const DRINFO_API_URL = "https://synduct-ai-summary-stage.drinfo.ai/chat/stream";
 export interface Citation {
   title: string;
   url: string;
@@ -23,6 +23,10 @@ export interface DrInfoSummaryData {
   processed_content?: string;
   citations?: Record<string, Citation>;
   thread_id?: string;
+  responseStatus?: number;
+  apiResponse?: any;
+  remaining_limit?: number | string;
+  questions_followed?: string[];
 }
 
 export interface StreamingResponse {
@@ -41,6 +45,9 @@ interface DrInfoSummaryOptions {
   direct_image_request?: boolean;  // Add direct image request flag
 }
 
+// Global variable to store the last API response
+let lastApiResponse: any = null;
+
 /**
  * Fetches medical information from the AI info summary API with streaming support
  */
@@ -54,33 +61,41 @@ export async function fetchDrInfoSummary(
   // console.log("[API] Initiating API request for query:", query);
   
   let hasCalledComplete = false;
+  // console.log("[API] About to send fetch request to:", DRINFO_API_URL);
+  const response = await fetch(DRINFO_API_URL, {
+    method: "POST",
+    headers: {
+      'X-API-Key': 'test_key',        // API key
+      'X-User-ID': options?.userId || "anonymous_user",    // Required user ID
+      'Content-Type': 'application/json'
+    },
+    
+    body: JSON.stringify({
+      query,
+      userId: options?.userId || "anonymous_user",
+      session_id: options?.sessionId || undefined,
+      language: "English",
+      country: options?.country || "US",
+      parent_thread_id: options?.parent_thread_id || null,  // Use Firebase thread-based approach
+      mode: options?.mode || "study",  // Add mode parameter with default fallback
+      direct_image_request: options?.direct_image_request || false  // Add direct image request flag
+    })
+  });
+  // console.log('response', response);
   
   try {
-    // console.log("[API] About to send fetch request to:", DRINFO_API_URL);
-    const response = await fetch(DRINFO_API_URL, {
-      method: "POST",
-      headers: {
-        'X-API-Key': 'test_key',        // API key
-        'X-User-ID': options?.userId || "anonymous_user",    // Required user ID
-        'Content-Type': 'application/json'
-      },
-      
-      body: JSON.stringify({
-        query,
-        userId: options?.userId || "anonymous_user",
-        session_id: options?.sessionId || undefined,
-        language: "English",
-        country: options?.country || "US",
-        parent_thread_id: options?.parent_thread_id || null,  // Use Firebase thread-based approach
-        mode: options?.mode || "study",  // Add mode parameter with default fallback
-        direct_image_request: options?.direct_image_request || false  // Add direct image request flag
-      })
-    });
-
+    // console.log('response', response);
     if (!response.ok) {
       const errorText = await response.text();
-      // console.error(`[API] Request failed with status ${response.status}:`, errorText);
-      throw new Error(`API request failed with status ${response.status}`);
+      const errorDetails = {
+        status: response.status,
+        statusText: response.statusText,
+        url: response.url,
+        headers: Object.fromEntries(response.headers.entries()),
+        errorText: errorText
+      };
+      // console.log(`[API] Request failed:`, errorDetails);
+      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
 
     // console.log("[API] Response received, status:", response.status);
@@ -159,16 +174,41 @@ export async function fetchDrInfoSummary(
       }
     }
      } catch (error) {
-     // console.error("[API] Error in fetchDrInfoSummary:", error);
+      //  console.error("[API] Error in fetchDrInfoSummary:", error);
+       const responseStatus = response.status;
+      //  console.log('responseStatus', responseStatus);
+       
+       // Store the actual API response for debugging
+       lastApiResponse = {
+         status: response.status,
+         statusText: response.statusText,
+         url: response.url,
+         headers: Object.fromEntries(response.headers.entries())
+       };
+       
+       // Try to get response body as text
+       try {
+         const errorText = await response.text();
+         lastApiResponse.body = errorText;
+       } catch (textError) {
+         lastApiResponse.bodyError = textError;
+       }
     
-    // Ensure we always return something even on error
-    if (!hasCalledComplete) {
-      onComplete({
-        short_summary: "An error occurred while processing your request. Please try again.",
-        processed_content: "Error: " + (error instanceof Error ? error.message : String(error)),
-        citations: {}
-      });
-    }
+       // Ensure we always return something even on error
+       if (!hasCalledComplete) {
+         onComplete({
+           // status: responseStatus,
+           responseStatus: responseStatus,
+           short_summary: "An error occurred while processing your request. Please try again.",
+           processed_content: "Error: " + (error instanceof Error ? error.message : String(error)),
+           citations: {},
+           apiResponse: lastApiResponse // Pass the API response details
+         });
+       }
+     }
+  finally{
+
+    console.log("Request completed");
   }
 }
 
@@ -198,5 +238,4 @@ export async function sendFollowUpQuestion(
      } catch (error) {
      // console.error("Error sending follow-up question:", error);
      throw error;
-
 }}
