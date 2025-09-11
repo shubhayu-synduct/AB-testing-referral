@@ -959,6 +959,7 @@ function AIResultsContent() {
                       )}
                     
                     {/* Feedback Section - Only show when not streaming */}
+                    {/* COMMENTED OUT: Useful/Not Useful and Copy buttons
                     {!message.isStreaming && (
                       <div className="mt-4">
                         <AnswerFeedback
@@ -973,6 +974,7 @@ function AIResultsContent() {
                         />
                       </div>
                     )}
+                    */}
                   </div>
                 )}
               </div>
@@ -1010,6 +1012,7 @@ function AIResultsContent() {
           <div ref={messagesEndRef} />
           
           {/* Follow-up Question Section - Moved to bottom */}
+          {/* COMMENTED OUT: Follow-up search bar
           {messages.length > 0 && !isStreaming && (
             <>
               <div style={{ marginBottom: '120px sm:140px' }} />
@@ -1048,6 +1051,7 @@ function AIResultsContent() {
                 </div>
               </div>
           </>)}
+          */}
           </div>
         </div>
       </div>
@@ -1140,8 +1144,8 @@ function AIResultsContent() {
         </div>
       )}
 
-      {/* Feedback Reminder Modal */}
-      {showFeedbackReminder && (
+      {/* Feedback Reminder Modal - COMMENTED OUT */}
+      {/* {showFeedbackReminder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
             <div className="text-center">
@@ -1179,7 +1183,7 @@ function AIResultsContent() {
             </div>
           </div>
         </div>
-      )}
+      )} */}
     </DashboardLayout>
   );
 }
