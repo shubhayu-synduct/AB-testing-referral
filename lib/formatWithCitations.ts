@@ -36,6 +36,9 @@ function extractAndRenderHtml(content: string): string {
 
 // --- Process markdown formatting within HTML content ---
 function processMarkdownInHtml(htmlContent: string): string {
+  // Process combined bold+italic FIRST: **__text__** -> <strong><strong>text</strong></strong>
+  htmlContent = htmlContent.replace(/\*\*__([^_]+)__\*\*/g, '<strong><strong>$1</strong></strong>');
+  
   // Process bold formatting: **text** or __text__ -> <strong>text</strong>
   htmlContent = htmlContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   htmlContent = htmlContent.replace(/__(.*?)__/g, '<strong>$1</strong>');
@@ -43,9 +46,6 @@ function processMarkdownInHtml(htmlContent: string): string {
   // Process italic formatting: *text* or _text_ -> <em>text</em>
   htmlContent = htmlContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
   htmlContent = htmlContent.replace(/_(.*?)_/g, '<em>$1</em>');
-  
-  // Process combined bold+italic: **__text__** -> <strong><em>text</em></strong>
-  htmlContent = htmlContent.replace(/\*\*__([^_]+)__\*\*/g, '<strong><em>$1</em></strong>');
   
   return htmlContent;
 }
@@ -122,16 +122,18 @@ export const formatWithCitations = (text: string, citations?: Record<string, any
   // Updated regex to handle multi-word drug names with spaces
   const drugMatches = text.match(/<strong><strong>([a-zA-Z][a-zA-Z0-9\s\-'()]+)<\/strong><\/strong>\s*\[(\d+)\]/g);
   logger.debug('Found potential drug matches:', drugMatches);
+  logger.debug('Updated drug regex will match both **__Substance__** [num] and <strong><strong>Substance</strong></strong> [num] formats');
   
   // Collect all matches first, then process in reverse order to avoid index conflicts
   const matchesToProcess: Array<{match: string, drugName: string, num: string, index: number}> = [];
   let match;
-  // Updated regex to include \s for spaces in drug names
-  const drugRegex = /<strong><strong>([a-zA-Z][a-zA-Z0-9\s\-'()]+)<\/strong><\/strong>\s*\[(\d+)\]/g;
+  // Updated regex to handle both HTML and markdown formats for drug names
+  const drugRegex = /(?:\*\*__([a-zA-Z][a-zA-Z0-9\s\-'()]+)__\*\*|<strong><strong>([a-zA-Z][a-zA-Z0-9\s\-'()]+)<\/strong><\/strong>)\s*\[(\d+)\]/g;
   
   while ((match = drugRegex.exec(text)) !== null) {
-    const drugName = match[1];
-    const num = match[2];
+    // Handle both capture groups - either markdown format (group 1) or HTML format (group 2)
+    const drugName = match[1] || match[2];
+    const num = match[3];
     const citation = citations[num];
     
     logger.debug('Found drug match:', { drugName, num, citation, sourceType: citation?.source_type });

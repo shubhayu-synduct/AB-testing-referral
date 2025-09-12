@@ -46,6 +46,7 @@ interface ChatMessage {
     citations?: Record<string, Citation>;
     svg_content?: string[]; // Changed from string to string[]
     apiResponse?: any; // Added API response field
+    questions_followed?: string[]; // Added follow-up questions field
   };
   feedback?: {
     likes: number;
@@ -126,6 +127,7 @@ interface DrInfoSummaryData {
   responseStatus?: number;
   apiResponse?: any;
   remaining_limit?: number | string;
+  questions_followed?: string[];
 }
 
 const KNOWN_STATUSES: StatusType[] = ['processing', 'searching', 'summarizing', 'formatting', 'complete', 'complete_image'];
@@ -442,7 +444,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
             citations,
             svg_content: lastAssistantMsg.answer.svg_content,
             status: 'complete',
-            references: []
+            references: [],
+            questions_followed: lastAssistantMsg.answer.questions_followed || []
           });
           
           if (citations && Object.keys(citations).length > 0) {
@@ -894,7 +897,6 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       }
 
       .drug-name-clickable {
-        text-decoration: underline !important;
         color: #214498 !important;
         cursor: pointer;
         transition: color 0.2s ease;
@@ -904,7 +906,6 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       
       .drug-name-clickable:hover {
         color: #3771FE !important;
-        text-decoration: underline !important;
       }
 
       /* Table styling for HTML content */
@@ -1439,7 +1440,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                       svg_content: msg.answer?.svg_content || (data?.svg_content ? 
                         (Array.isArray(data.svg_content) ? data.svg_content.filter((content: any) => content !== null && content !== undefined) : [data.svg_content])
                       : []),
-                      apiResponse: data?.apiResponse // Store the API response details
+                      apiResponse: data?.apiResponse, // Store the API response details
+                      questions_followed: data?.questions_followed || [] // Store the follow-up questions
                     },
                   }
                 : msg
@@ -1457,6 +1459,12 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
               source_type: citation.source_type || 'internet'
             }
           }), {}) : {});
+          
+          // Update completeData with questions_followed
+          setCompleteData(prev => ({
+            ...prev,
+            questions_followed: data?.questions_followed || []
+          }));
           
           // Set remaining limit if available and not 'N/A'
           if (data?.remaining_limit !== undefined && data.remaining_limit !== 'N/A') {
@@ -2367,9 +2375,62 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                   messageId={msg.id}
                                 />
                                 
+                                {/* Show follow-up questions if available - ONLY for the latest question */}
+                                {idx === messages.length - 1 && completeData?.questions_followed && completeData.questions_followed.length > 0 && (
+                                  <div className="mt-4 sm:mt-6">
+                                    <h4 className="text-base font-semibold mb-3 flex items-center" style={{
+                                      color: '#223258',
+                                      fontFamily: 'DM Sans, sans-serif',
+                                      fontWeight: 500,
+                                      fontSize: '16px'
+                                    }}>
+                                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2" style={{ color: '#223258' }}>
+                                      <path d="M7 9H17M7 13H17M21 20L17.6757 18.3378C17.4237 18.2118 17.2977 18.1488 17.1656 18.1044C17.0484 18.065 16.9277 18.0365 16.8052 18.0193C16.6672 18 16.5263 18 16.2446 18H6.2C5.07989 18 4.51984 18 4.09202 17.782C3.71569 17.5903 3.40973 17.2843 3.21799 16.908C3 16.4802 3 15.9201 3 14.8V7.2C3 6.07989 3 5.51984 3.21799 5.09202C3.40973 4.71569 3.71569 4.40973 4.09202 4.21799C4.51984 4 5.0799 4 6.2 4H17.8C18.9201 4 19.4802 4 19.908 4.21799C20.2843 4.40973 20.5903 4.71569 20.782 5.09202C21 5.51984 21 6.0799 21 7.2V20Z" />
+                                      </svg>
+                                      Suggested Follow-up Questions
+                                    </h4>
+                                    <div className="space-y-0">
+                                      {completeData.questions_followed.map((question: string, questionIdx: number) => (
+                                        <div key={questionIdx} className="flex items-center justify-between py-0.5 border-b border-gray-200 last:border-b-0">
+                                          <button
+                                            onClick={() => {
+                                              // Send the question directly to backend as a follow-up
+                                              handleSearchWithContent(question, true, activeMode === 'instant' ? 'swift' : 'study', false);
+                                            }}
+                                            className="flex-1 text-left hover:text-blue-600 transition-colors duration-200"
+                                            style={{
+                                              fontFamily: 'DM Sans, sans-serif',
+                                              fontWeight: 400,
+                                              fontSize: '14px',
+                                              color: '#223258'
+                                            }}
+                                          >
+                                            <span className="font-semibold mr-2" style={{ color: '#223258' }}>
+                                              {questionIdx + 1}.
+                                            </span>
+                                            {question}
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              // Send the question directly to backend as a follow-up
+                                              handleSearchWithContent(question, true, activeMode === 'instant' ? 'swift' : 'study', false);
+                                            }}
+                                            className="w-8 h-8 flex items-center justify-center ml-3 hover:bg-gray-100 rounded-full transition-colors duration-200"
+                                          >
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#223258' }}>
+                                              <line x1="12" y1="5" x2="12" y2="19"></line>
+                                              <line x1="5" y1="12" x2="19" y2="12"></line>
+                                            </svg>
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
                                 {/* Show infographic option for long text answers - NOW BELOW FEEDBACK */}
                                 {shouldShowInfographicOption(msg.content || '', idx, messages.length) && (
-                                  <div className="mt-4 sm:mt-6">
+                                  <div className="mt-4 sm:mt-4">
                                     <button
                                       onClick={() => {
                                         const infographicRequest = `Create a visual abstract for this answer::::::${msg.content}`;
@@ -2392,8 +2453,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                   </div>
                                 )}
                                 
-                                {/* Show remaining limit warning */}
-                                {remainingLimit !== undefined && remainingLimit <= 5 && (
+                                {/* Show remaining limit warning - only for the latest question */}
+                                {idx === messages.length - 1 && remainingLimit !== undefined && remainingLimit <= 5 && (
                                   <div className="mt-3 sm:mt-4 p-3">
                                     <p className="text-sm text-gray-600 font-['DM_Sans'] text-center">
                                       You only have <span className="font-semibold text-gray-700">{remainingLimit}</span> monthly question{remainingLimit === 1 ? '' : 's'} left!
@@ -2455,7 +2516,11 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                           {isLoading ? (
                             <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                           ) : (
-                            <img src="/search.svg" alt="Search" width={30} height={30} />
+                            <svg width="30" height="30" viewBox="0 0 46 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <rect width="46" height="46" rx="6.57143" fill="#3771FE"/>
+                              <path d="M29.8594 16.5703L13.3594 33.0703" stroke="white" strokeWidth="2.25" strokeLinecap="round"/>
+                              <path d="M20.4297 14.6406H31.6426V24.9263" stroke="white" strokeWidth="2.25" strokeLinecap="round"/>
+                            </svg>
                           )}
                         </button>
                       </div>

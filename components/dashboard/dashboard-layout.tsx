@@ -159,7 +159,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     } else if (pathname === '/dashboard/profile') {
       return 'Profile'
     } else if (pathname.startsWith('/dashboard/')) {
-      return 'Dr. Info Summary'
+      return 'DR. INFO Summary'
     } else if (pathname === '/dashboard') {
       return (
         <Image 
