@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { logger } from '@/lib/logger';
 
-export default function UnsubscribePage() {
+function UnsubscribeContent() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState<string | null>(null);
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'not_found'>('loading');
@@ -195,5 +195,34 @@ export default function UnsubscribePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function UnsubscribePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <img
+              className="mx-auto h-20 w-auto"
+              src="https://app.drinfo.ai/login-logo.png"
+              alt="DR. INFO Logo"
+            />
+            <h2 className="mt-6 text-3xl font-bold text-gray-900">
+              Unsubscribe from Emails
+            </h2>
+          </div>
+          <div className="bg-white py-8 px-6 shadow rounded-lg sm:px-10">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Loading...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    }>
+      <UnsubscribeContent />
+    </Suspense>
   );
 }
