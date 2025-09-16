@@ -1,8 +1,8 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Eye, EyeOff } from "lucide-react"
 import { setSessionCookie } from "@/lib/auth-service"
@@ -34,11 +34,20 @@ const MicrosoftIcon = () => (
 
 export function SignInForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+
+  // Handle URL parameters for error messages
+  useEffect(() => {
+    const errorParam = searchParams.get('error')
+    if (errorParam === 'duplicate-email') {
+      setError("An account with this email already exists. Please sign in instead.")
+    }
+  }, [searchParams])
 
   const parseFirebaseError = (error: any) => {
     if (!error) return "";

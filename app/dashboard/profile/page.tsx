@@ -7,6 +7,7 @@ import { getFirebaseAuth, getFirebaseFirestore } from "@/lib/firebase";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useSearchParams, useRouter } from "next/navigation";
+import { CleanupService } from "@/lib/cleanup-service";
 
 
 export default function ProfilePage() {
@@ -94,7 +95,7 @@ export default function ProfilePage() {
     // Check if tab parameter is set in URL
     const tabParam = searchParams.get('tab');
     if (tabParam === 'subscription') {
-      setActiveTab('profile');
+      setActiveTab('subscription');
     }
     
     // Check if payment was cancelled
@@ -364,6 +365,9 @@ export default function ProfilePage() {
       const auth = await getFirebaseAuth();
       const user = auth.currentUser;
       if (user) {
+        const userUid = user.uid;
+        const userEmail = user.email || 'unknown@example.com';
+        
         // Send delete confirmation email first
         try {
           await fetch('/api/send-delete-email', {
@@ -382,30 +386,63 @@ export default function ProfilePage() {
           // Don't fail the deletion if email fails
         }
 
-        const db = getFirebaseFirestore();
-        const docRef = doc(db, "users", user.uid);
+        // Use server-side API for deletion (handles Firebase Admin SDK)
+        console.log('Calling server-side delete API...');
+        const deleteResponse = await fetch('/api/delete-profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userUid: userUid,
+            userEmail: userEmail
+          }),
+        });
+
+        const deleteResult = await deleteResponse.json();
         
-        // Delete the user document from Firestore
-        await deleteDoc(docRef);
-        
-        // Delete the user's authentication account
-        await user.delete();
+        if (!deleteResponse.ok) {
+          throw new Error(deleteResult.error || 'Failed to delete profile');
+        }
+
+        console.log('Server-side deletion successful:', deleteResult);
+        console.log(`Deleted ${deleteResult.deletedUserCount} user document(s) with email ${userEmail}`);
         
         // Sign out to clear authentication cookies
         await auth.signOut();
+        
+        // Perform comprehensive cleanup
+        await CleanupService.performCompleteCleanup(userUid, userEmail);
         
         // Reset local state
         setProfile(null);
         setShowDeleteModal(false);
         setDeleteConfirmation('');
         
-        // Redirect to signup page
-        window.location.href = '/signup';
+        // Verify cleanup was successful
+        const cleanupSuccessful = CleanupService.verifyCleanup();
+        console.log('Cleanup verification:', cleanupSuccessful);
+        
+        // The cleanup service will handle the redirect
+        // No need for manual redirect here
+        
       }
     } catch (error) {
       console.error('Error deleting profile:', error);
-      // If there's an error, it might be because the user needs to re-authenticate
-      // You might want to show a message asking them to sign in again
+      
+      // Even if there's an error, try to perform cleanup
+      try {
+        const auth = await getFirebaseAuth();
+        const user = auth.currentUser;
+        if (user) {
+          await CleanupService.performCompleteCleanup(user.uid, user.email || 'unknown@example.com');
+        }
+      } catch (cleanupError) {
+        console.error('Error during cleanup after deletion failure:', cleanupError);
+      }
+      
+      // Show error message to user
+      alert('There was an error deleting your account. Please try again or contact support if the problem persists.');
     } finally {
       setDeleting(false);
     }
@@ -433,14 +470,13 @@ export default function ProfilePage() {
           >
             Profile
           </button>
-          {/* Tempory comment out subscription tab */}
-          {/* <button
+          <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'subscription' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
             onClick={() => handleTabChange('subscription')}
           >
             Subscription
-          </button> */}
+          </button>
           {/* <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'feedback' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
