@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Drug API Connection Test</h1>
+    <p>This page tests the connection to the localhost backend API.</p>
+    
+    <div class="info">
+        <strong>Backend URL:</strong> https://synduct-drugsummary.drinfo.ai
+    </div>
+    
+    <button onclick="testHealthEndpoint()">Test Health Endpoint</button>
+    <button onclick="testUserStatus()">Test User Status (No Auth)</button>
+    <button onclick="testSearchEndpoint()">Test Search Endpoint (No Auth)</button>
+    
+    <div id="results"></div>
+    
+    <script>
+        // const BACKEND_URL = 'http://localhost:8002';
+        const BACKEND_URL = 'https://synduct-drugsummary.drinfo.ai';
+        
+        function addResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${type}`;
+            resultDiv.innerHTML = message;
+            resultsDiv.appendChild(resultDiv);
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        async function testHealthEndpoint() {
+            clearResults();
+            addResult('Testing health endpoint...', 'info');
+            
+            try {
+                const response = await fetch(`${BACKEND_URL}/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addResult(`✅ Health endpoint working!<br><pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                } else {
+                    addResult(`❌ Health endpoint failed: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Connection failed: ${error.message}`, 'error');
+                addResult('Make sure the backend server is running on port 8002', 'error');
+            }
+        }
+        
+        async function testUserStatus() {
+            clearResults();
+            addResult('Testing user status endpoint (without authentication)...', 'info');
+            
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/user-status`);
+                
+                if (response.status === 401) {
+                    addResult('✅ User status endpoint working (correctly requires authentication)', 'success');
+                } else if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ User status endpoint accessible:<br><pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                } else {
+                    addResult(`❌ User status endpoint failed: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Connection failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testSearchEndpoint() {
+            clearResults();
+            addResult('Testing search endpoint (without authentication)...', 'info');
+            
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/search?q=aspirin&limit=5`);
+                
+                if (response.status === 401) {
+                    addResult('✅ Search endpoint working (correctly requires authentication)', 'success');
+                } else if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ Search endpoint accessible:<br><pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                } else {
+                    addResult(`❌ Search endpoint failed: ${response.status} ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Connection failed: ${error.message}`, 'error');
+            }
+        }
+        
+        // Auto-test health endpoint on page load
+        window.onload = function() {
+            testHealthEndpoint();
+        };
+    </script>
+</body>
+</html>

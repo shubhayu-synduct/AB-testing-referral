@@ -1,11 +1,8 @@
-####### Dr. INFO - Medical Information Platform
+# Dr. INFO - Medical Information Platform
 
 Dr. INFO is a comprehensive web application designed for healthcare professionals to access evidence-based medical information, clinical guidelines, drug information, and other healthcare resources in one centralized platform.
 
-###############
-=======
-###########
-####### Features
+## Features
 - **Dr. INFO Summary**: AI-powered medical information summaries from trusted sources
 - **Clinical Guidelines**: Access to evidence-based clinical practice guidelines 
 - **Drug Information**: Comprehensive medication database with dosing, side effects, and more
@@ -15,24 +12,23 @@ Dr. INFO is a comprehensive web application designed for healthcare professional
 - **External Resources**: Quick links to trusted external medical resources
 - **CME Access**: Continuing Medical Education resources (coming soon)
 - **Projects**: Save and organize your research and references (coming soon)
-- **History**: Track and manage your search history#
+- **History**: Track and manage your search history
 
-###### Tech Stack
-#######
+## Tech Stack
 - **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS
 - **Authentication**: Firebase Authentication
 - **Database**: Firestore
 - **Deployment**: Vercel
 
-### Getting Started
+## Getting Started
 
-##### Prerequisites
+### Prerequisites
 
 - Node.js 18 or higher
 - npm or yarn
 - Firebase account
 
-###### Installation
+### Installation
 
 1. Clone the repository:
    ```
@@ -57,7 +53,6 @@ Dr. INFO is a comprehensive web application designed for healthcare professional
    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
    NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
    ```
-#######
 4. Run the development server:
    ```
    npm run dev
@@ -75,57 +70,12 @@ The application uses Firebase Authentication for user management:
 - Protected routes with authentication checks
 - Secure session management
 
-##### License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-#### Acknowledgments
+## Acknowledgments
 
 - Medical information is for demonstration purposes only
 - Icons provided by [Lucide](https://lucide.dev/)
-- UI components built with Tailwind CSS 
-
-
-### Deploy
-#### Lets se
-
-## Miracales Happen
-
-### mergeing sandy guidelines with ai summary
-# Deploying sandys latest commit 
-## Another commit
-###
-##### 
-fix: active substances from api
-### reset password UI
-
-## fix: active substances from api
-
-#### ######
-Merge pull request #7 from synductgmbh/dev_sand
-# deploying with new sign in
-## redeploy
-#deploy
-
-## deployed
-### NDA merged
-
-## drug information first iteration
-##
-## Push
-####
-##.......
-# color push ### ###### #### ## ###
-## history page responsive
-merged changes guideline and layout
-### ## deploy ###
-### new change 
-## new deployment
-#### responsive
-### deploy from sandy
-### deploy from subh##
-### deploy
-## deploy
-### commiting with all major issues
-
-### Praying to deploy gods............
+- UI components built with Tailwind CSS
