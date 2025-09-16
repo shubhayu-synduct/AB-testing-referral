@@ -43,34 +43,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const prompt = `You are a drug name autocomplete system for pharmaceutical search. Given the partial query: "${query}", suggest 3 complete drug names or drug-related terms that start with or contain this text.
+    const prompt = `You are a pharmaceutical autocomplete system with extensive knowledge of drugs and active substances. Given the partial query: "${query}", suggest 3 REAL drug names or active substances that start with or contain this text.
 
 Previous queries to avoid duplicating: ${previousQueries.join(', ')}
 
-Focus specifically on:
+STRICT REQUIREMENTS:
+- ONLY suggest actual pharmaceutical names, active substances, or established drug names
+- NO generic formulations like "${query} tablets" or "${query} injection"
+- Focus on real medications that healthcare professionals would recognize
+- Include both generic (INN) and brand names when applicable
+- Prioritize exact matches and common medications
+
+Categories to consider:
+- Active pharmaceutical ingredients (APIs)
 - Generic drug names (INN - International Nonproprietary Names)
 - Brand/trade names of medications
-- Drug classes and categories (e.g., "ACE inhibitors", "beta blockers")
-- Pharmaceutical formulations (e.g., "extended release", "immediate release")
-- Drug combinations (e.g., "amlodipine/valsartan")
-- Complete the partial input naturally for drug searches
+- Drug combinations with established names
+- Well-known drug classes only if they are specific (e.g., "ACE inhibitors")
 
-Prioritize:
-1. Exact drug name matches first
-2. Common medications that healthcare professionals frequently search
-3. Both generic and brand names when relevant
-4. Drug classes if the query suggests category search
-
-Examples:
-- "para" → ["paracetamol", "paroxetine", "paracetamol/codeine"]
+Examples of GOOD suggestions:
+- "aspi" → ["aspirin", "aspartame", "asparagine"]
+- "para" → ["paracetamol", "paroxetine", "paracetamol"]
 - "metf" → ["metformin", "metformin XR", "metformin/sitagliptin"]
-- "beta" → ["beta blockers", "betamethasone", "betaxolol"]
+- "amlo" → ["amlodipine", "amlodipine/valsartan", "amlodipine besylate"]
+
+Examples of BAD suggestions to AVOID:
+- "aspi tablets", "aspi injection", "aspi capsules"
+- "para medication", "para treatment"
 
 IMPORTANT: Return ONLY a valid JSON array of exactly 3 strings. No markdown formatting, no code blocks, no additional text, no explanations. Just the raw JSON array.
 
-Example format: ["paracetamol", "paroxetine", "paracetamol/codeine"]
+Example format: ["aspirin", "aspartame", "asparagine"]
 
-Each suggestion should be a complete drug name, brand name, or drug-related term.`;
+Each suggestion MUST be a real, specific pharmaceutical name or active substance.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.0-flash',
@@ -116,7 +121,7 @@ Each suggestion should be a complete drug name, brand name, or drug-related term
         throw new Error('No valid suggestions found');
       }
       
-      // Pad with drug-specific suggestions if needed
+      // Pad with real drug-specific suggestions if needed
       while (validSuggestions.length < 3) {
         const lowerQuery = query.toLowerCase();
         if (lowerQuery.includes('para')) {
@@ -125,8 +130,15 @@ Each suggestion should be a complete drug name, brand name, or drug-related term
           validSuggestions.push('metformin');
         } else if (lowerQuery.includes('asp')) {
           validSuggestions.push('aspirin');
+        } else if (lowerQuery.includes('amlo')) {
+          validSuggestions.push('amlodipine');
+        } else if (lowerQuery.includes('ibu')) {
+          validSuggestions.push('ibuprofen');
+        } else if (lowerQuery.includes('sim')) {
+          validSuggestions.push('simvastatin');
         } else {
-          validSuggestions.push(`${query} tablets`);
+          // Use common drug prefixes as fallback
+          validSuggestions.push('acetaminophen');
         }
       }
 
@@ -134,7 +146,7 @@ Each suggestion should be a complete drug name, brand name, or drug-related term
     } catch (parseError) {
       logger.error('Failed to parse AI response:', { text: cleanText, error: parseError });
       
-      // Return drug-specific fallback suggestions
+      // Return real drug-specific fallback suggestions
       const lowerQuery = query.toLowerCase();
       let fallbackSuggestions;
       
@@ -143,17 +155,35 @@ Each suggestion should be a complete drug name, brand name, or drug-related term
       } else if (lowerQuery.includes('met')) {
         fallbackSuggestions = ['metformin', 'metoprolol', 'metronidazole'];
       } else if (lowerQuery.includes('asp')) {
-        fallbackSuggestions = ['aspirin', 'aspartame', 'aspirin/clopidogrel'];
+        fallbackSuggestions = ['aspirin', 'aspartame', 'asparagine'];
+      } else if (lowerQuery.includes('amlo')) {
+        fallbackSuggestions = ['amlodipine', 'amlodipine/valsartan', 'amlodipine besylate'];
+      } else if (lowerQuery.includes('ibu')) {
+        fallbackSuggestions = ['ibuprofen', 'ibuprofen/paracetamol', 'ibuprofen lysine'];
+      } else if (lowerQuery.includes('sim')) {
+        fallbackSuggestions = ['simvastatin', 'simvastatin/ezetimibe', 'simethicone'];
       } else if (lowerQuery.includes('beta')) {
-        fallbackSuggestions = ['beta blockers', 'betamethasone', 'betaxolol'];
+        fallbackSuggestions = ['betamethasone', 'betaxolol', 'beta blockers'];
       } else if (lowerQuery.includes('ace')) {
-        fallbackSuggestions = ['ACE inhibitors', 'acetaminophen', 'acebutolol'];
+        fallbackSuggestions = ['acetaminophen', 'acebutolol', 'ACE inhibitors'];
+      } else if (lowerQuery.includes('ator')) {
+        fallbackSuggestions = ['atorvastatin', 'atorvastatin calcium', 'atorvastatin/amlodipine'];
+      } else if (lowerQuery.includes('omep')) {
+        fallbackSuggestions = ['omeprazole', 'omeprazole/sodium bicarbonate', 'omeprazole magnesium'];
       } else {
-        fallbackSuggestions = [
-          `${query} tablets`,
-          `${query} injection`,
-          `${query} capsules`
-        ];
+        // Common drug fallbacks based on first letter
+        const firstLetter = query.charAt(0).toLowerCase();
+        if (firstLetter === 'a') {
+          fallbackSuggestions = ['acetaminophen', 'aspirin', 'amlodipine'];
+        } else if (firstLetter === 'm') {
+          fallbackSuggestions = ['metformin', 'metoprolol', 'morphine'];
+        } else if (firstLetter === 'l') {
+          fallbackSuggestions = ['lisinopril', 'levothyroxine', 'losartan'];
+        } else if (firstLetter === 's') {
+          fallbackSuggestions = ['simvastatin', 'sertraline', 'sildenafil'];
+        } else {
+          fallbackSuggestions = ['acetaminophen', 'ibuprofen', 'aspirin'];
+        }
       }
       
       return NextResponse.json({ suggestions: fallbackSuggestions });
