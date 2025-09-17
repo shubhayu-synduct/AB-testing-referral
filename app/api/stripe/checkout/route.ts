@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
       payment_method_types: ['card'],
       customer: customer.id,
       line_items: [{ price: priceId, quantity: 1 }],
+      allow_promotion_codes: true,
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/profile?tab=subscription&status=cancelled`,
       metadata: {
