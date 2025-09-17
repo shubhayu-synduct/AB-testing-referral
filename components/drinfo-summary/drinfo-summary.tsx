@@ -2335,19 +2335,17 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                             return !hasCitations;
                           })() && (
                             <div className="mt-4 sm:mt-6">
+                              {/* Disclaimer appears before shimmer animation (formatting phase) */}
+                              <div className="mb-4 text-center">
+                                <p className="text-sm text-gray-500 font-['DM_Sans'] italic leading-relaxed">
+                                  DR.INFO is an informational and educational tool.
+                                </p>
+                              </div>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                                 <div className="reference-skeleton h-[95px] sm:h-[105px] lg:h-[125px]" />
                                 <div className="reference-skeleton h-[95px] sm:h-[105px] lg:h-[125px]" />
                                 <div className="reference-skeleton hidden sm:block h-[95px] sm:h-[105px] lg:h-[125px]" />
                               </div>
-                            </div>
-                          )}
-                          {/* Disclaimer for all assistant answers */}
-                          {msg.type === 'assistant' && msg.content && (
-                            <div className="mb-3 sm:mb-4 text-center">
-                              <p className="text-sm text-gray-500 font-['DM_Sans'] italic leading-relaxed">
-                                DR.INFO is an informational and educational tool.
-                              </p>
                             </div>
                           )}
 
@@ -2365,6 +2363,12 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                             return shouldShowCitations;
                           })() && (
                             <div className="mt-4 sm:mt-6">
+                              {/* Disclaimer appears above references when citations are shown (complete phase) */}
+                              <div className="mb-4 text-center">
+                                <p className="text-sm text-gray-500 font-['DM_Sans'] italic leading-relaxed">
+                                  DR.INFO is an informational and educational tool.
+                                </p>
+                              </div>
                               <p className="text-slate-500 text-xs sm:text-sm">
                                 Used {getCitationCount(msg.answer?.citations || activeCitations || {})} references
                               </p>
