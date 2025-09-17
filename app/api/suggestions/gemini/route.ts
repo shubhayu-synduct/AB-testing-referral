@@ -6,7 +6,7 @@ import { logger } from '@/lib/logger';
 const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
 if (!GEMINI_API_KEY) {
-  console.error('GEMINI_API_KEY is not configured on server-side');
+  console.error('NEXT_PUBLIC_GEMINI_API_KEY is not configured');
   console.error('Available env vars:', Object.keys(process.env).filter(key => key.includes('GEMINI')));
 }
 
