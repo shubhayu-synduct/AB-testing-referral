@@ -95,7 +95,7 @@ export default function ProfilePage() {
     // Check if tab parameter is set in URL
     const tabParam = searchParams.get('tab');
     if (tabParam === 'subscription') {
-      setActiveTab('subscription');
+      setActiveTab('profile');
     }
     
     // Check if payment was cancelled
@@ -1262,6 +1262,24 @@ export default function ProfilePage() {
             )}
           </div>
         )}
+
+        {/* Feedback Tab Content */}
+        {/* {activeTab === 'feedback' && (
+          <div>
+            <h2 className="text-xl font-regular text-[#000000] mb-1">Feedback</h2>
+            <p className="text-[#747474] text-sm mb-6">Share your thoughts and suggestions with us</p>
+            
+            <div className="border border-[#B5C9FC] rounded-[10px] p-4 md:p-8 bg-[#F4F7FF] w-full">
+              <div className="text-center py-8">
+                <h3 className="text-lg font-medium text-[#223258] mb-2">Coming Soon</h3>
+                <p className="text-[#747474] text-sm">
+                  We're working on a feedback system to better serve you. 
+                  For now, you can reach us at <a href="mailto:info@synduct.com" className="text-[#3771FE] hover:underline">info@synduct.com</a>
+                </p>
+              </div>
+            </div>
+          </div>
+        )} */}
       </div>
 
       {/* Delete Profile Modal */}
