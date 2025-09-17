@@ -3,10 +3,10 @@ import { GoogleGenAI } from '@google/genai';
 import { logger } from '@/lib/logger';
 
 // Server-side only API key (no NEXT_PUBLIC_ prefix)
-const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 if (!GEMINI_API_KEY) {
-  console.error('NEXT_PUBLIC_GEMINI_API_KEY is not configured');
+  console.error('GEMINI_API_KEY is not configured on server-side');
   console.error('Available env vars:', Object.keys(process.env).filter(key => key.includes('GEMINI')));
 }
 

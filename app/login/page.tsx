@@ -1,12 +1,11 @@
 "use client"
 
 import type React from "react"
-import { Suspense } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { SignInForm } from "@/components/auth/signin-form"
 
-function SignInContent() {
+export default function SignIn() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-2 sm:p-4 font-['DM_Sans']">
       <div className="w-full max-w-[95%] sm:max-w-[85%] md:max-w-[75%] lg:max-w-[60%] flex flex-col items-center justify-center">
@@ -36,9 +35,7 @@ function SignInContent() {
         {/* Sign In Form */}
         <div className="w-full max-w-[95%] sm:max-w-[85%] md:max-w-md flex flex-col items-center">
           <div className="bg-[#F4F7FF] rounded-[10px] shadow-sm border-[#3771FE]/50 border-2 p-3 sm:p-5 md:p-6 lg:p-8 w-full">
-            <Suspense fallback={<div className="flex justify-center items-center p-4">Loading...</div>}>
-              <SignInForm />
-            </Suspense>
+            <SignInForm />
           </div>
 
           {/* Terms and Privacy */}
@@ -55,42 +52,5 @@ function SignInContent() {
         </div>
       </div>
     </div>
-  )
-}
-
-export default function SignIn() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-2 sm:p-4 font-['DM_Sans']">
-        <div className="w-full max-w-[95%] sm:max-w-[85%] md:max-w-[75%] lg:max-w-[60%] flex flex-col items-center justify-center">
-          <div className="text-center mb-4 sm:mb-6 md:mb-8 w-full flex flex-col items-center">
-            <div className="flex items-center justify-center mb-3 sm:mb-4">
-              <Image
-                src="/full-icon.svg"
-                alt="DR. INFO Logo"
-                width={150}
-                height={32}
-                className="text-white w-[150px] sm:w-[180px] md:w-[200px] lg:w-[200px]"
-              />
-            </div>
-            <div className="w-full">
-              <p 
-                className="text-[#223258] mt-5 mb-2 font-medium text-[24px] sm:text-[28px] md:text-[30px] lg:text-[30px] font-['DM_Sans']" 
-                style={{ 
-                  lineHeight: '1.2'
-                }}
-              >
-                Welcome!
-              </p>
-            </div>
-          </div>
-          <div className="flex justify-center items-center p-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
-        </div>
-      </div>
-    }>
-      <SignInContent />
-    </Suspense>
   )
 } 
