@@ -1,15 +1,8 @@
-####### Dr. INFO - Medical Information Platform
+# Dr. INFO - Medical Information Platform
 
 Dr. INFO is a comprehensive web application designed for healthcare professionals to access evidence-based medical information, clinical guidelines, drug information, and other healthcare resources in one centralized platform.
 
-<<<<<<< HEAD
-###############
-=======
-###########
-####### Features
-=======
 ## Features
->>>>>>> images/dev_images
 - **Dr. INFO Summary**: AI-powered medical information summaries from trusted sources
 - **Clinical Guidelines**: Access to evidence-based clinical practice guidelines 
 - **Drug Information**: Comprehensive medication database with dosing, side effects, and more
@@ -21,12 +14,7 @@ Dr. INFO is a comprehensive web application designed for healthcare professional
 - **Projects**: Save and organize your research and references (coming soon)
 - **History**: Track and manage your search history
 
-<<<<<<< HEAD
-###### Tech Stack
-#######
-=======
 ## Tech Stack
->>>>>>> images/dev_images
 - **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS
 - **Authentication**: Firebase Authentication
 - **Database**: Firestore
