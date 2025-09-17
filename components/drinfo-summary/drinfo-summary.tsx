@@ -1093,6 +1093,36 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       @media (prefers-reduced-motion: reduce) {
         .shimmer-text { animation: none; }
       }
+
+      /* Hide scrollbars while maintaining scroll functionality */
+      .hide-scrollbar {
+        -ms-overflow-style: none;  /* Internet Explorer 10+ */
+        scrollbar-width: none;  /* Firefox */
+      }
+      
+      .hide-scrollbar::-webkit-scrollbar {
+        display: none;  /* Safari and Chrome */
+      }
+
+      /* Apply to main content areas */
+      .overflow-y-auto {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      
+      .overflow-y-auto::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* Apply to specific scrollable containers */
+      .flex-1.overflow-y-auto {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      
+      .flex-1.overflow-y-auto::-webkit-scrollbar {
+        display: none;
+      }
     `;
     document.head.appendChild(style);
     
@@ -2501,31 +2531,61 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                             e.target.style.height = e.target.scrollHeight + 'px';
                           }}
                           placeholder="Ask a follow-up question..."
-                          className="w-full text-base md:text-[16px] text-[#223258] font-normal font-['DM_Sans'] outline-none resize-none min-h-[24px] max-h-[200px] overflow-y-auto"
-                          onKeyDown={(e) => e.key === 'Enter' && handleFollowUpQuestion(e as any)}
+                          className={`w-full text-base md:text-[16px] font-normal font-['DM_Sans'] outline-none resize-none min-h-[24px] max-h-[200px] overflow-y-auto ${
+                            isLoading || (status && status !== 'complete' && status !== 'complete_image') 
+                              ? 'text-gray-400 cursor-not-allowed bg-gray-50' 
+                              : 'text-[#223258]'
+                          }`}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !isLoading && (status === 'complete' || status === 'complete_image')) {
+                              handleFollowUpQuestion(e as any);
+                            }
+                          }}
                           rows={1}
                           style={{ height: '24px' }}
+                          disabled={isLoading || (status !== null && status !== 'complete' && status !== 'complete_image')}
                         />
                       </div>
                       <div className="flex justify-between items-center mt-2">
                         {/* Toggle switch for Acute/Research mode */}
-                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <label className={`flex items-center gap-2 select-none ${
+                          isLoading || (status && status !== 'complete' && status !== 'complete_image') 
+                            ? 'cursor-not-allowed opacity-50' 
+                            : 'cursor-pointer'
+                        }`}>
                           <input
                             type="checkbox"
                             checked={activeMode === 'instant'}
                             onChange={() => setActiveMode(activeMode === 'instant' ? 'research' : 'instant')}
                             className="toggle-checkbox hidden"
+                            disabled={isLoading || (status !== null && status !== 'complete' && status !== 'complete_image')}
                           />
-                          <span className={`w-10 h-6 flex items-center rounded-full p-1 duration-300 ease-in-out ${activeMode === 'instant' ? 'bg-blue-500' : 'bg-gray-300'}`}
+                          <span className={`w-10 h-6 flex items-center rounded-full p-1 duration-300 ease-in-out ${
+                            isLoading || (status && status !== 'complete' && status !== 'complete_image')
+                              ? 'bg-gray-200'
+                              : activeMode === 'instant' ? 'bg-blue-500' : 'bg-gray-300'
+                          }`}
                                 style={{ transition: 'background 0.3s' }}>
-                            <span className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ease-in-out ${activeMode === 'instant' ? 'translate-x-4' : ''}`}></span>
+                            <span className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ease-in-out ${
+                              isLoading || (status && status !== 'complete' && status !== 'complete_image')
+                                ? ''
+                                : activeMode === 'instant' ? 'translate-x-4' : ''
+                            }`}></span>
                           </span>
-                          <span className={`text-sm font-medium ${activeMode === 'instant' ? 'text-[#3771FE]' : 'text-gray-500'}`}
+                          <span className={`text-sm font-medium ${
+                            isLoading || (status && status !== 'complete' && status !== 'complete_image')
+                              ? 'text-gray-400'
+                              : activeMode === 'instant' ? 'text-[#3771FE]' : 'text-gray-500'
+                          }`}
                                 style={{ fontSize: '16px', fontFamily: 'DM Sans, sans-serif' }}>
                             Acute
                           </span>
                         </label>
-                        <button onClick={handleFollowUpQuestion} className="flex-shrink-0" disabled={isLoading}>
+                        <button 
+                          onClick={handleFollowUpQuestion} 
+                          className="flex-shrink-0" 
+                          disabled={isLoading || (status !== null && status !== 'complete' && status !== 'complete_image')}
+                        >
                           {isLoading ? (
                             <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                           ) : (
