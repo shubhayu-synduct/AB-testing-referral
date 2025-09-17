@@ -2342,6 +2342,15 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                               </div>
                             </div>
                           )}
+                          {/* Disclaimer for all assistant answers */}
+                          {msg.type === 'assistant' && msg.content && (
+                            <div className="mb-3 sm:mb-4 text-center">
+                              <p className="text-sm text-gray-500 font-['DM_Sans'] italic leading-relaxed">
+                                DR.INFO is an informational and educational tool.
+                              </p>
+                            </div>
+                          )}
+
                           {(() => {
                             const shouldShowCitations = (msg.answer?.citations && Object.keys(msg.answer.citations).length > 0) || 
                               (activeCitations && Object.keys(activeCitations).length > 0);
