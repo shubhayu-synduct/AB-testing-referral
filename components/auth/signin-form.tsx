@@ -44,9 +44,7 @@ export function SignInForm() {
   // Handle URL parameters for error messages
   useEffect(() => {
     const errorParam = searchParams.get('error')
-    if (errorParam === 'duplicate-email') {
-      setError("An account with this email already exists. Please sign in instead.")
-    }
+    // Add other error handling here if needed
   }, [searchParams])
 
   const parseFirebaseError = (error: any) => {

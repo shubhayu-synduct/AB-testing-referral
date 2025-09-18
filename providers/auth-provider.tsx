@@ -7,7 +7,6 @@ import type { User } from "firebase/auth"
 import { getSessionCookie, setSessionCookie, clearSessionCookie } from "@/lib/auth-service"
 import { VerificationModal } from "@/components/auth/verification-modal"
 import { logger } from "@/lib/logger"
-import { checkEmailExists } from "@/lib/email-validation"
 import { CleanupService } from "@/lib/cleanup-service"
 
 type AuthContextType = {
@@ -345,25 +344,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setRedirectTo('/onboarding')
         }
       } else {
-        logger.authLog("User document does not exist, checking for duplicate email before creating user")
-        
-        // Check if email already exists in database before creating user document
-        if (user.email) {
-          const emailExists = await checkEmailExists(user.email)
-          if (emailExists) {
-            logger.warn("Duplicate email detected during login:", user.email)
-            // Sign out the user and redirect to sign in page
-            const { getFirebaseAuth } = await import("@/lib/firebase")
-            const auth = await getFirebaseAuth()
-            if (auth) {
-              await auth.signOut()
-            }
-            setRedirectTo('/signin?error=duplicate-email')
-            return
-          }
-        }
-        
-        logger.authLog("No duplicate email found, creating new user and setting redirect to onboarding")
+        logger.authLog("User document does not exist, creating new user and setting redirect to onboarding")
         
         // Create user document for new users
         const { setDoc } = await import("firebase/firestore")
