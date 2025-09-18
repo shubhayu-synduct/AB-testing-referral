@@ -619,10 +619,12 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }
   }, [sessionId, isChatLoading, query, hasFetched, lastQuestion]);
 
-  // Single, working scroll effect for streaming content
+  const [shouldUseNextScroll, setShouldUseNextScroll] = useState(true);
+  
+  // Scroll to end during active session (when streaming)
   useEffect(() => {
-    // Only scroll during streaming or when messages change
-    if (status !== 'complete' && status !== 'complete_image' && messages.length > 0) {
+    if (lastQuestion && isStreaming) {
+      setShouldUseNextScroll(false);
       // Use requestAnimationFrame for smooth performance
       requestAnimationFrame(() => {
         // Scroll the content container to bottom
@@ -641,11 +643,14 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         }
       });
     }
-  }, [messages, status]); // Depend on messages and status
+  }, [lastQuestion, isStreaming]); // Depend on lastQuestion and isStreaming
 
-  // Always scroll to end after any new message (answer) is added
+  // Scroll to end when loading from history (not streaming)
   useEffect(() => {
-    if (messages.length > 0) {
+    // console.log('messages.length', messages.length);
+    // console.log('isStreaming', isStreaming);
+    // console.log('shouldUseNextScroll', shouldUseNextScroll);
+    if (messages.length > 0 && !isStreaming && shouldUseNextScroll) {
       // Use requestAnimationFrame for smooth performance
       requestAnimationFrame(() => {
         // Scroll the content container to bottom
@@ -664,7 +669,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         }
       });
     }
-  }, [messages]); // Only depend on messages
+  }, [messages.length, isStreaming, shouldUseNextScroll]); // Depend on messages, streaming, and shouldUseNextScroll
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
