@@ -7,6 +7,8 @@ import type { User } from "firebase/auth"
 import { getSessionCookie, setSessionCookie, clearSessionCookie } from "@/lib/auth-service"
 import { VerificationModal } from "@/components/auth/verification-modal"
 import { logger } from "@/lib/logger"
+import { checkEmailExists } from "@/lib/email-validation"
+import { CleanupService } from "@/lib/cleanup-service"
 
 type AuthContextType = {
   user: User | null
@@ -189,6 +191,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return
 
+    // Set up BroadcastChannel for better cross-tab communication
+    let broadcastChannel: BroadcastChannel | null = null
+    if ('BroadcastChannel' in window) {
+      broadcastChannel = new BroadcastChannel('auth-sync')
+      broadcastChannel.onmessage = (event) => {
+        const data = event.data
+        const currentUser = userRef.current
+        
+        if (data.action === 'account-deleted' && currentUser && currentUser.email === data.email) {
+          logger.authLog("BroadcastChannel account deletion detected. Performing cleanup.")
+          CleanupService.performCompleteCleanup(data.uid, data.email)
+        }
+      }
+    }
+
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === "auth-sync" && e.newValue) {
         try {
@@ -217,10 +234,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           logger.error("Error handling cross-tab auth sync:", error)
         }
       }
+      
+      // Handle account deletion notification
+      if (e.key === "account-deleted" && e.newValue) {
+        try {
+          const data = JSON.parse(e.newValue)
+          const currentUser = userRef.current
+          
+          // If this tab has the deleted user (by email match), perform cleanup
+          if (currentUser && currentUser.email === data.email) {
+            logger.authLog("Cross-tab account deletion detected. Performing cleanup.")
+            CleanupService.performCompleteCleanup(data.uid, data.email)
+            return
+          }
+        } catch (error) {
+          logger.error("Error handling cross-tab account deletion:", error)
+        }
+      }
     }
 
     window.addEventListener("storage", handleStorageChange)
-    return () => window.removeEventListener("storage", handleStorageChange)
+    return () => {
+      window.removeEventListener("storage", handleStorageChange)
+      if (broadcastChannel) {
+        broadcastChannel.close()
+      }
+    }
   }, []) // Empty dependency array is now safe because we use a ref
 
   // Protected routes check
@@ -306,7 +345,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setRedirectTo('/onboarding')
         }
       } else {
-        logger.authLog("User document does not exist, creating new user and setting redirect to onboarding")
+        logger.authLog("User document does not exist, checking for duplicate email before creating user")
+        
+        // Check if email already exists in database before creating user document
+        if (user.email) {
+          const emailExists = await checkEmailExists(user.email)
+          if (emailExists) {
+            logger.warn("Duplicate email detected during login:", user.email)
+            // Sign out the user and redirect to sign in page
+            const { getFirebaseAuth } = await import("@/lib/firebase")
+            const auth = await getFirebaseAuth()
+            if (auth) {
+              await auth.signOut()
+            }
+            setRedirectTo('/signin?error=duplicate-email')
+            return
+          }
+        }
+        
+        logger.authLog("No duplicate email found, creating new user and setting redirect to onboarding")
         
         // Create user document for new users
         const { setDoc } = await import("firebase/firestore")

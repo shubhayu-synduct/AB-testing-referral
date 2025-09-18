@@ -1,15 +1,16 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { unstable_noStore as noStore } from 'next/cache';
 import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirebaseFirestore } from "@/lib/firebase";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useSearchParams, useRouter } from "next/navigation";
+import { CleanupService } from "@/lib/cleanup-service";
 
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   noStore(); // Disable static generation/prerendering
   
   const { user, loading: authLoading } = useAuth();
@@ -364,6 +365,9 @@ export default function ProfilePage() {
       const auth = await getFirebaseAuth();
       const user = auth.currentUser;
       if (user) {
+        const userUid = user.uid;
+        const userEmail = user.email || 'unknown@example.com';
+        
         // Send delete confirmation email first
         try {
           await fetch('/api/send-delete-email', {
@@ -382,30 +386,63 @@ export default function ProfilePage() {
           // Don't fail the deletion if email fails
         }
 
-        const db = getFirebaseFirestore();
-        const docRef = doc(db, "users", user.uid);
+        // Use server-side API for deletion (handles Firebase Admin SDK)
+        console.log('Calling server-side delete API...');
+        const deleteResponse = await fetch('/api/delete-profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userUid: userUid,
+            userEmail: userEmail
+          }),
+        });
+
+        const deleteResult = await deleteResponse.json();
         
-        // Delete the user document from Firestore
-        await deleteDoc(docRef);
-        
-        // Delete the user's authentication account
-        await user.delete();
+        if (!deleteResponse.ok) {
+          throw new Error(deleteResult.error || 'Failed to delete profile');
+        }
+
+        console.log('Server-side deletion successful:', deleteResult);
+        console.log(`Deleted ${deleteResult.deletedUserCount} user document(s) with email ${userEmail}`);
         
         // Sign out to clear authentication cookies
         await auth.signOut();
+        
+        // Perform comprehensive cleanup
+        await CleanupService.performCompleteCleanup(userUid, userEmail);
         
         // Reset local state
         setProfile(null);
         setShowDeleteModal(false);
         setDeleteConfirmation('');
         
-        // Redirect to signup page
-        window.location.href = '/signup';
+        // Verify cleanup was successful
+        const cleanupSuccessful = CleanupService.verifyCleanup();
+        console.log('Cleanup verification:', cleanupSuccessful);
+        
+        // The cleanup service will handle the redirect
+        // No need for manual redirect here
+        
       }
     } catch (error) {
       console.error('Error deleting profile:', error);
-      // If there's an error, it might be because the user needs to re-authenticate
-      // You might want to show a message asking them to sign in again
+      
+      // Even if there's an error, try to perform cleanup
+      try {
+        const auth = await getFirebaseAuth();
+        const user = auth.currentUser;
+        if (user) {
+          await CleanupService.performCompleteCleanup(user.uid, user.email || 'unknown@example.com');
+        }
+      } catch (cleanupError) {
+        console.error('Error during cleanup after deletion failure:', cleanupError);
+      }
+      
+      // Show error message to user
+      alert('There was an error deleting your account. Please try again or contact support if the problem persists.');
     } finally {
       setDeleting(false);
     }
@@ -433,14 +470,13 @@ export default function ProfilePage() {
           >
             Profile
           </button>
-          {/* Tempory comment out subscription tab */}
-          {/* <button
+          <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'subscription' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
             onClick={() => handleTabChange('subscription')}
           >
             Subscription
-          </button> */}
+          </button>
           {/* <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'feedback' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
@@ -1226,6 +1262,24 @@ export default function ProfilePage() {
             )}
           </div>
         )}
+
+        {/* Feedback Tab Content */}
+        {/* {activeTab === 'feedback' && (
+          <div>
+            <h2 className="text-xl font-regular text-[#000000] mb-1">Feedback</h2>
+            <p className="text-[#747474] text-sm mb-6">Share your thoughts and suggestions with us</p>
+            
+            <div className="border border-[#B5C9FC] rounded-[10px] p-4 md:p-8 bg-[#F4F7FF] w-full">
+              <div className="text-center py-8">
+                <h3 className="text-lg font-medium text-[#223258] mb-2">Coming Soon</h3>
+                <p className="text-[#747474] text-sm">
+                  We're working on a feedback system to better serve you. 
+                  For now, you can reach us at <a href="mailto:info@synduct.com" className="text-[#3771FE] hover:underline">info@synduct.com</a>
+                </p>
+              </div>
+            </div>
+          </div>
+        )} */}
       </div>
 
       {/* Delete Profile Modal */}
@@ -1277,4 +1331,16 @@ export default function ProfilePage() {
       )}
     </DashboardLayout>
   );
-} 
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    }>
+      <ProfilePageContent />
+    </Suspense>
+  );
+}

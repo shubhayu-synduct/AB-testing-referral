@@ -13,6 +13,7 @@ import { doc, setDoc } from "firebase/firestore"
 import { VerificationModal } from "./verification-modal"
 import { logger } from "@/lib/logger"
 import { handleUserSignup, handleFirebaseAuthSignup } from "@/lib/signup-integration"
+import { validateEmailForSignup } from "@/lib/email-validation"
 import { track } from '@vercel/analytics'
 
 // Google Icon SVG component
@@ -104,6 +105,13 @@ export function SignUpForm() {
     })
 
     try {
+      // Check if email already exists before attempting to create account
+      const emailValidation = await validateEmailForSignup(email)
+      if (!emailValidation.allowed) {
+        setError(emailValidation.error || "An account with this email already exists. Please sign in instead.")
+        return
+      }
+
       const { getFirebaseAuth } = await import("@/lib/firebase")
       const { createUserWithEmailAndPassword, sendEmailVerification } = await import("firebase/auth")
 
@@ -165,6 +173,17 @@ export function SignUpForm() {
       }
 
       const result = await signInWithPopup(auth, googleProvider)
+      
+      // Check if email already exists before creating user document
+      if (result.user.email) {
+        const emailValidation = await validateEmailForSignup(result.user.email)
+        if (!emailValidation.allowed) {
+          // Sign out the user since they shouldn't be signed in
+          await auth.signOut()
+          setError(emailValidation.error || "An account with this email already exists. Please sign in instead.")
+          return
+        }
+      }
       
       const userDocRef = doc(db, "users", result.user.uid)
       const userDoc = await getDoc(userDocRef)
@@ -229,6 +248,17 @@ export function SignUpForm() {
       }
 
       const result = await signInWithPopup(auth, microsoftProvider)
+      
+      // Check if email already exists before creating user document
+      if (result.user.email) {
+        const emailValidation = await validateEmailForSignup(result.user.email)
+        if (!emailValidation.allowed) {
+          // Sign out the user since they shouldn't be signed in
+          await auth.signOut()
+          setError(emailValidation.error || "An account with this email already exists. Please sign in instead.")
+          return
+        }
+      }
       
       const userDocRef = doc(db, "users", result.user.uid)
       const userDoc = await getDoc(userDocRef)
