@@ -8,6 +8,7 @@ import { getFirebaseAuth } from "@/lib/firebase"
 import { useAuth } from "@/hooks/use-auth"
 import { logger } from "@/lib/logger"
 import { handleUserSignup } from "@/lib/signup-integration"
+import { track } from "@/lib/analytics"
 
 function VerifyEmailContent() {
   const router = useRouter()
@@ -115,6 +116,12 @@ function VerifyEmailContent() {
           // Apply the verification code
           await applyActionCode(auth, oobCode)
           logger.info("Email verification successful!")
+          
+          // Track email verification success
+          if (user?.email) {
+            track.userEmailVerified(user.email, 'email')
+          }
+          
           setVerified(true)
           setError("") // Clear any existing errors
           // Redirect to onboarding after successful verification

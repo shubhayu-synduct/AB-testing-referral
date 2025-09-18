@@ -7,6 +7,7 @@ import { Mail } from "lucide-react"
 import { getFirebaseAuth } from "@/lib/firebase"
 import { sendPasswordResetEmail } from "firebase/auth"
 import { logger } from "@/lib/logger"
+import { track } from "@/lib/analytics"
 
 export default function ForgotPasswordPage() {
   const router = useRouter()
@@ -30,6 +31,10 @@ export default function ForgotPasswordPage() {
         url: "https://app.drinfo.ai/reset-password",
         handleCodeInApp: true
       })
+      
+      // Track password reset request
+      track.userPasswordResetRequested(email)
+      
       setSuccess(true)
     } catch (err: any) {
       logger.error("Password reset error:", err)
