@@ -14,7 +14,7 @@ import { VerificationModal } from "./verification-modal"
 import { logger } from "@/lib/logger"
 import { handleUserSignup, handleFirebaseAuthSignup } from "@/lib/signup-integration"
 import { validateEmailForSignup } from "@/lib/email-validation"
-import { track } from '@vercel/analytics'
+import { track } from '@/lib/analytics'
 
 // Google Icon SVG component
 const GoogleIcon = () => (
@@ -99,10 +99,9 @@ export function SignUpForm() {
     e.preventDefault()
     setError("")
     setLoading(true)
-    track('SignUpAttempted', {
-      method: 'email',
-      email: email ? 'provided' : 'not_provided'
-    })
+    
+    // Track signup initiation
+    track.userSignupInitiated('email', undefined, !!email)
 
     try {
       // Check if email already exists before attempting to create account
@@ -121,6 +120,9 @@ export function SignUpForm() {
       }
 
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      
+      // Track email verification sent
+      track.userEmailVerificationSent(email, 'email')
       
       // Send email verification
       await sendEmailVerification(userCredential.user, {
@@ -141,6 +143,9 @@ export function SignUpForm() {
         // Don't fail the signup if email automation fails
       }
       
+      // Track signup completion
+      track.userSignupCompleted('email', undefined, userCredential.user.uid)
+      
       // Show verification modal instead of redirecting
       setShowVerificationModal(true)
     } catch (err: any) {
@@ -154,10 +159,8 @@ export function SignUpForm() {
   const handleGoogleSignUp = async () => {
     setError("")
     setLoading(true)
-    track('SignUpAttempted', {
-      method: 'google',
-      provider: 'google'
-    })
+    // Track signup initiation
+    track.userSignupInitiated('google', 'google', true)
     
     try {
       const { signInWithPopup } = await import("firebase/auth")
@@ -210,7 +213,13 @@ export function SignUpForm() {
           // Don't fail the signup if email automation fails
         }
         
+        // Track signup completion
+        track.userSignupCompleted('google', 'google', result.user.uid)
+        
         // AuthProvider will handle the redirect to onboarding
+      } else {
+        // User already exists, track as login
+        track.userLoginSuccessful('google', 'google', result.user.uid)
       }
     } catch (err: any) {
       logger.error("Google sign up error:", err)
@@ -229,10 +238,7 @@ export function SignUpForm() {
   const handleMicrosoftSignUp = async () => {
     setError("")
     setLoading(true)
-    track('SignUpAttempted', {
-      method: 'microsoft',
-      provider: 'microsoft'
-    })
+    track.signUpAttempted('microsoft', 'microsoft')
     
     try {
       const { signInWithPopup } = await import("firebase/auth")

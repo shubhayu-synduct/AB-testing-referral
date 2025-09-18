@@ -71,23 +71,50 @@ export async function POST(request: NextRequest) {
       // Don't fail the deletion if analytics deletion fails
     }
     
-    // Step 3: Delete the user's authentication account
+    // Step 3: Find and delete ALL Firebase Auth users with the same email
+    let deletedAuthUserCount = 0;
     try {
-      await authAdmin.deleteUser(userUid);
-      logger.info(`Successfully deleted Firebase Auth user: ${userUid}`);
+      const authUsers = await authAdmin.getUsers([{ email: userEmail }]);
+      if (authUsers.users.length > 0) {
+        const uidsToDelete = authUsers.users.map(userRecord => userRecord.uid);
+        logger.info(`Found ${authUsers.users.length} Firebase Auth user(s) with email ${userEmail}, deleting all...`);
+        
+        // Delete all Firebase Auth users with the same email
+        await authAdmin.deleteUsers(uidsToDelete);
+        deletedAuthUserCount = uidsToDelete.length;
+        
+        logger.info(`Successfully deleted ${deletedAuthUserCount} Firebase Auth user(s) with email ${userEmail}`);
+        logger.info(`Deleted Firebase Auth UIDs: ${uidsToDelete.join(', ')}`);
+      } else {
+        logger.warn(`No Firebase Auth users found with email ${userEmail}`);
+      }
     } catch (authError: any) {
-      logger.error('Could not delete Firebase Auth user:', authError);
+      logger.error('Could not delete Firebase Auth users:', authError);
       // Continue even if auth deletion fails
     }
 
-    logger.info(`Profile deletion completed for ${userEmail}. Deleted ${deletedUserCount} user documents.`);
+    // Check if any users were found and deleted
+    if (deletedUserCount === 0 && deletedAuthUserCount === 0) {
+      logger.warn(`No users found with email ${userEmail} to delete`);
+      return NextResponse.json({
+        success: false,
+        message: "No users found with this email address",
+        email: userEmail,
+        deletedUserCount: 0,
+        deletedAuthUserCount: 0,
+        totalAccountsDeleted: 0
+      }, { status: 404 });
+    }
+
+    logger.info(`Profile deletion completed for ${userEmail}. Deleted ${deletedUserCount} user documents and ${deletedAuthUserCount} Firebase Auth users.`);
 
     return NextResponse.json({
       success: true,
       message: "Profile and all related data deleted successfully",
       email: userEmail,
       deletedUserCount: deletedUserCount,
-      deletedAuthUser: userUid
+      deletedAuthUserCount: deletedAuthUserCount,
+      totalAccountsDeleted: deletedUserCount + deletedAuthUserCount
     });
 
   } catch (error: any) {

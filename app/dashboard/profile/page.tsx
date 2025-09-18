@@ -407,6 +407,8 @@ function ProfilePageContent() {
 
         console.log('Server-side deletion successful:', deleteResult);
         console.log(`Deleted ${deleteResult.deletedUserCount} user document(s) with email ${userEmail}`);
+        console.log(`Deleted ${deleteResult.deletedAuthUserCount} Firebase Auth user(s) with email ${userEmail}`);
+        console.log(`Total accounts deleted: ${deleteResult.totalAccountsDeleted}`);
         
         // Sign out to clear authentication cookies
         await auth.signOut();
