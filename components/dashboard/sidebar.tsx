@@ -25,6 +25,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { doc, getDoc } from 'firebase/firestore'
 import { getFirebaseFirestore } from '@/lib/firebase'
 import { logger } from '@/lib/logger'
+import { track } from '@/lib/analytics'
 
 interface SidebarProps {
   isOpen: boolean;
@@ -117,6 +118,9 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
       // Sign out of Firebase
       await signOut(auth)
+      
+      // Track logout event
+      track.userLogout('manual', user?.uid)
       
       // Clear our custom session cookie
       clearSessionCookie()
@@ -211,6 +215,9 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               <Link 
                 href="/guidelines"
                 onClick={() => {
+                  if (user) {
+                    track.guidelinesClicked(user.uid, pathname)
+                  }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);
                   }
@@ -228,6 +235,9 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               <Link 
                 href="/drug-information"
                 onClick={() => {
+                  if (user) {
+                    track.drugInformationViewed('drug_search', 'search', user.uid, pathname)
+                  }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);
                   }
@@ -245,6 +255,9 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               <Link 
                 href="/image-generator"
                 onClick={() => {
+                  if (user) {
+                    track.visualAbstractClicked(user.uid, pathname)
+                  }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);
                   }
@@ -269,6 +282,9 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               <Link 
                 href="/library"
                 onClick={() => {
+                  if (user) {
+                    track.libraryClicked(user.uid, pathname)
+                  }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);
                   }

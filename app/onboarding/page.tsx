@@ -9,6 +9,7 @@ import Image from "next/image"
 import { logger } from "@/lib/logger"
 import { handleUserSignup } from "@/lib/signup-integration"
 import { CookieConsentBanner } from "@/components/CookieConsentBanner"
+import { track } from "@/lib/analytics"
 
 export default function Onboarding() {
   const router = useRouter()
@@ -54,6 +55,18 @@ export default function Onboarding() {
   useEffect(() => {
     if (!authLoading && !user) {
       window.location.href = "/login"
+    }
+  }, [user, authLoading])
+
+  // Track onboarding started
+  useEffect(() => {
+    if (user && !authLoading) {
+      const method = user.providerData.some(provider => 
+        provider.providerId === 'google.com' || 
+        provider.providerId === 'microsoft.com'
+      ) ? 'oauth' : 'email'
+      
+      track.onboardingStarted(user.uid, method)
     }
   }, [user, authLoading])
 
@@ -267,6 +280,9 @@ export default function Onboarding() {
         // Don't fail the onboarding if email automation fails
       }
 
+      // Track onboarding completion
+      track.onboardingCompleted(user.uid, undefined, formData.specialties)
+      
       // Set registration success first for all users
       setRegistrationSuccess(true)
       

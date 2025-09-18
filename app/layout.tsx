@@ -5,6 +5,7 @@ import "./globals.css"
 import { AuthProvider } from "@/providers/auth-provider"
 import { Analytics } from "@vercel/analytics/next"
 import { TourProvider, GuidelineTourProvider, DrugTourProvider, DrinfoSummaryTourProvider } from "@/components/TourContext";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 
 const inter = Inter({ subsets: ["latin"] })
 const poppins = Poppins({ 
@@ -49,6 +50,7 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        <GoogleAnalytics />
       </head>
       <body className={`${inter.className} ${poppins.variable} font-['DM_Sans']`}>
         <DrinfoSummaryTourProvider>

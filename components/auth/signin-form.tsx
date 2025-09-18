@@ -10,7 +10,7 @@ import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth"
 import { doc, getDoc } from "firebase/firestore"
 import { getFirebaseAuth, getFirebaseFirestore, getGoogleProvider, getMicrosoftProvider } from "@/lib/firebase"
 import { logger } from "@/lib/logger"
-import { track } from "@vercel/analytics"
+import { track } from "@/lib/analytics"
 
 // Google Icon SVG component
 const GoogleIcon = () => (
@@ -98,10 +98,7 @@ export function SignInForm() {
     setError("")
     setLoading(true)
     // Track sign-in attempt
-    track('SignInAttempted', {
-      method: 'email',
-      email: email ? 'provided' : 'not_provided'
-    })
+    track.signInAttempted('email', undefined, !!email)
 
     try {
       const { getFirebaseAuth } = await import("@/lib/firebase")
@@ -112,7 +109,11 @@ export function SignInForm() {
         throw new Error("Firebase not initialized")
       }
 
-      await signInWithEmailAndPassword(auth, email, password)
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      
+      // Track successful login
+      track.userLoginSuccessful('email', undefined, userCredential.user.uid)
+      
       // AuthProvider will handle the redirect based on onboarding status
       
     } catch (err: any) {
@@ -126,11 +127,8 @@ export function SignInForm() {
   const handleGoogleSignIn = async () => {
     setError("")
     setLoading(true)
-        // Track Google sign-in attempt
-    track('SignInAttempted', {
-          method: 'google',
-          provider: 'google'
-        })
+    // Track Google sign-in attempt
+    track.signInAttempted('google', 'google')
     
     try {
       const auth = await getFirebaseAuth()
@@ -142,6 +140,9 @@ export function SignInForm() {
 
       const result = await signInWithPopup(auth, googleProvider)
       await setSessionCookie(result.user)
+      
+      // Track successful login
+      track.userLoginSuccessful('google', 'google', result.user.uid)
       
       // AuthProvider will handle the redirect based on onboarding status
       
@@ -164,10 +165,7 @@ export function SignInForm() {
     setLoading(true)
 
     // Track Microsoft sign-in attempt
-    track('SignInAttempted', {
-          method: 'microsoft',
-          provider: 'microsoft'
-        })
+    track.signInAttempted('microsoft', 'microsoft')
 
     
     try {
@@ -180,6 +178,9 @@ export function SignInForm() {
 
       const result = await signInWithPopup(auth, microsoftProvider)
       await setSessionCookie(result.user)
+      
+      // Track successful login
+      track.userLoginSuccessful('microsoft', 'microsoft', result.user.uid)
       
       // AuthProvider will handle the redirect based on onboarding status
       

@@ -9,7 +9,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { getFirebaseFirestore } from '@/lib/firebase'
 import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore'
 import { logger } from '@/lib/logger'
-import { track } from '@vercel/analytics'
+import { track } from '@/lib/analytics'
 
 interface Guideline {
   id: number;
@@ -298,11 +298,7 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
   }, [searchParams, userCountry, userSpecialties, user, performSearch, lastSearchQuery]); // Only when search params change
 
   useEffect(() => {
-    track('GuidelinesPageVisited', {
-      user: user ? 'authenticated' : 'unauthenticated',
-      userCountry: userCountry || 'unknown',
-      timestamp: new Date().toISOString()
-    });
+    track.pageViewed('GuidelinesPage', user ? 'authenticated' : 'unauthenticated', userCountry);
   }, [user, userCountry]);
 
   const fetchInitialGuidelines = async (country: string, specialties: string[], otherSpecialty: string) => {

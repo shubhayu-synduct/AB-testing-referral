@@ -10,7 +10,7 @@ import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import { ArrowRight, X, Search } from "lucide-react"
 import { v4 as uuidv4 } from 'uuid'
 import { logger } from '@/lib/logger';
-import { track } from '@vercel/analytics';
+import { track } from '@/lib/analytics';
 import { useTour } from "@/components/TourContext"
 // Removed GoogleGenAI import - now using secure server-side API
 
@@ -44,13 +44,12 @@ export default function Dashboard() {
   const isRequestInProgressRef = useRef<boolean>(false)
 
 
-    // Track dashboard landing
-    // useEffect(() => {
-    //   track('DashboardLanded', {
-    //     user: user ? 'authenticated' : 'unauthenticated',
-    //     timestamp: new Date().toISOString()
-    //   });
-    // }, [user]);
+  // Track dashboard landing
+  useEffect(() => {
+    if (user) {
+      track.dashboardVisited(user.uid)
+    }
+  }, [user]);
   
   // Tour functionality
   const tourContext = useTour()
@@ -302,12 +301,8 @@ export default function Dashboard() {
     }
     
     if (!query.trim() || !user) return
-        // Track search query
-    track('SearchQuerySubmitted', {
-      queryLength: query.length,
-      mode: activeMode,
-      hasUser: !!user
-    })
+        // Track search query (both Vercel and GA4)
+    track.searchQuery(query, activeMode, !!user)
     
     // Immediately lock everything - no more interactions possible
     isRequestInProgressRef.current = true;
@@ -326,10 +321,20 @@ export default function Dashboard() {
     
     logger.debug("[DASHBOARD] Creating new chat session for query:", query);
     
-    try {
-      // Create a new session ID using uuidv4
-      const sessionId = uuidv4();
-      logger.debug("[DASHBOARD] Generated new sessionId:", sessionId);
+      // Track medical query submission
+      if (user) {
+        track.medicalQuerySubmitted(query, activeMode, user.uid, query.length)
+      }
+      
+      try {
+        // Create a new session ID using uuidv4
+        const sessionId = uuidv4();
+        logger.debug("[DASHBOARD] Generated new sessionId:", sessionId);
+        
+        // Track chat session started
+        if (user) {
+          track.chatSessionStarted(sessionId, user.uid, activeMode)
+        }
       
       // Create chat session in Firebase first
       const userMessage = {
