@@ -348,22 +348,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logger.authLog("User document does not exist, checking for duplicate email before creating user")
         
         // Check if email already exists in database before creating user document
-        if (user.email) {
-          const emailExists = await checkEmailExists(user.email)
-          if (emailExists) {
-            logger.warn("Duplicate email detected during login:", user.email)
-            // Sign out the user and redirect to sign in page
-            const { getFirebaseAuth } = await import("@/lib/firebase")
-            const auth = await getFirebaseAuth()
-            if (auth) {
-              await auth.signOut()
-            }
-            setRedirectTo('/signin?error=duplicate-email')
-            return
-          }
-        }
+        // if (user.email) {
+        //   const emailExists = await checkEmailExists(user.email)
+        //   if (emailExists) {
+        //     logger.warn("Duplicate email detected during login:", user.email)
+        //     // Sign out the user and redirect to sign in page
+        //     const { getFirebaseAuth } = await import("@/lib/firebase")
+        //     const auth = await getFirebaseAuth()
+        //     if (auth) {
+        //       await auth.signOut()
+        //     }
+        //     setRedirectTo('/signin?error=duplicate-email')
+        //     return
+        //   }
+        // }
         
-        logger.authLog("No duplicate email found, creating new user and setting redirect to onboarding")
+        // logger.authLog("No duplicate email found, creating new user and setting redirect to onboarding")
         
         // Create user document for new users
         const { setDoc } = await import("firebase/firestore")

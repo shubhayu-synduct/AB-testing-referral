@@ -116,17 +116,51 @@ export default function Onboarding() {
     }
   }, [user, authLoading])
 
-  // Handle redirect to waitlist after 5-second delay
+  // Handle redirect to waitlist after 5-second delay for non-medical users
+  // Handle redirect to dashboard for medical professionals
   useEffect(() => {
     if (redirectTimeoutRef.current) {
       clearTimeout(redirectTimeoutRef.current);
     }
 
-    if (registrationSuccess && !isMedicalProfessional) {
-      redirectTimeoutRef.current = setTimeout(() => {
-        logger.info("5-second delay completed, redirecting non-medical user to waitlist")
-        router.push('/waitlist')
-      }, 5000) // 5 seconds delay to ensure Firebase data is saved
+    if (registrationSuccess) {
+      if (!isMedicalProfessional) {
+        // Non-medical users: redirect to waitlist after 5 seconds
+        redirectTimeoutRef.current = setTimeout(() => {
+          logger.info("5-second delay completed, redirecting non-medical user to waitlist")
+          router.push('/waitlist')
+        }, 5000) // 5 seconds delay to ensure Firebase data is saved
+      } else {
+        // Medical professionals: redirect to dashboard immediately after sending welcome email
+        const sendWelcomeEmailAndRedirect = async () => {
+          try {
+            // Send Day 1 welcome email
+            const response = await fetch('/api/send-welcome-email', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                userName: user?.displayName || formData.firstName || 'Healthcare Professional',
+                userEmail: user?.email || ''
+              })
+            });
+
+            if (response.ok) {
+              logger.info("Day 1 welcome email sent successfully");
+            } else {
+              logger.error("Failed to send welcome email");
+            }
+          } catch (error) {
+            logger.error("Error sending welcome email:", error);
+          }
+
+          // Navigate to dashboard regardless of email success/failure
+          router.push('/dashboard');
+        };
+
+        sendWelcomeEmailAndRedirect();
+      }
     }
 
     return () => {
@@ -134,7 +168,7 @@ export default function Onboarding() {
         clearTimeout(redirectTimeoutRef.current);
       }
     };
-  }, [registrationSuccess, isMedicalProfessional, router]);
+  }, [registrationSuccess, isMedicalProfessional, router, user, formData.firstName]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -142,6 +176,10 @@ export default function Onboarding() {
       ...prev,
       [name]: value
     }))
+  }
+
+  const handleTermsAgreement = (checked: boolean) => {
+    setTermsAgreed(checked)
   }
 
   const validateRequiredFields = () => {
@@ -216,11 +254,17 @@ export default function Onboarding() {
       
       setIsMedicalProfessional(isMedicalProfessional)
 
+      // Create consent text
+      const consentText = `${formData.firstName}${formData.lastName ? ` ${formData.lastName}` : ''} has agreed to use DR. INFO as an informational and educational tool in accordance with the terms and conditions.`
+
       // Create user profile data
       const userProfileData = {
         email: user.email,
         onboardingCompleted: true,
         updatedAt: new Date().toISOString(),
+        // Add consent data
+        consent_of_use: consentText,
+        consentAgreedAt: new Date().toISOString(),
         // Add additional profile fields
         displayName: formData.lastName ? `${formData.firstName} ${formData.lastName}` : formData.firstName,
         firstName: formData.firstName,
@@ -639,7 +683,11 @@ export default function Onboarding() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <div className="flex justify-center space-x-1 mb-4">
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+          </div>
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
@@ -652,84 +700,16 @@ export default function Onboarding() {
   }
 
   if (registrationSuccess && isMedicalProfessional) {
+    // Show loading state while redirecting to dashboard
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6 pb-8">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-4 ">
-            <div className="flex items-center justify-center mb-2">
-              <Image
-                src="/full-icon.svg"
-                alt="DR. INFO Logo"
-                width={200}
-                height={57}
-                className="text-white"
-              />
-            </div>
-            <h2 className="font-semibold text-[#223258] mt-6 mb-6 text-[20px] sm:text-[20px] font-dm-sans">
-              Complete Registration
-            </h2>
-            {/* Step Indicator with both steps checked */}
-            <div className="flex items-center justify-center mb-6">
-              <div className="flex items-center">
-                <div className="flex items-center justify-center rounded-full font-medium transition-all duration-200 border border-[#3771FE]/50 font-dm-sans bg-[#3771FE] text-white w-8 h-8 text-base">
-                  <Check size={20} strokeWidth={3} className="text-white" />
-                </div>
-                <div className="h-0.5 w-10 bg-[#3771FE]" />
-                <div className="flex items-center justify-center rounded-full font-medium transition-all duration-200 border border-[#3771FE]/50 font-dm-sans bg-[#3771FE] text-white w-8 h-8 text-base">
-                  <Check size={20} strokeWidth={3} className="text-white" />
-                </div>
-              </div>
-            </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="flex justify-center space-x-1 mb-4">
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
           </div>
-          <div className="bg-[#F4F7FF] shadow-lg border border-[#3771FE]/50 px-8 py-8 rounded-[5px] text-center">
-            <div className="flex flex-col items-center mb-4">
-              <Image
-                src="/password-success.svg"
-                alt="Success"
-                width={40}
-                height={40}
-                className="mb-2"
-              />
-              <h3 className="text-xl font-semibold text-[#223258] mb-2" style={{ fontFamily: 'DM Sans', fontSize: 20, fontWeight: 550 }}>
-                Registration Complete!
-              </h3>
-              <p className="text-[#223258] mb-4" style={{ fontFamily: 'DM Sans', fontWeight: 400 }}>
-                Your registration is now complete. You can now access the full features of DR. INFO.
-              </p>
-            </div>
-            <button
-              className="w-full bg-[#C6D7FF]/50 text-[#3771FE] py-2 px-4 border border-[#3771FE]/50 rounded-[5px] font-dm-sans font-medium hover:bg-[#C6D7FF]/70 transition-colors duration-200"
-              style={{ fontFamily: 'DM Sans', fontSize: 14 }}
-              onClick={async () => {
-                try {
-                  // Send Day 1 welcome email
-                  const response = await fetch('/api/send-welcome-email', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      userName: user?.displayName || formData.firstName || 'Healthcare Professional',
-                      userEmail: user?.email || ''
-                    })
-                  });
-
-                  if (response.ok) {
-                    logger.info("Day 1 welcome email sent successfully");
-                  } else {
-                    logger.error("Failed to send welcome email");
-                  }
-                } catch (error) {
-                  logger.error("Error sending welcome email:", error);
-                }
-
-                // Navigate to dashboard regardless of email success/failure
-                router.push('/dashboard');
-              }}
-            >
-              Let's Get Started...
-            </button>
-          </div>
+          <p className="text-gray-600">Redirecting to dashboard...</p>
         </div>
       </div>
     )
@@ -1166,12 +1146,12 @@ export default function Onboarding() {
                       type="checkbox"
                       id="terms-agreement"
                       checked={termsAgreed}
-                      onChange={(e) => setTermsAgreed(e.target.checked)}
+                      onChange={(e) => handleTermsAgreement(e.target.checked)}
                       className="mt-0.5 w-2 h-2 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       style={{ backgroundColor: !termsAgreed ? '#DEE8FF' : undefined, minWidth: '20px', minHeight: '20px' }}
                     />
                     <label htmlFor="terms-agreement" className="cursor-pointer" style={{ fontFamily: 'DM Sans', fontSize: '12px', fontWeight: 400, color: '#000' }}>
-                      I agree to the <a href="https://drinfo.ai/termsofservice/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Terms of Use</a> and <a href="https://drinfo.ai/privacy-policy/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Privacy Policy</a>
+                      I agree to the <a href="https://drinfo.ai/termsofservice/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Terms of Use</a> and <a href="https://drinfo.ai/privacy-policy/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Privacy Policy</a> and confirm that I will only use DR. INFO as an informational and educational tool in accordance with the terms and conditions.
                     </label>
               </div>
               {error && <div className="bg-red-50 text-red-600 p-2 rounded-[5px] text-sm">{error}</div>}
