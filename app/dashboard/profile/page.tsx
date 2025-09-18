@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { unstable_noStore as noStore } from 'next/cache';
 import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirebaseFirestore } from "@/lib/firebase";
@@ -10,7 +10,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { CleanupService } from "@/lib/cleanup-service";
 
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   noStore(); // Disable static generation/prerendering
   
   const { user, loading: authLoading } = useAuth();
@@ -1331,4 +1331,16 @@ export default function ProfilePage() {
       )}
     </DashboardLayout>
   );
-} 
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    }>
+      <ProfilePageContent />
+    </Suspense>
+  );
+}

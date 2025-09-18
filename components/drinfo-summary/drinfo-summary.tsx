@@ -619,10 +619,12 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }
   }, [sessionId, isChatLoading, query, hasFetched, lastQuestion]);
 
-  // Single, working scroll effect for streaming content
+  const [shouldUseNextScroll, setShouldUseNextScroll] = useState(true);
+  
+  // Scroll to end during active session (when streaming)
   useEffect(() => {
-    // Only scroll during streaming or when messages change
-    if (status !== 'complete' && status !== 'complete_image' && messages.length > 0) {
+    if (lastQuestion && isStreaming) {
+      setShouldUseNextScroll(false);
       // Use requestAnimationFrame for smooth performance
       requestAnimationFrame(() => {
         // Scroll the content container to bottom
@@ -641,11 +643,14 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         }
       });
     }
-  }, [messages, status]); // Depend on messages and status
+  }, [lastQuestion, isStreaming]); // Depend on lastQuestion and isStreaming
 
-  // Always scroll to end after any new message (answer) is added
+  // Scroll to end when loading from history (not streaming)
   useEffect(() => {
-    if (messages.length > 0) {
+    // console.log('messages.length', messages.length);
+    // console.log('isStreaming', isStreaming);
+    // console.log('shouldUseNextScroll', shouldUseNextScroll);
+    if (messages.length > 0 && !isStreaming && shouldUseNextScroll) {
       // Use requestAnimationFrame for smooth performance
       requestAnimationFrame(() => {
         // Scroll the content container to bottom
@@ -664,7 +669,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         }
       });
     }
-  }, [messages]); // Only depend on messages
+  }, [messages.length, isStreaming, shouldUseNextScroll]); // Depend on messages, streaming, and shouldUseNextScroll
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -1092,6 +1097,36 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
 
       @media (prefers-reduced-motion: reduce) {
         .shimmer-text { animation: none; }
+      }
+
+      /* Hide scrollbars while maintaining scroll functionality */
+      .hide-scrollbar {
+        -ms-overflow-style: none;  /* Internet Explorer 10+ */
+        scrollbar-width: none;  /* Firefox */
+      }
+      
+      .hide-scrollbar::-webkit-scrollbar {
+        display: none;  /* Safari and Chrome */
+      }
+
+      /* Apply to main content areas */
+      .overflow-y-auto {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      
+      .overflow-y-auto::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* Apply to specific scrollable containers */
+      .flex-1.overflow-y-auto {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      
+      .flex-1.overflow-y-auto::-webkit-scrollbar {
+        display: none;
       }
     `;
     document.head.appendChild(style);
@@ -2335,6 +2370,12 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                             return !hasCitations;
                           })() && (
                             <div className="mt-4 sm:mt-6">
+                              {/* Disclaimer appears before shimmer animation (formatting phase) */}
+                              <div className="mb-4 text-center">
+                                <p className="text-sm text-gray-500 font-['DM_Sans'] italic leading-relaxed">
+                                  DR.INFO is an informational and educational tool.
+                                </p>
+                              </div>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                                 <div className="reference-skeleton h-[95px] sm:h-[105px] lg:h-[125px]" />
                                 <div className="reference-skeleton h-[95px] sm:h-[105px] lg:h-[125px]" />
@@ -2342,6 +2383,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                               </div>
                             </div>
                           )}
+
                           {(() => {
                             const shouldShowCitations = (msg.answer?.citations && Object.keys(msg.answer.citations).length > 0) || 
                               (activeCitations && Object.keys(activeCitations).length > 0);
@@ -2356,6 +2398,12 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                             return shouldShowCitations;
                           })() && (
                             <div className="mt-4 sm:mt-6">
+                              {/* Disclaimer appears above references when citations are shown (complete phase) */}
+                              <div className="mb-4 text-center">
+                                <p className="text-sm text-gray-500 font-['DM_Sans'] italic leading-relaxed">
+                                  DR.INFO is an informational and educational tool.
+                                </p>
+                              </div>
                               <p className="text-slate-500 text-xs sm:text-sm">
                                 Used {getCitationCount(msg.answer?.citations || activeCitations || {})} references
                               </p>
@@ -2488,31 +2536,61 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                             e.target.style.height = e.target.scrollHeight + 'px';
                           }}
                           placeholder="Ask a follow-up question..."
-                          className="w-full text-base md:text-[16px] text-[#223258] font-normal font-['DM_Sans'] outline-none resize-none min-h-[24px] max-h-[200px] overflow-y-auto"
-                          onKeyDown={(e) => e.key === 'Enter' && handleFollowUpQuestion(e as any)}
+                          className={`w-full text-base md:text-[16px] font-normal font-['DM_Sans'] outline-none resize-none min-h-[24px] max-h-[200px] overflow-y-auto ${
+                            isLoading || (status && status !== 'complete' && status !== 'complete_image') 
+                              ? 'text-gray-400 cursor-not-allowed bg-gray-50' 
+                              : 'text-[#223258]'
+                          }`}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !isLoading && (status === 'complete' || status === 'complete_image')) {
+                              handleFollowUpQuestion(e as any);
+                            }
+                          }}
                           rows={1}
                           style={{ height: '24px' }}
+                          disabled={isLoading || (status !== null && status !== 'complete' && status !== 'complete_image')}
                         />
                       </div>
                       <div className="flex justify-between items-center mt-2">
                         {/* Toggle switch for Acute/Research mode */}
-                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <label className={`flex items-center gap-2 select-none ${
+                          isLoading || (status && status !== 'complete' && status !== 'complete_image') 
+                            ? 'cursor-not-allowed opacity-50' 
+                            : 'cursor-pointer'
+                        }`}>
                           <input
                             type="checkbox"
                             checked={activeMode === 'instant'}
                             onChange={() => setActiveMode(activeMode === 'instant' ? 'research' : 'instant')}
                             className="toggle-checkbox hidden"
+                            disabled={isLoading || (status !== null && status !== 'complete' && status !== 'complete_image')}
                           />
-                          <span className={`w-10 h-6 flex items-center rounded-full p-1 duration-300 ease-in-out ${activeMode === 'instant' ? 'bg-blue-500' : 'bg-gray-300'}`}
+                          <span className={`w-10 h-6 flex items-center rounded-full p-1 duration-300 ease-in-out ${
+                            isLoading || (status && status !== 'complete' && status !== 'complete_image')
+                              ? 'bg-gray-200'
+                              : activeMode === 'instant' ? 'bg-blue-500' : 'bg-gray-300'
+                          }`}
                                 style={{ transition: 'background 0.3s' }}>
-                            <span className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ease-in-out ${activeMode === 'instant' ? 'translate-x-4' : ''}`}></span>
+                            <span className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ease-in-out ${
+                              isLoading || (status && status !== 'complete' && status !== 'complete_image')
+                                ? ''
+                                : activeMode === 'instant' ? 'translate-x-4' : ''
+                            }`}></span>
                           </span>
-                          <span className={`text-sm font-medium ${activeMode === 'instant' ? 'text-[#3771FE]' : 'text-gray-500'}`}
+                          <span className={`text-sm font-medium ${
+                            isLoading || (status && status !== 'complete' && status !== 'complete_image')
+                              ? 'text-gray-400'
+                              : activeMode === 'instant' ? 'text-[#3771FE]' : 'text-gray-500'
+                          }`}
                                 style={{ fontSize: '16px', fontFamily: 'DM Sans, sans-serif' }}>
                             Acute
                           </span>
                         </label>
-                        <button onClick={handleFollowUpQuestion} className="flex-shrink-0" disabled={isLoading}>
+                        <button 
+                          onClick={handleFollowUpQuestion} 
+                          className="flex-shrink-0" 
+                          disabled={isLoading || (status !== null && status !== 'complete' && status !== 'complete_image')}
+                        >
                           {isLoading ? (
                             <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                           ) : (

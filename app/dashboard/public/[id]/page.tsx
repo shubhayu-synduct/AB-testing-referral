@@ -680,6 +680,16 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
                         )}
                       </div>
                     )}
+                    
+      {/* Disclaimer for all assistant answers - only after streaming ends */}
+      {msg.type === 'assistant' && msg.content && (
+        <div className="mb-3 sm:mb-4 text-center">
+          <p className="text-sm text-gray-500 font-['DM_Sans'] italic leading-relaxed">
+            DR.INFO is an informational and educational tool.
+          </p>
+        </div>
+      )}
+
                     {msg.answer?.citations && Object.keys(msg.answer.citations).length > 0 && (
                       <div className="mt-4 sm:mt-6">
                         <p className="text-slate-500 text-xs sm:text-sm">
