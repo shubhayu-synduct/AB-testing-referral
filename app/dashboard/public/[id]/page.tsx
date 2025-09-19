@@ -681,14 +681,6 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
                       </div>
                     )}
                     
-      {/* Disclaimer for all assistant answers - only after streaming ends */}
-      {msg.type === 'assistant' && msg.content && (
-        <div className="mb-3 sm:mb-4 text-center">
-          <p className="text-sm text-gray-500 font-['DM_Sans'] italic leading-relaxed">
-            DR.INFO is an informational and educational tool.
-          </p>
-        </div>
-      )}
 
                     {msg.answer?.citations && Object.keys(msg.answer.citations).length > 0 && (
                       <div className="mt-4 sm:mt-6">
@@ -739,6 +731,15 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
           </ol>
         </div>
       )}
+
+      {/* Disclaimer at the bottom */}
+      <div className="w-full py-3 md:py-4 text-center text-xs text-gray-400 px-4">
+        <p>DR. INFO is an informational and educational tool.</p>
+        <p>Do not insert protected health information or personal data.</p>
+        <Link href="https://www.drinfo.ai/termsofservice/" className="text-black hover:text-[#3771FE] underline inline-block" target="_blank" rel="noopener noreferrer">
+          Terms and Conditions
+        </Link>
+      </div>
     </div>
   );
 }

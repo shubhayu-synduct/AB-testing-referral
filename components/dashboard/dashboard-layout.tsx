@@ -90,28 +90,22 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          const profile = userData?.profile || userData;
           
-          // Check if user has completed onboarding and has a profession
-          if (userData?.onboardingCompleted && profile?.occupation) {
-            // Define medical professions (these are allowed access)
-            const medicalProfessions = [
-              'Physician', 'Medical fellow', 'Medical consultant', 
-              'Medical intern/resident', 'Medical student', 'Dentist'
-            ];
+          // Check if user has completed onboarding
+          if (userData?.onboardingCompleted) {
+            // Check the waitlisted field directly from Firebase
+            const isWaitlisted = userData?.waitlisted === true;
             
-            const isMedicalProfessional = medicalProfessions.includes(profile.occupation);
-            
-            // If NOT a medical professional, redirect to waitlist
-            if (!isMedicalProfessional) {
-              console.log('Non-medical user detected, redirecting to waitlist');
+            // If user is waitlisted, redirect to waitlist
+            if (isWaitlisted) {
+              console.log('Waitlisted user detected, redirecting to waitlist');
               router.push('/waitlist');
             }
           }
         }
       } catch (err) {
-        console.error("Error checking user profession:", err);
-        logger.error("Error checking user profession:", err);
+        console.error("Error checking user waitlist status:", err);
+        logger.error("Error checking user waitlist status:", err);
         // On error, allow access (fail-safe)
       }
     };

@@ -17,6 +17,7 @@ export default function Onboarding() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [termsAgreed, setTermsAgreed] = useState(false)
+  const [isHealthcareProfessional, setIsHealthcareProfessional] = useState(false)
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -137,8 +138,62 @@ export default function Onboarding() {
     }))
   }
 
+  // Auto-check healthcare professional checkbox based on occupation
+  const handleOccupationChange = (occupation: string) => {
+    const medicalProfessions = [
+      'Physician',
+      'Medical fellow', 
+      'Medical consultant', 
+      'Medical intern/resident', 
+      'Dentist',
+      'Pharmacist',
+      'Advanced practice nurse',
+      'Clinical Researcher',
+    ]
+    
+    const isMedical = medicalProfessions.includes(occupation)
+    setIsHealthcareProfessional(isMedical)
+    
+    setFormData(prev => ({
+      ...prev,
+      occupation: occupation,
+      ...(occupation === "other" ? { otherOccupation: "" } : {})
+    }))
+  }
+
   const handleTermsAgreement = (checked: boolean) => {
     setTermsAgreed(checked)
+  }
+
+  const handleHealthcareProfessionalAgreement = (checked: boolean) => {
+    // Only allow interaction if a profession is selected
+    if (!formData.occupation) {
+      return
+    }
+    
+    const medicalProfessions = [
+      'Physician',
+      'Medical fellow', 
+      'Medical consultant', 
+      'Medical intern/resident', 
+      'Dentist',
+      'Pharmacist',
+      'Advanced practice nurse',
+      'Clinical Researcher',
+    ]
+    
+    const isMedical = medicalProfessions.includes(formData.occupation)
+    
+    if (isMedical) {
+      // If medical profession is selected, keep it checked and don't allow unchecking
+      return
+    } else {
+      // For non-medical professions, only allow unchecking, not checking
+      if (!checked) {
+        setIsHealthcareProfessional(false)
+      }
+      // Don't allow checking manually for non-medical professions
+    }
   }
 
   const validateRequiredFields = () => {
@@ -189,6 +244,26 @@ export default function Onboarding() {
       return
     }
 
+    // For non-medical professionals, they can still register but will be treated as non-medical
+    const medicalProfessions = [
+      'Physician',
+      'Medical fellow', 
+      'Medical consultant', 
+      'Medical intern/resident', 
+      'Dentist',
+      'Pharmacist',
+      'Advanced practice nurse',
+      'Clinical Researcher',
+    ]
+    
+    const isMedicalProfessional = medicalProfessions.includes(formData.occupation)
+    
+    // If they selected a medical profession but unchecked the checkbox, show error
+    if (isMedicalProfessional && !isHealthcareProfessional) {
+      setError("Please confirm that you are a healthcare professional to continue")
+      return
+    }
+
     setLoading(true)
     setError("")
 
@@ -201,16 +276,7 @@ export default function Onboarding() {
         throw new Error("Firestore not initialized")
       }
 
-      // Check if user is medical professional
-      const isMedicalProfessional = [
-        'Physician',
-        'Medical fellow', 
-        'Medical consultant', 
-        'Medical intern/resident', 
-        'Medical student',
-        'Dentist'
-      ].includes(formData.occupation)
-      
+      // Use the already determined medical professional status
       setIsMedicalProfessional(isMedicalProfessional)
 
       // Create consent text
@@ -220,6 +286,7 @@ export default function Onboarding() {
       const userProfileData = {
         email: user.email,
         onboardingCompleted: true,
+        waitlisted: !isMedicalProfessional, // true for non-medical professionals, false for medical professionals
         updatedAt: new Date().toISOString(),
         // Add consent data
         consent_of_use: consentText,
@@ -274,26 +341,30 @@ export default function Onboarding() {
       // Track onboarding completion
       track.onboardingCompleted(user.uid, undefined, formData.specialties)
       
-      // Send Day 1 welcome email
-      try {
-        const response = await fetch('/api/send-welcome-email', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userName: user?.displayName || formData.firstName || 'Healthcare Professional',
-            userEmail: user?.email || ''
-          })
-        });
+      // Send Day 1 welcome email only to medical professionals
+      if (isMedicalProfessional) {
+        try {
+          const response = await fetch('/api/send-welcome-email', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userName: user?.displayName || formData.firstName || 'Healthcare Professional',
+              userEmail: user?.email || ''
+            })
+          });
 
-        if (response.ok) {
-          logger.info("Day 1 welcome email sent successfully");
-        } else {
-          logger.error("Failed to send welcome email");
+          if (response.ok) {
+            logger.info("Day 1 welcome email sent successfully to medical professional");
+          } else {
+            logger.error("Failed to send welcome email");
+          }
+        } catch (error) {
+          logger.error("Error sending welcome email:", error);
         }
-      } catch (error) {
-        logger.error("Error sending welcome email:", error);
+      } else {
+        logger.info("Non-medical professional registered - no welcome email sent, user will be waitlisted");
       }
 
       // Dispatch a custom event to notify auth provider that onboarding is complete
@@ -464,6 +535,7 @@ export default function Onboarding() {
     { value: "Advanced practice nurse", label: "Advanced Practice Nurse" },
     { value: "Dentist", label: "Dentist" },
     { value: "Medical librarian", label: "Medical Librarian" },
+    { value: "Clinical Researcher", label: "Clinical Researcher" },
     { value: "other", label: "Other" },
   ];
 
@@ -788,11 +860,7 @@ export default function Onboarding() {
                              className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
                              style={{ fontSize: '12px', color: '#223258' }}
                              onClick={() => {
-                               setFormData(prev => ({
-                                 ...prev,
-                                 occupation: opt.value,
-                                 ...(opt.value === "other" ? { otherOccupation: "" } : {})
-                               }));
+                               handleOccupationChange(opt.value);
                                setShowProfessionDropdown(false);
                              }}
                            >
@@ -1120,11 +1188,42 @@ export default function Onboarding() {
               <div className="flex items-start space-x-2 mb-2">
                     <input
                       type="checkbox"
+                      id="healthcare-professional"
+                      checked={isHealthcareProfessional}
+                      onChange={(e) => handleHealthcareProfessionalAgreement(e.target.checked)}
+                      className={`mt-0.5 w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 ${
+                        !formData.occupation || ['Physician', 'Medical fellow', 'Medical consultant', 'Medical intern/resident', 'Dentist', 'Pharmacist', 'Advanced practice nurse', 'Clinical Researcher'].includes(formData.occupation) 
+                          ? 'cursor-not-allowed' 
+                          : isHealthcareProfessional ? 'cursor-pointer' : 'cursor-not-allowed'
+                      }`}
+                      style={{ 
+                        backgroundColor: !isHealthcareProfessional ? '#DEE8FF' : undefined, 
+                        minWidth: '12px', 
+                        minHeight: '12px',
+                        opacity: !formData.occupation || ['Physician', 'Medical fellow', 'Medical consultant', 'Medical intern/resident', 'Dentist', 'Pharmacist', 'Advanced practice nurse', 'Clinical Researcher'].includes(formData.occupation) ? 0.7 : 1
+                      }}
+                      disabled={!formData.occupation || ['Physician', 'Medical fellow', 'Medical consultant', 'Medical intern/resident', 'Dentist', 'Pharmacist', 'Advanced practice nurse', 'Clinical Researcher'].includes(formData.occupation)}
+                    />
+                    <label 
+                      htmlFor="healthcare-professional" 
+                      className={`${
+                        !formData.occupation || ['Physician', 'Medical fellow', 'Medical consultant', 'Medical intern/resident', 'Dentist', 'Pharmacist', 'Advanced practice nurse', 'Clinical Researcher'].includes(formData.occupation) 
+                          ? 'cursor-not-allowed' 
+                          : isHealthcareProfessional ? 'cursor-pointer' : 'cursor-not-allowed'
+                      }`} 
+                      style={{ fontFamily: 'DM Sans', fontSize: '12px', fontWeight: 400, color: '#000' }}
+                    >
+                      I confirm that I am a healthcare professional{isHealthcareProfessional && formData.occupation ? ` (${formData.occupation === "other" ? formData.otherOccupation : formData.occupation.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")})` : ''}.
+                    </label>
+              </div>
+              <div className="flex items-start space-x-2 mb-2">
+                    <input
+                      type="checkbox"
                       id="terms-agreement"
                       checked={termsAgreed}
                       onChange={(e) => handleTermsAgreement(e.target.checked)}
-                      className="mt-0.5 w-2 h-2 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      style={{ backgroundColor: !termsAgreed ? '#DEE8FF' : undefined, minWidth: '20px', minHeight: '20px' }}
+                      className="mt-0.5 w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      style={{ backgroundColor: !termsAgreed ? '#DEE8FF' : undefined, minWidth: '12px', minHeight: '12px' }}
                     />
                     <label htmlFor="terms-agreement" className="cursor-pointer" style={{ fontFamily: 'DM Sans', fontSize: '12px', fontWeight: 400, color: '#000' }}>
                       I agree to the <a href="https://drinfo.ai/termsofservice/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Terms of Use</a> and <a href="https://drinfo.ai/privacy-policy/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Privacy Policy</a> and confirm that I will only use DR. INFO as an informational and educational tool in accordance with the terms and conditions.

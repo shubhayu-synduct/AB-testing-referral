@@ -518,9 +518,10 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        <div className="w-full py-3 md:py-4 text-center text-xs md:text-sm text-gray-400 px-4">
+        <div className="w-full py-3 md:py-4 text-center text-xs text-gray-400 px-4">
+          <p>DR. INFO is an informational and educational tool.</p>
           <p>Do not insert protected health information or personal data.</p>
-          <Link href="https://synduct.com/terms-and-conditions/" className="text-black hover:text-[#3771FE] underline inline-block" target="_blank" rel="noopener noreferrer">
+          <Link href="https://www.drinfo.ai/termsofservice/" className="text-black hover:text-[#3771FE] underline inline-block" target="_blank" rel="noopener noreferrer">
             Terms and Conditions
           </Link>
         </div>
