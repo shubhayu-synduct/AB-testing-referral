@@ -2523,7 +2523,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
             {(searchPosition === "bottom" || chatHistory.length > 0 || streamedContent.mainSummary) && (
               <>
                 <div ref={inputAnchorRef} style={{ marginBottom: '120px sm:140px' }} />
-                <div className="sticky bottom-0 bg-gray-50 pt-2 pb-4 z-10">
+                <div className="sticky bottom-0 bg-gray-50 pt-2 pb-0 z-10 mt-0">
                   <div className="max-w-4xl mx-auto px-2 sm:px-4">
                     <div className="relative w-full bg-white rounded border-2 border-[#3771fe44] shadow-[0px_0px_11px_#0000000c] p-3 md:p-4 follow-up-question-search">
                       <div className="relative">
@@ -2603,7 +2603,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                         </button>
                       </div>
                     </div>
-                    <div className="w-full py-3 md:py-4 text-center text-xs md:text-sm text-gray-400 px-4">
+                    <div className="w-full py-3 md:py-4 text-center text-xs text-gray-400 px-4">
                       <p>DR. INFO is an informational and educational tool.</p>
                       <p>Do not insert protected health information or personal data.</p>
                         <Link href="https://synduct.com/terms-and-conditions/" className="text-black hover:text-[#3771FE] underline inline-block" target="_blank" rel="noopener noreferrer">
