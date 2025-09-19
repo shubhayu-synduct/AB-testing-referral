@@ -137,6 +137,10 @@ export default function Onboarding() {
     }))
   }
 
+  const handleTermsAgreement = (checked: boolean) => {
+    setTermsAgreed(checked)
+  }
+
   const validateRequiredFields = () => {
     const requiredFields = {
       firstName: "First Name",
@@ -209,11 +213,17 @@ export default function Onboarding() {
       
       setIsMedicalProfessional(isMedicalProfessional)
 
+      // Create consent text
+      const consentText = `${formData.firstName}${formData.lastName ? ` ${formData.lastName}` : ''} has agreed to use DR. INFO as an informational and educational tool in accordance with the terms and conditions.`
+
       // Create user profile data
       const userProfileData = {
         email: user.email,
         onboardingCompleted: true,
         updatedAt: new Date().toISOString(),
+        // Add consent data
+        consent_of_use: consentText,
+        consentAgreedAt: new Date().toISOString(),
         // Add additional profile fields
         displayName: formData.lastName ? `${formData.firstName} ${formData.lastName}` : formData.firstName,
         firstName: formData.firstName,
@@ -657,7 +667,11 @@ export default function Onboarding() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <div className="flex justify-center space-x-1 mb-4">
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+          </div>
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
@@ -1097,12 +1111,12 @@ export default function Onboarding() {
                       type="checkbox"
                       id="terms-agreement"
                       checked={termsAgreed}
-                      onChange={(e) => setTermsAgreed(e.target.checked)}
+                      onChange={(e) => handleTermsAgreement(e.target.checked)}
                       className="mt-0.5 w-2 h-2 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       style={{ backgroundColor: !termsAgreed ? '#DEE8FF' : undefined, minWidth: '20px', minHeight: '20px' }}
                     />
                     <label htmlFor="terms-agreement" className="cursor-pointer" style={{ fontFamily: 'DM Sans', fontSize: '12px', fontWeight: 400, color: '#000' }}>
-                      I agree to the <a href="https://drinfo.ai/termsofservice/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Terms of Use</a> and <a href="https://drinfo.ai/privacy-policy/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Privacy Policy</a>
+                      I agree to the <a href="https://drinfo.ai/termsofservice/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Terms of Use</a> and <a href="https://drinfo.ai/privacy-policy/" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-[#3771FE] transition-colors duration-200">Privacy Policy</a> and confirm that I will only use DR. INFO as an informational and educational tool in accordance with the terms and conditions.
                     </label>
               </div>
               {error && <div className="bg-red-50 text-red-600 p-2 rounded-[5px] text-sm">{error}</div>}
