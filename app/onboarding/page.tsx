@@ -32,7 +32,6 @@ export default function Onboarding() {
   })
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const [registrationSuccess, setRegistrationSuccess] = useState(false)
   const [autoFilledNames, setAutoFilledNames] = useState({ firstName: false, lastName: false })
   const [cookieConsent, setCookieConsent] = useState<any>(null)
   const [isMedicalProfessional, setIsMedicalProfessional] = useState(false)
@@ -129,59 +128,6 @@ export default function Onboarding() {
     }
   }, [user, authLoading])
 
-  // Handle redirect to waitlist after 5-second delay for non-medical users
-  // Handle redirect to dashboard for medical professionals
-  useEffect(() => {
-    if (redirectTimeoutRef.current) {
-      clearTimeout(redirectTimeoutRef.current);
-    }
-
-    if (registrationSuccess) {
-      if (!isMedicalProfessional) {
-        // Non-medical users: redirect to waitlist after 5 seconds
-        redirectTimeoutRef.current = setTimeout(() => {
-          logger.info("5-second delay completed, redirecting non-medical user to waitlist")
-          router.push('/waitlist')
-        }, 5000) // 5 seconds delay to ensure Firebase data is saved
-      } else {
-        // Medical professionals: redirect to dashboard immediately after sending welcome email
-        const sendWelcomeEmailAndRedirect = async () => {
-          try {
-            // Send Day 1 welcome email
-            const response = await fetch('/api/send-welcome-email', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                userName: user?.displayName || formData.firstName || 'Healthcare Professional',
-                userEmail: user?.email || ''
-              })
-            });
-
-            if (response.ok) {
-              logger.info("Day 1 welcome email sent successfully");
-            } else {
-              logger.error("Failed to send welcome email");
-            }
-          } catch (error) {
-            logger.error("Error sending welcome email:", error);
-          }
-
-          // Navigate to dashboard regardless of email success/failure
-          router.push('/dashboard');
-        };
-
-        sendWelcomeEmailAndRedirect();
-      }
-    }
-
-    return () => {
-      if (redirectTimeoutRef.current) {
-        clearTimeout(redirectTimeoutRef.current);
-      }
-    };
-  }, [registrationSuccess, isMedicalProfessional, router, user, formData.firstName]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -310,6 +256,7 @@ export default function Onboarding() {
 
       // Update user document
       await updateDoc(doc(db, "users", user.uid), userProfileData)
+      logger.info("User document updated with onboarding completion")
 
       // Add user to email automation system if not already added
       try {
@@ -327,15 +274,47 @@ export default function Onboarding() {
       // Track onboarding completion
       track.onboardingCompleted(user.uid, undefined, formData.specialties)
       
-      // Set registration success first for all users
-      setRegistrationSuccess(true)
-      
-      // Set flag to redirect non-medical users after 5-second delay
+      // Send Day 1 welcome email
+      try {
+        const response = await fetch('/api/send-welcome-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userName: user?.displayName || formData.firstName || 'Healthcare Professional',
+            userEmail: user?.email || ''
+          })
+        });
+
+        if (response.ok) {
+          logger.info("Day 1 welcome email sent successfully");
+        } else {
+          logger.error("Failed to send welcome email");
+        }
+      } catch (error) {
+        logger.error("Error sending welcome email:", error);
+      }
+
+      // Dispatch a custom event to notify auth provider that onboarding is complete
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('onboarding-completed', {
+          detail: { userId: user.uid, isMedicalProfessional }
+        }))
+      }
+
+      // Wait a moment for the auth state to potentially update
+      await new Promise(resolve => setTimeout(resolve, 200))
+
+      // Use window.location.href for a hard redirect to ensure we don't get caught in auth loops
       if (!isMedicalProfessional) {
-        // The redirect is now handled by the useEffect hook with 5-second delay
-        logger.info("Non-medical user registered, will redirect to waitlist after 5 seconds")
+        // Non-medical users go to waitlist
+        logger.info("Non-medical user registered, redirecting to waitlist")
+        window.location.href = '/waitlist'
       } else {
-        logger.info("Medical professional registered successfully")
+        // Medical professionals go directly to dashboard
+        logger.info("Medical professional registered successfully, redirecting to dashboard")
+        window.location.href = '/dashboard'
       }
 
     } catch (err: any) {
@@ -710,26 +689,7 @@ export default function Onboarding() {
     )
   }
 
-  if (registrationSuccess && !isMedicalProfessional) {
-    router.push('/waitlist')
-    return null
-  }
 
-  if (registrationSuccess && isMedicalProfessional) {
-    // Show loading state while redirecting to dashboard
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="flex justify-center space-x-1 mb-4">
-            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-          </div>
-          <p className="text-gray-600">Redirecting to dashboard...</p>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 sm:px-6 pb-4 sm:pb-8">

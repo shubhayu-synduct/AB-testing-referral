@@ -95,6 +95,8 @@ function ProfilePageContent() {
     // Check if tab parameter is set in URL
     const tabParam = searchParams.get('tab');
     if (tabParam === 'subscription') {
+      setActiveTab('subscription');
+    } else if (tabParam === 'profile') {
       setActiveTab('profile');
     }
     
@@ -410,29 +412,34 @@ function ProfilePageContent() {
         console.log(`Deleted ${deleteResult.deletedAuthUserCount} Firebase Auth user(s) with email ${userEmail}`);
         console.log(`Total accounts deleted: ${deleteResult.totalAccountsDeleted}`);
         
-        // Sign out to clear authentication cookies
-        await auth.signOut();
-        
-        // Perform comprehensive cleanup
-        await CleanupService.performCompleteCleanup(userUid, userEmail);
-        
-        // Reset local state
+        // Reset local state immediately
         setProfile(null);
         setShowDeleteModal(false);
         setDeleteConfirmation('');
+        
+        // Perform comprehensive cleanup (without redirect)
+        await CleanupService.performCompleteCleanup(userUid, userEmail);
         
         // Verify cleanup was successful
         const cleanupSuccessful = CleanupService.verifyCleanup();
         console.log('Cleanup verification:', cleanupSuccessful);
         
-        // The cleanup service will handle the redirect
-        // No need for manual redirect here
+        // Redirect to signup page (sign out will be handled there)
+        console.log('Redirecting to signup page...');
+        window.location.replace('/signup?deleted=true');
         
       }
     } catch (error) {
       console.error('Error deleting profile:', error);
       
-      // Even if there's an error, try to perform cleanup
+      // Show error message to user
+      alert('There was an error deleting your account. Please try again or contact support if the problem persists.');
+      
+      // Redirect to signup page even on error (before cleanup)
+      console.log('Redirecting to signup page after error...');
+      window.location.replace('/signup?deleted=true');
+      
+      // Even if there's an error, try to perform cleanup after redirect
       try {
         const auth = await getFirebaseAuth();
         const user = auth.currentUser;
@@ -442,9 +449,6 @@ function ProfilePageContent() {
       } catch (cleanupError) {
         console.error('Error during cleanup after deletion failure:', cleanupError);
       }
-      
-      // Show error message to user
-      alert('There was an error deleting your account. Please try again or contact support if the problem persists.');
     } finally {
       setDeleting(false);
     }

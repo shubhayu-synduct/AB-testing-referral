@@ -186,6 +186,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Protected routes and cross-tab sync remain the same
   // ... (keeping existing logic for protected routes and storage events) ...
   
+  // Listen for onboarding completion events
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const handleOnboardingCompleted = async (event: CustomEvent) => {
+      const { userId, isMedicalProfessional } = event.detail
+      const currentUser = userRef.current
+      
+      if (currentUser && currentUser.uid === userId) {
+        logger.authLog("Onboarding completion event received, re-checking user status")
+        // Force a re-check of the user's onboarding status
+        await checkUserOnboardingAndRedirect(currentUser)
+      }
+    }
+
+    window.addEventListener('onboarding-completed', handleOnboardingCompleted as EventListener)
+    
+    return () => {
+      window.removeEventListener('onboarding-completed', handleOnboardingCompleted as EventListener)
+    }
+  }, [])
+
   // Cross-tab auth sync effect
   useEffect(() => {
     if (typeof window === "undefined") return

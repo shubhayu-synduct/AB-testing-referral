@@ -38,11 +38,8 @@ export class CleanupService {
       // 6. Notify other tabs
       this.notifyOtherTabs(userUid, userEmail);
 
-      // 7. Clear global variables
+      // 7. Clear global variables (redirect handled by caller)
       this.clearGlobalVariables();
-
-      // 8. Force page reload to ensure clean state
-      this.forceCleanReload();
 
       logger.info(`Complete cleanup finished for user: ${userUid}`);
     } catch (error) {
