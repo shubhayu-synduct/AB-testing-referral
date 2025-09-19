@@ -256,6 +256,7 @@ export default function Onboarding() {
 
       // Update user document
       await updateDoc(doc(db, "users", user.uid), userProfileData)
+      logger.info("User document updated with onboarding completion")
 
       // Add user to email automation system if not already added
       try {
@@ -295,15 +296,25 @@ export default function Onboarding() {
         logger.error("Error sending welcome email:", error);
       }
 
-      // Redirect based on user type
+      // Dispatch a custom event to notify auth provider that onboarding is complete
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('onboarding-completed', {
+          detail: { userId: user.uid, isMedicalProfessional }
+        }))
+      }
+
+      // Wait a moment for the auth state to potentially update
+      await new Promise(resolve => setTimeout(resolve, 200))
+
+      // Use window.location.href for a hard redirect to ensure we don't get caught in auth loops
       if (!isMedicalProfessional) {
         // Non-medical users go to waitlist
         logger.info("Non-medical user registered, redirecting to waitlist")
-        router.push('/waitlist')
+        window.location.href = '/waitlist'
       } else {
         // Medical professionals go directly to dashboard
         logger.info("Medical professional registered successfully, redirecting to dashboard")
-        router.push('/dashboard')
+        window.location.href = '/dashboard'
       }
 
     } catch (err: any) {
