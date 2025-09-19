@@ -32,7 +32,6 @@ export default function Onboarding() {
   })
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const [registrationSuccess, setRegistrationSuccess] = useState(false)
   const [autoFilledNames, setAutoFilledNames] = useState({ firstName: false, lastName: false })
   const [cookieConsent, setCookieConsent] = useState<any>(null)
   const [isMedicalProfessional, setIsMedicalProfessional] = useState(false)
@@ -129,25 +128,6 @@ export default function Onboarding() {
     }
   }, [user, authLoading])
 
-  // Handle redirect to waitlist after 5-second delay
-  useEffect(() => {
-    if (redirectTimeoutRef.current) {
-      clearTimeout(redirectTimeoutRef.current);
-    }
-
-    if (registrationSuccess && !isMedicalProfessional) {
-      redirectTimeoutRef.current = setTimeout(() => {
-        logger.info("5-second delay completed, redirecting non-medical user to waitlist")
-        router.push('/waitlist')
-      }, 5000) // 5 seconds delay to ensure Firebase data is saved
-    }
-
-    return () => {
-      if (redirectTimeoutRef.current) {
-        clearTimeout(redirectTimeoutRef.current);
-      }
-    };
-  }, [registrationSuccess, isMedicalProfessional, router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -283,15 +263,37 @@ export default function Onboarding() {
       // Track onboarding completion
       track.onboardingCompleted(user.uid, undefined, formData.specialties)
       
-      // Set registration success first for all users
-      setRegistrationSuccess(true)
-      
-      // Set flag to redirect non-medical users after 5-second delay
+      // Send Day 1 welcome email
+      try {
+        const response = await fetch('/api/send-welcome-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userName: user?.displayName || formData.firstName || 'Healthcare Professional',
+            userEmail: user?.email || ''
+          })
+        });
+
+        if (response.ok) {
+          logger.info("Day 1 welcome email sent successfully");
+        } else {
+          logger.error("Failed to send welcome email");
+        }
+      } catch (error) {
+        logger.error("Error sending welcome email:", error);
+      }
+
+      // Redirect based on user type
       if (!isMedicalProfessional) {
-        // The redirect is now handled by the useEffect hook with 5-second delay
-        logger.info("Non-medical user registered, will redirect to waitlist after 5 seconds")
+        // Non-medical users go to waitlist
+        logger.info("Non-medical user registered, redirecting to waitlist")
+        router.push('/waitlist')
       } else {
-        logger.info("Medical professional registered successfully")
+        // Medical professionals go directly to dashboard
+        logger.info("Medical professional registered successfully, redirecting to dashboard")
+        router.push('/dashboard')
       }
 
     } catch (err: any) {
@@ -662,94 +664,7 @@ export default function Onboarding() {
     )
   }
 
-  if (registrationSuccess && !isMedicalProfessional) {
-    router.push('/waitlist')
-    return null
-  }
 
-  if (registrationSuccess && isMedicalProfessional) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6 pb-8">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-4 ">
-            <div className="flex items-center justify-center mb-2">
-              <Image
-                src="/full-icon.svg"
-                alt="DR. INFO Logo"
-                width={200}
-                height={57}
-                className="text-white"
-              />
-            </div>
-            <h2 className="font-semibold text-[#223258] mt-6 mb-6 text-[20px] sm:text-[20px] font-dm-sans">
-              Complete Registration
-            </h2>
-            {/* Step Indicator with both steps checked */}
-            <div className="flex items-center justify-center mb-6">
-              <div className="flex items-center">
-                <div className="flex items-center justify-center rounded-full font-medium transition-all duration-200 border border-[#3771FE]/50 font-dm-sans bg-[#3771FE] text-white w-8 h-8 text-base">
-                  <Check size={20} strokeWidth={3} className="text-white" />
-                </div>
-                <div className="h-0.5 w-10 bg-[#3771FE]" />
-                <div className="flex items-center justify-center rounded-full font-medium transition-all duration-200 border border-[#3771FE]/50 font-dm-sans bg-[#3771FE] text-white w-8 h-8 text-base">
-                  <Check size={20} strokeWidth={3} className="text-white" />
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-[#F4F7FF] shadow-lg border border-[#3771FE]/50 px-8 py-8 rounded-[5px] text-center">
-            <div className="flex flex-col items-center mb-4">
-              <Image
-                src="/password-success.svg"
-                alt="Success"
-                width={40}
-                height={40}
-                className="mb-2"
-              />
-              <h3 className="text-xl font-semibold text-[#223258] mb-2" style={{ fontFamily: 'DM Sans', fontSize: 20, fontWeight: 550 }}>
-                Registration Complete!
-              </h3>
-              <p className="text-[#223258] mb-4" style={{ fontFamily: 'DM Sans', fontWeight: 400 }}>
-                Your registration is now complete. You can now access the full features of DR. INFO.
-              </p>
-            </div>
-            <button
-              className="w-full bg-[#C6D7FF]/50 text-[#3771FE] py-2 px-4 border border-[#3771FE]/50 rounded-[5px] font-dm-sans font-medium hover:bg-[#C6D7FF]/70 transition-colors duration-200"
-              style={{ fontFamily: 'DM Sans', fontSize: 14 }}
-              onClick={async () => {
-                try {
-                  // Send Day 1 welcome email
-                  const response = await fetch('/api/send-welcome-email', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      userName: user?.displayName || formData.firstName || 'Healthcare Professional',
-                      userEmail: user?.email || ''
-                    })
-                  });
-
-                  if (response.ok) {
-                    logger.info("Day 1 welcome email sent successfully");
-                  } else {
-                    logger.error("Failed to send welcome email");
-                  }
-                } catch (error) {
-                  logger.error("Error sending welcome email:", error);
-                }
-
-                // Navigate to dashboard regardless of email success/failure
-                router.push('/dashboard');
-              }}
-            >
-              Let's Get Started...
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 sm:px-6 pb-4 sm:pb-8">
