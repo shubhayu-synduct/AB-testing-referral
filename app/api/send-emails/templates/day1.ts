@@ -136,10 +136,10 @@ export const day1Template = {
             <div class="card">
               <p class="greeting">Dear {{name}},</p>
               <p class="intro-text">You've just joined a growing community of physicians and students who want one thing: to spend less time searching, and more time treating.</p>
-              <p class="intro-text">DR. INFO is your AI-powered clinical assistant, built with physicians, for physicians. It distills vast, complex guidelines and literature into clear, referenced, and actionable insights so you can make evidence-based decisions faster and with more confidence.</p>
+              <p class="intro-text">DR. INFO is your AI-powered clinical knowledge assistant, built with physicians, for physicians. It distills vast, complex guidelines and literature into clear, referenced, and actionable insights so you can make evidence-based decisions faster and with more confidence.</p>
               
               <div style="margin-bottom: 24px;">
-                <h2 class="section-title">Whether you're in an emergency setting or researching chronic care, DR. INFO helps you:</h2>
+                <h2 class="section-title">DR. INFO helps you:</h2>
                 <ul class="feature-list">
                   <li>Ask any medical question and get a concise, guideline-backed answer in seconds</li>
                   <li>See instantly where the information comes from - full traceability, no black box</li>
@@ -151,8 +151,7 @@ export const day1Template = {
               <div style="text-align: center;">
                 <a href="https://app.drinfo.ai" class="button" style="display: inline-block; background: #214498; background-color: #214498; color: #ffffff; padding: 18px 48px; text-decoration: none; border-radius: 12px; margin: 20px 0; font-weight: 600; text-align: center; font-size: 16px; font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.4; border: 2px solid #214498; min-height: 44px; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">Start Using DR. INFO Now</a>
               </div>
-              
-              <p class="intro-text">We're excited to see how DR. INFO helps you provide better care to your patients.</p>
+            
               <p class="footer-text">Best regards,<br>The DR. INFO Team</p>
             </div>
           </div>

@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import Image from 'next/image';
 import { getCachedAuthStatus, UserAuthStatus } from '@/lib/background-auth';
 import { logger } from '@/lib/logger';
+import { SparkleIcon } from '@/components/ui/sparkle-icon';
 
 
 interface Drug {
@@ -146,46 +147,54 @@ export default function DrugInformationPage() {
           return transformedData.slice(0, 3); // Ensure max 3 EMA results
         })(),
         
-        // AI Suggestions (limited to 3 results) - Port 8000
+        // Gemini Drug Suggestions (limited to 3 results)
         (async () => {
           try {
-            const authStatus = await getCachedAuthStatus();
-            const { enhancedSearchDrugsAI } = await import('@/lib/authenticated-api');
-            const data = await enhancedSearchDrugsAI(term, 3, authStatus.database);
+            const response = await fetch('/api/suggestions/drugs', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ query: term }),
+            });
             
-            let transformedData = [];
-            
-            // Handle direct match
-            if (data.direct_match) {
-              transformedData.push({
-                brand_name: data.direct_match.name,
-                active_substance: data.direct_match.active_substance,
-                inn: [],
-                search_type: 'ai_suggestion'
-              });
+            if (!response.ok) {
+              throw new Error(`API request failed with status ${response.status}`);
             }
             
-            // Handle brand options
-            if (data.brand_options && data.brand_options.length > 0) {
-              const brandOptions = data.brand_options.slice(0, 2).map((drug: any) => ({
-                brand_name: drug.brand_name,
-                active_substance: drug.active_substance || [],
-                inn: drug.inn || [],
-                search_type: 'ai_suggestion'
-              }));
-              transformedData = [...transformedData, ...brandOptions];
+            const data = await response.json();
+            
+            if (data.error) {
+              throw new Error(data.error);
             }
             
-            return transformedData.slice(0, 3);
-          } catch (error) {
-            // AI fallback suggestions
-            return [
-              `${term}`,
-              `${term} tablets`,
-              `${term} injection`
-            ].slice(0, 3).map(suggestion => ({
+            const suggestions = data.suggestions || [];
+            
+            return suggestions.slice(0, 3).map((suggestion: string) => ({
               brand_name: suggestion,
-              active_substance: ['AI Suggestion'],
+              active_substance: ['Drug Suggestion'],
+              inn: [],
+              search_type: 'ai_suggestion'
+            }));
+          } catch (error) {
+            logger.error('Gemini drug suggestions failed:', error);
+            // Fallback to real drug suggestions
+            const lowerTerm = term.toLowerCase();
+            let fallbackSuggestions;
+            
+            if (lowerTerm.includes('asp')) {
+              fallbackSuggestions = ['aspirin', 'aspartame', 'asparagine'];
+            } else if (lowerTerm.includes('para')) {
+              fallbackSuggestions = ['paracetamol', 'paroxetine', 'paracetamol/codeine'];
+            } else if (lowerTerm.includes('met')) {
+              fallbackSuggestions = ['metformin', 'metoprolol', 'metronidazole'];
+            } else {
+              fallbackSuggestions = ['acetaminophen', 'ibuprofen', 'aspirin'];
+            }
+            
+            return fallbackSuggestions.slice(0, 3).map(suggestion => ({
+              brand_name: suggestion,
+              active_substance: ['Drug Suggestion'],
               inn: [],
               search_type: 'ai_suggestion'
             }));
@@ -433,9 +442,8 @@ export default function DrugInformationPage() {
   const handleSearch = () => {
     if (searchTerm.trim() === '') return;
     
-    // Show search results (both EMA and AI)
-    setShowRecommendations(true);
-    fetchSearchResults(searchTerm);
+    // Navigate to AI results page with the search query
+    router.push(`/ai-results?q=${encodeURIComponent(searchTerm.trim())}`);
   };
 
   // Removed useEffect for AI mode changes since we now show unified results
@@ -486,7 +494,9 @@ export default function DrugInformationPage() {
         <div className="flex flex-col md:flex-row justify-center items-center mb-0 md:mb-[20px]">
           <div className="text-center mb-4 md:mb-0">
             <h1 className="hidden md:block text-[36px] font-semibold text-[#214498] mb-[4px] mt-0 font-['DM_Sans'] font-[600]">Drug Information</h1>
-            <p className="hidden md:block text-gray-600 text-[16px] mt-0">European Medicines Agency approved drug information</p>
+            <p className="hidden md:block text-[14px] md:text-[16px] text-[#64748B] font-['DM_Sans'] mt-2">
+              Drug insights from EMA and AI literature summaries
+            </p>
           </div>
           <div>
             
@@ -495,14 +505,14 @@ export default function DrugInformationPage() {
         
 
 
-        <div className="relative mb-4 md:mb-8" ref={searchContainerRef}>
+        <div className="relative mb-6 md:mb-10" ref={searchContainerRef}>
           {/* Unified search with gradient border */}
           <div className="absolute inset-0 w-full max-w-[1118px] mx-auto rounded-lg p-[2px] pointer-events-none">
-            <div className="w-full h-full rounded-lg bg-gradient-to-r from-[#6366f1]/[0.4] via-[#3b82f6]/[0.6] to-[#6366f1]/[0.4] animate-[border-flow_3s_ease-in-out_infinite] bg-[length:200%_100%]" />
+            <div className="w-full h-full rounded-lg bg-gradient-to-r from-[#3771FE]/[0.4] via-[#2563eb]/[0.6] to-[#3771FE]/[0.4] animate-[border-flow_3s_ease-in-out_infinite] bg-[length:200%_100%]" />
           </div>
-          <div className="flex items-center border-[2.7px] rounded-lg h-[56px] md:h-[69px] w-full max-w-[1118px] mx-auto pr-3 md:pr-4 bg-white transition-all duration-300 relative z-10 border-[#6366f1]/[0.3] shadow-[0_0_12px_rgba(99,102,241,0.2)]">
+          <div className="flex items-center border-[2.7px] rounded-lg h-[48px] md:h-[56px] w-full max-w-[1118px] mx-auto pr-3 md:pr-4 bg-white transition-all duration-300 relative z-10 border-[#3771FE]/[0.27] shadow-[0_0_12px_rgba(55,113,254,0.2)]">
             <div className="pl-3 md:pl-4 flex items-center">
-              <Search className="stroke-[1.5] w-[18px] h-[18px] md:w-[20px] md:h-[20px] transition-colors duration-300 text-[#6366f1]" fill="none" />
+              <Search className="stroke-[1.5] w-[18px] h-[18px] md:w-[20px] md:h-[20px] transition-colors duration-300 text-[#3771FE]" fill="none" />
             </div>
             <input
               ref={searchInputRef}
@@ -536,13 +546,13 @@ export default function DrugInformationPage() {
 
             
             <button 
-              className="flex items-center justify-center border-none bg-transparent relative ml-1 md:ml-2 hover:opacity-80 transition-opacity text-[#6366f1]"
+              className="flex items-center justify-center border-none bg-transparent relative ml-2 md:ml-3 hover:opacity-80 transition-opacity text-[#6366f1] p-1"
               onClick={handleSearch}
             >
               <img 
                 src="/search.svg" 
                 alt="Search" 
-                className="w-[40px] h-[40px] md:w-[48px] md:h-[48px]"
+                className="w-[36px] h-[36px] md:w-[40px] md:h-[40px]"
               />
             </button>
           </div>
@@ -592,14 +602,24 @@ export default function DrugInformationPage() {
                         </>
                       )}
                     </div>
-                    <span className={`px-2 py-1 rounded-full text-[10px] font-['DM_Sans'] font-semibold uppercase ${
+                    <span className={`px-2 py-1 rounded-full text-[14px] font-['DM_Sans'] font-semibold uppercase ${
                       drug.search_type === 'ai_suggestion'
                         ? 'bg-[#e3f2fd] text-[#1565c0] border border-[#bbdefb]'
                         : drug.search_type === 'ai_search'
                         ? 'bg-[#fff3cd] text-[#856404] border border-[#ffeaa7]' 
                         : 'bg-[#d4edda] text-[#155724] border border-[#c3e6cb]'
                     }`}>
-                      {drug.search_type === 'ai_suggestion' ? 'AI' : drug.search_type === 'ai_search' ? 'AI' : 'EMA'}
+                      {drug.search_type === 'ai_suggestion' ? (
+                        <div className="flex items-center">
+                          <span className="mr-1">AI</span>
+                          <SparkleIcon className="w-[14px] h-[14px]" fill="currentColor" />
+                        </div>
+                      ) : drug.search_type === 'ai_search' ? (
+                        <div className="flex items-center">
+                          <span className="mr-1">AI</span>
+                          <SparkleIcon className="w-[14px] h-[14px]" fill="currentColor" />
+                        </div>
+                      ) : 'EMA'}
                     </span>
                   </div>
                 </div>
@@ -607,6 +627,13 @@ export default function DrugInformationPage() {
             </div>
           )}
         </div>
+         
+         {/* Explanatory text for alphabet navigation */}
+         <div className="w-full max-w-[1118px] mx-auto mb-4">
+           <p className="text-[14px] md:text-[16px] text-[#64748B] font-['DM_Sans'] text-center">
+             List of EMA drugs
+           </p>
+         </div>
         
         {/* Alphabet navigation bar */}
         <div className="flex justify-start w-full mb-8">

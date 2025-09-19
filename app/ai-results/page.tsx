@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { ArrowLeft, Search, ExternalLink, Copy, CheckCircle, X, Check, ThumbsUp, ThumbsDown, Mail, Share2, RotateCcw, Download, ChevronDown, ChevronUp, User, Bot, Plus, Loader2, AlertCircle } from 'lucide-react';
+import { SparkleIcon } from '@/components/ui/sparkle-icon';
 import { logger } from '@/lib/logger';
 import { useAuth } from '@/hooks/use-auth';
 import { fetchDrugSummary, sendDrugFollowUpQuestion, DrugSummaryData } from '@/lib/drug-summary-service';
@@ -19,6 +21,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 import { marked } from 'marked';
 import { formatWithCitations, formatWithDummyCitations } from '@/lib/formatWithCitations';
+import { getCachedAuthStatus } from '@/lib/background-auth';
 
 interface Citation {
   id: string;
@@ -90,6 +93,13 @@ function AIResultsContent() {
   
   // UI state
   const [followUpQuestion, setFollowUpQuestion] = useState('');
+  
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showRecommendations, setShowRecommendations] = useState(false);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState(false);
   const [showCitationsSidebar, setShowCitationsSidebar] = useState(false);
@@ -125,6 +135,8 @@ function AIResultsContent() {
     if (sessionId && user) {
       loadChatSession();
     } else if (query) {
+      // Clear previous messages and start new search
+      setMessages([]);
       // Create new session for direct query
       const newSessionId = uuidv4();
       router.replace(`/ai-results?q=${encodeURIComponent(query)}&sessionId=${newSessionId}`);
@@ -254,8 +266,8 @@ function AIResultsContent() {
           setMessages(loadedMessages);
         }
       } else if (query) {
-        // Start new search if no session exists
-        await handleSearch(query);
+        // Start new search if no session exists - clear previous messages
+        await handleSearch(query, true);
       }
     } catch (error) {
       console.error('Error loading chat session:', error);
@@ -288,7 +300,7 @@ function AIResultsContent() {
   };
 
   // Handle search
-  const handleSearch = async (searchQuery: string) => {
+  const handleSearch = async (searchQuery: string, clearPrevious: boolean = false) => {
     if (!searchQuery.trim()) return;
     
     const userMessage: Message = {
@@ -306,7 +318,8 @@ function AIResultsContent() {
       isStreaming: true
     };
 
-    const newMessages = [...messages, userMessage, assistantMessage];
+    // If clearPrevious is true, start with empty messages array, otherwise append to existing
+    const newMessages = clearPrevious ? [userMessage, assistantMessage] : [...messages, userMessage, assistantMessage];
     setMessages(newMessages);
     setIsStreaming(true);
     setStreamedContent('');
@@ -452,7 +465,189 @@ function AIResultsContent() {
     };
   };
 
+  // Fetch unified suggestions (both EMA drugs and AI suggestions) for autocomplete
+  const fetchAISuggestions = async (term: string) => {
+    logger.debug('fetchAISuggestions called with:', term);
+    if (term.trim() === '') {
+      setRecommendations([]);
+      setShowRecommendations(false);
+      return;
+    }
+    setShowRecommendations(true);
+    
+    try {
+      // Fetch both EMA drugs and AI suggestions simultaneously
+      const [emaResults, aiResults] = await Promise.allSettled([
+        // EMA Drug Search (limited to 3 results) - Port 8002
+        (async () => {
+          const authStatus = await getCachedAuthStatus();
+          const { enhancedSearchDrugs } = await import('@/lib/authenticated-api');
+          const data = await enhancedSearchDrugs(term, 3, authStatus.database);
+          
+          let transformedData = [];
+          
+          // Handle direct brand match
+          if (data.direct_match) {
+            transformedData.push({
+              brand_name: data.direct_match.name,
+              active_substance: data.direct_match.active_substance,
+              inn: [],
+              search_type: 'direct_brand'
+            });
+          }
+          
+          // Handle brand options (limit to 2 to make room for AI suggestions)
+          if (data.brand_options && data.brand_options.length > 0) {
+            const brandOptions = data.brand_options.slice(0, 2).map((drug: any) => ({
+              brand_name: drug.brand_name,
+              active_substance: drug.active_substance || [],
+              inn: drug.inn || [],
+              search_type: drug.search_type || 'brand_option'
+            }));
+            transformedData = [...transformedData, ...brandOptions];
+          }
+          
+          return transformedData.slice(0, 3); // Ensure max 3 EMA results
+        })(),
+        
+        // Gemini Drug Suggestions (limited to 3 results)
+        (async () => {
+          try {
+            const response = await fetch('/api/suggestions/drugs', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ query: term }),
+            });
+            
+            if (!response.ok) {
+              throw new Error(`API request failed with status ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.error) {
+              throw new Error(data.error);
+            }
+            
+            const suggestions = data.suggestions || [];
+            
+            return suggestions.slice(0, 3).map((suggestion: string) => ({
+              brand_name: suggestion,
+              active_substance: ['Drug Suggestion'],
+              inn: [],
+              search_type: 'ai_suggestion'
+            }));
+          } catch (error) {
+            logger.error('Gemini drug suggestions failed:', error);
+            // Fallback to real drug suggestions
+            const lowerTerm = term.toLowerCase();
+            let fallbackSuggestions;
+            
+            if (lowerTerm.includes('asp')) {
+              fallbackSuggestions = ['aspirin', 'aspartame', 'asparagine'];
+            } else if (lowerTerm.includes('para')) {
+              fallbackSuggestions = ['paracetamol', 'paroxetine', 'paracetamol/codeine'];
+            } else if (lowerTerm.includes('met')) {
+              fallbackSuggestions = ['metformin', 'metoprolol', 'metronidazole'];
+            } else {
+              fallbackSuggestions = ['acetaminophen', 'ibuprofen', 'aspirin'];
+            }
+            
+            return fallbackSuggestions.slice(0, 3).map(suggestion => ({
+              brand_name: suggestion,
+              active_substance: ['Drug Suggestion'],
+              inn: [],
+              search_type: 'ai_suggestion'
+            }));
+          }
+        })()
+      ]);
+      
+      // Combine results - mix EMA and AI suggestions
+      let allRecommendations = [];
+      
+      // Add EMA results first
+      if (emaResults.status === 'fulfilled' && emaResults.value.length > 0) {
+        allRecommendations = [...allRecommendations, ...emaResults.value];
+      }
+      
+      // Add AI results
+      if (aiResults.status === 'fulfilled' && aiResults.value.length > 0) {
+        allRecommendations = [...allRecommendations, ...aiResults.value];
+      }
+      
+      // Limit total to 6 suggestions (3 EMA + 3 AI)
+      setRecommendations(allRecommendations.slice(0, 6));
+      
+    } catch (error) {
+      logger.error('Error fetching unified suggestions:', error);
+      
+      // Fallback: try EMA search with English database + AI fallback
+      try {
+        const { enhancedSearchDrugs } = await import('@/lib/authenticated-api');
+        const data = await enhancedSearchDrugs(term, 3, 'english');
+        
+        let fallbackData = [];
+        if (data.direct_match) {
+          fallbackData.push({
+            brand_name: data.direct_match.name,
+            active_substance: data.direct_match.active_substance,
+            inn: [],
+            search_type: 'direct_brand'
+          });
+        }
+        if (data.brand_options && data.brand_options.length > 0) {
+          const brandOptions = data.brand_options.slice(0, 2).map((drug: any) => ({
+            brand_name: drug.brand_name,
+            active_substance: drug.active_substance || [],
+            inn: drug.inn || [],
+            search_type: drug.search_type || 'brand_option'
+          }));
+          fallbackData = [...fallbackData, ...brandOptions];
+        }
+        
+        // Add AI fallback suggestions
+        const aiFallback = [
+          `${term}`,
+          `${term} generic`,
+          `${term} brand`
+        ].slice(0, 3).map(suggestion => ({
+          brand_name: suggestion,
+          active_substance: ['AI Suggestion'],
+          inn: [],
+          search_type: 'ai_suggestion'
+        }));
+        
+        setRecommendations([...fallbackData.slice(0, 3), ...aiFallback]);
+      } catch (fallbackError) {
+        logger.error('Unified suggestions fallback also failed:', fallbackError);
+        // Final fallback - just AI suggestions
+        const finalFallback = [
+          `${term}`,
+          `${term} generic`,
+          `${term} brand`
+        ].map(suggestion => ({
+          brand_name: suggestion,
+          active_substance: ['AI Suggestion'],
+          inn: [],
+          search_type: 'ai_suggestion'
+        }));
+        setRecommendations(finalFallback);
+      }
+    }
+  };
 
+  // Handle search from search bar
+  const handleSearchBarSubmit = () => {
+    if (!searchTerm.trim()) return;
+    
+    // Navigate to new AI results with the search term
+    const searchParams = new URLSearchParams();
+    searchParams.set('q', searchTerm.trim());
+    router.push(`/ai-results?${searchParams.toString()}`);
+  };
 
   // Handle showing all citations
   const handleShowAllCitations = (citations: Citation[]) => {
@@ -566,6 +761,32 @@ function AIResultsContent() {
       return true;
     }).length;
   };
+
+  // Fetch AI suggestions when search term changes (debounced)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm.trim()) {
+        fetchAISuggestions(searchTerm);
+      } else {
+        setRecommendations([]);
+        setShowRecommendations(false);
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  // Handle clicking outside the recommendations to close them
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowRecommendations(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Handle sharing
   const handleShare = async () => {
@@ -851,6 +1072,15 @@ function AIResultsContent() {
       html {
         scroll-behavior: smooth;
       }
+      
+      @keyframes border-flow {
+        0%, 100% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+      }
     `;
     document.head.appendChild(style);
     
@@ -863,24 +1093,125 @@ function AIResultsContent() {
     <DashboardLayout>
       {user && (
       <div className="flex-1 flex flex-col bg-gray-50">
-        {/* Top Bar */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex justify-between items-center">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span>Back</span>
-            </button>
-            <button
-              onClick={handleShare}
-              disabled={isSharing || messages.length === 0}
-              className="flex items-center space-x-2 px-4 py-2 bg-white border border-[#C8C8C8] text-[#223258] rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <img src="/Share icon.svg" alt="Share" className="w-5 h-5" />
-              <span>{isSharing ? 'Sharing...' : 'Share'}</span>
-            </button>
+        {/* Search Bar */}
+        <div className="sticky top-0 z-50 bg-white border-b border-gray-200 py-3">
+          <div className="max-w-4xl mx-auto px-2 sm:px-4">
+            <div className="relative mb-0" ref={searchContainerRef}>
+              {/* Unified search with gradient border */}
+              <div className="absolute inset-0 w-full max-w-4xl mx-auto rounded-lg p-[2px] pointer-events-none">
+                <div className="w-full h-full rounded-lg bg-gradient-to-r from-[#3771FE]/[0.4] via-[#2563eb]/[0.6] to-[#3771FE]/[0.4] animate-[border-flow_3s_ease-in-out_infinite] bg-[length:200%_100%]" />
+              </div>
+              <div className="flex items-center border-[2.7px] rounded-lg h-[52px] w-full max-w-4xl mx-auto pr-3 md:pr-4 bg-white transition-all duration-300 relative z-10 border-[#3771FE]/[0.27] shadow-[0_0_12px_rgba(55,113,254,0.2)]">
+                <button 
+                  onClick={() => router.back()}
+                  className="pl-3 md:pl-4 flex items-center hover:opacity-70 transition-opacity"
+                >
+                  <ArrowLeft className="stroke-[1.5] w-[18px] h-[18px] md:w-[20px] md:h-[20px] transition-colors duration-300 text-[#3771FE]" fill="none" />
+                </button>
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search drugs or ask medical questions..."
+                  className="flex-1 py-2 md:py-3 px-2 md:px-3 outline-none text-[#223258] font-['DM_Sans'] font-[400] text-[14px] md:text-[16px] leading-[100%] tracking-[0%] placeholder-[#9599A8] placeholder:font-['DM_Sans'] placeholder:text-[14px] md:placeholder:text-[16px]"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onFocus={() => {
+                    if (searchTerm.trim() !== '') {
+                      setShowRecommendations(true);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && searchTerm.trim() !== '') {
+                      handleSearchBarSubmit();
+                    }
+                  }}
+                  onBlur={(e) => {
+                    setTimeout(() => {
+                      if (searchContainerRef.current && !searchContainerRef.current.contains(document.activeElement)) {
+                        setShowRecommendations(false);
+                      } else {
+                        if (searchInputRef.current) {
+                          searchInputRef.current.focus();
+                        }
+                      }
+                    }, 100);
+                  }}
+                />
+                <button 
+                  className="flex items-center justify-center border-none bg-transparent relative ml-2 md:ml-3 hover:opacity-80 transition-opacity text-[#6366f1] p-1"
+                  onClick={handleSearchBarSubmit}
+                  disabled={!searchTerm.trim()}
+                >
+                  <Search className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Recommendations dropdown */}
+              {showRecommendations && recommendations.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-w-4xl mx-auto">
+                  {recommendations.map((drug, index) => (
+                    <div 
+                      key={index}
+                      className={`block px-4 py-3 hover:bg-blue-50 text-[#223258] font-['DM_Sans'] font-[400] text-[16px] leading-[100%] tracking-[0%] border-b border-gray-100 last:border-b-0 relative cursor-pointer ${
+                        drug.search_type === 'ai_suggestion' ? 'border-l-4 border-l-[#2196f3]' : drug.search_type === 'ai_search' ? 'border-l-4 border-l-[#ffa500]' : 'border-l-4 border-l-[#28a745]'
+                      }`}
+                      onClick={() => {
+                        if (drug.search_type === 'ai_suggestion') {
+                          // Navigate to AI results page for AI suggestions
+                          const searchParams = new URLSearchParams();
+                          searchParams.set('q', drug.brand_name);
+                          router.push(`/ai-results?${searchParams.toString()}`);
+                        } else {
+                          // Navigate to drug information page for EMA drugs (direct_brand, brand_option)
+                          router.push(`/drug-information/${encodeURIComponent(drug.brand_name)}`);
+                        }
+                        setShowRecommendations(false);
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          {drug.search_type === 'ai_suggestion' ? (
+                            <>
+                              <span className="font-semibold">{drug.brand_name}</span>
+                            </>
+                          ) : drug.search_type !== 'direct_brand' ? (
+                            <>
+                              <span className="font-semibold">{drug.active_substance?.join(', ') || drug.inn?.join(', ') || drug.brand_name}</span> <span className="text-gray-600">(<em>Brand Name:</em> <span className="font-semibold">{drug.brand_name}</span>)</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-semibold">{drug.brand_name}</span> <span className="text-gray-600">(<em>active substances:</em> <span className="font-semibold">{drug.active_substance?.join(', ') || drug.inn?.join(', ') || 'N/A'}</span>)</span>
+                            </>
+                          )}
+                        </div>
+                        <span className={`px-2 py-1 rounded-full text-[14px] font-['DM_Sans'] font-semibold uppercase ${
+                          drug.search_type === 'ai_suggestion'
+                            ? 'bg-[#e3f2fd] text-[#1565c0] border border-[#bbdefb]'
+                            : drug.search_type === 'ai_search'
+                            ? 'bg-[#fff3cd] text-[#856404] border border-[#ffeaa7]' 
+                            : 'bg-[#d4edda] text-[#155724] border border-[#c3e6cb]'
+                        }`}>
+                          {drug.search_type === 'ai_suggestion' ? (
+                            <div className="flex items-center">
+                              <span className="mr-1">AI</span>
+                              <SparkleIcon className="w-[14px] h-[14px]" fill="currentColor" />
+                            </div>
+                          ) : drug.search_type === 'ai_search' ? (
+                            <div className="flex items-center">
+                              <span className="mr-1">AI</span>
+                              <SparkleIcon className="w-[14px] h-[14px]" fill="currentColor" />
+                            </div>
+                          ) : 'EMA'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1184,6 +1515,15 @@ function AIResultsContent() {
           </div>
         </div>
       )} */}
+      
+      {/* Disclaimer Footer */}
+      <div className="w-full py-3 md:py-4 text-center text-xs text-gray-400 px-4">
+        <p>DR. INFO is an informational and educational tool.</p>
+        <p>Do not insert protected health information or personal data.</p>
+        <Link href="https://www.drinfo.ai/termsofservice/" className="text-black hover:text-[#3771FE] underline inline-block" target="_blank" rel="noopener noreferrer">
+          Terms and Conditions
+        </Link>
+      </div>
     </DashboardLayout>
   );
 }

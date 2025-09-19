@@ -9,6 +9,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { getFirebaseFirestore } from '@/lib/firebase'
 import { logger } from '@/lib/logger'
 import { CookieConsentBanner } from "@/components/CookieConsentBanner"
+import { toast } from "sonner"
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -26,6 +27,35 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   })
   const [showCookieBanner, setShowCookieBanner] = useState(false)
   const pathname = usePathname()
+
+  // Simple share function for current page
+  const handleShare = async () => {
+    try {
+      const currentUrl = window.location.href;
+      
+      if (navigator.share) {
+        // Use native share API if available (mobile)
+        await navigator.share({
+          title: 'DR. INFO',
+          text: 'Check out DR. INFO - AI-powered medical assistant',
+          url: currentUrl,
+        });
+      } else {
+        // Fallback: copy to clipboard
+        await navigator.clipboard.writeText(currentUrl);
+        toast.success('Link copied to clipboard!');
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success('Link copied to clipboard!');
+      } catch (clipboardError) {
+        toast.error('Failed to share');
+      }
+    }
+  };
 
   // Keep sidebar open/close state in sync with localStorage
   useEffect(() => {
@@ -249,12 +279,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
           {pathname !== '/dashboard' && (
             <button
-              onClick={() => router.push('/dashboard')}
+              onClick={handleShare}
               className="p-2 hover:bg-gray-100 rounded-md"
             >
               <Image 
-                src="/new-search.svg" 
-                alt="New Search" 
+                src="/Share icon.svg" 
+                alt="Share" 
                 width={28}
                 height={28}
                 className="w-7 h-7"
@@ -277,4 +307,4 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       {showCookieBanner && <CookieConsentBanner onConsentUpdate={updateFirebaseConsent} forceShow={true} />}
     </div>
   )
-} 
+}
