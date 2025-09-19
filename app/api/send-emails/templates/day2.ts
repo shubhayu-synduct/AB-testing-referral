@@ -141,9 +141,9 @@ export const day2Template = {
           <div class="card">
             <p class="greeting">Dear {{name}},</p>
             
-            <p class="intro-text">The secret to getting the best out of DR. INFO? It starts with how you ask. Just like in clinical practice, context matters.</p>
+            <p class="intro-text">The secret to getting the best out of DR. INFO? It starts with how you ask.</p>
             
-            <p class="intro-text">DR. INFO is designed to understand nuanced medical queries especially when you include clinical context like age, sex, symptoms, and relevant medical history.</p>
+            <p class="intro-text">Optimise search and retrieval by incorporating more detail in your query. For example, demographic factors or relevant background information so that results are tailored to the learning context.</p>
             
             <div class="example">
               <div class="example-content">
@@ -156,20 +156,14 @@ export const day2Template = {
             <p class="intro-text">But it doesn't stop there. Once DR. INFO gives an answer, you can continue the conversation using the "Ask a follow-up" field. It's the fastest way to:</p>
             
             <ul class="feature-list">
-              <li>Dive deeper into your current case</li>
-              <li>Add additional clinical information</li>
-              <li>Clarify or explore treatment options</li>
+              <li>Add more detail to your query for improved relevance</li>
+              <li>Read more from the guidelines regarding treatments.</li>
               <li>Shift focus - without starting over</li>
             </ul>
             
-            <p class="intro-text">It's like having a tireless consultant in your pocket - ready for round 2 (or 10).</p>
+            <p class="intro-text">It's like having a tireless consultant in your pocket.</p>
             
-            <div class="pro-tip">
-              <div class="pro-tip-content">
-                <h3>Pro tip</h3>
-                <p>Turn on Acute Mode to get streamlined answers built for acute care settings.</p>
-              </div>
-            </div>
+       
             
             <div style="text-align: center;">
               <a href="https://app.drinfo.ai" class="button" style="display: inline-block; background: #214498; background-color: #214498; color: #ffffff; padding: 18px 48px; text-decoration: none; border-radius: 12px; margin: 20px 0; font-weight: 600; text-align: center; font-size: 16px; font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.4; border: 2px solid #214498; min-height: 44px; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">Try a Smarter Prompt on DR. INFO Now</a>

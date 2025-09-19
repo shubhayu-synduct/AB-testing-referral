@@ -1,10 +1,111 @@
 import { track as vercelTrack } from '@vercel/analytics'
 import { trackEvent, trackEngagement, trackSearch, trackLogin, trackSignUp } from './gtag'
+import { doc, getDoc } from 'firebase/firestore'
+import { getFirebaseFirestore } from './firebase'
+
+
+// Function that requires userId parameter
+export const checkUserCookieConsent = async (userId: string) => {
+  try {
+    const db = getFirebaseFirestore();
+    const userDocRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userDocRef);
+    
+    // console.log(`Checking cookie consent for user: ${userId}`);
+    
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      const cookieConsent = userData.cookieConsent;
+            
+      if (cookieConsent) {
+         const analytics = cookieConsent.analytics;
+         console.log('Analytics consent:', analytics);
+         return {
+          analytics
+        }
+      } else {
+        console.log('No cookie consent data found, analytics: false');
+        return {
+          analytics: false
+        };
+      }
+    } else {
+      console.log('User document does not exist, analytics: false');
+      return {
+        analytics: false
+      };
+    }
+  } catch (error) {
+    console.error("Error checking cookie consent:", error);
+    return {
+      analytics: false,
+    };
+  }
+}
+
+// Function that automatically uses the current authenticated user
+export const checkCurrentUserCookieConsent = async () => {
+  try {
+    // Import Firebase Auth to get current user
+    const { getFirebaseAuth } = await import('./firebase');
+    const { onAuthStateChanged } = await import('firebase/auth');
+    
+    const auth = await getFirebaseAuth();
+    if (!auth) {
+      console.log('Auth not available');
+      return { analytics: false };
+    }
+
+    // Get current user
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      console.log('No authenticated user found');
+      return { analytics: false };
+    }
+
+    console.log(`Checking cookie consent for current user: ${currentUser.uid}`);
+    
+    // Use the existing function with the current user's ID
+    return await checkUserCookieConsent(currentUser.uid);
+    
+  } catch (error) {
+    console.error("Error checking current user cookie consent:", error);
+    return { analytics: false };
+  }
+}
+
+// Example usage - call this function when you need to check consent
+export const getCurrentUserConsent = async () => {
+  const result = await checkCurrentUserCookieConsent();
+  console.log('Current user analytics consent:', result.analytics);
+  return result;
+};
+
+// Global variable to store analytics consent
+export let globalAnalyticsConsent: boolean = false;
+
+// Function to update and get the global consent
+export const updateGlobalConsent = async () => {
+  const result = await checkCurrentUserCookieConsent();
+  globalAnalyticsConsent = result.analytics;
+  console.log('Global analytics consent updated:', globalAnalyticsConsent);
+  return result;
+};
+
+// Initialize on module load
+updateGlobalConsent().then(() => {
+  console.log("Global analytics consent:", globalAnalyticsConsent);
+});
+
+// Helper function to check if analytics should be tracked
+const shouldTrack = () => globalAnalyticsConsent;
 
 // Enhanced analytics that tracks to both Vercel and Google Analytics
 export const track = {
   // Search events
   searchQuery: (query: string, mode: string, hasUser: boolean, resultsCount?: number) => {
+    if (!shouldTrack()) return;
+    
     // Vercel Analytics
     vercelTrack('SearchQuerySubmitted', {
       queryLength: query.length,
@@ -25,6 +126,8 @@ export const track = {
 
   // Authentication events
   signUpAttempted: (method: string, provider?: string, emailProvided?: boolean) => {
+    if (!shouldTrack()) return;
+    
     // Vercel Analytics
     vercelTrack('SignUpAttempted', {
       method,
@@ -43,6 +146,7 @@ export const track = {
 
   signInAttempted: (method: string, provider?: string, emailProvided?: boolean) => {
     // Vercel Analytics
+    if (!shouldTrack()) return;
     vercelTrack('SignInAttempted', {
       method,
       ...(provider && { provider }),
@@ -62,6 +166,7 @@ export const track = {
   // Custom events
   customEvent: (eventName: string, parameters: Record<string, any>) => {
     // Vercel Analytics
+    if (!shouldTrack()) return;
     vercelTrack(eventName, parameters)
     
     // Google Analytics
@@ -71,6 +176,7 @@ export const track = {
   // User interaction events
   userInteraction: (interaction: string, element: string, page: string, details?: Record<string, any>) => {
     // Vercel Analytics
+    if (!shouldTrack()) return;
     vercelTrack('UserInteraction', {
       interaction,
       element,
@@ -89,6 +195,8 @@ export const track = {
 
   // Conversion events
   conversion: (conversionType: string, value?: number, currency?: string, details?: Record<string, any>) => {
+    if (!shouldTrack()) return;
+    
     // Vercel Analytics
     vercelTrack('Conversion', {
       conversion_type: conversionType,
@@ -108,6 +216,7 @@ export const track = {
 
   // Error tracking
   error: (errorType: string, errorMessage: string, page: string, details?: Record<string, any>) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('Error', {
       error_type: errorType,
@@ -127,6 +236,7 @@ export const track = {
 
   // ===== PAGE EVENTS =====
   pageViewed: (page: string, user: string, userCountry?: string, timestamp?: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('PageViewed', {
       page,
@@ -146,6 +256,7 @@ export const track = {
 
   // ===== AUTHENTICATION EVENTS =====
   userSignupInitiated: (method: string, provider?: string, emailProvided?: boolean) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('UserSignupInitiated', {
       method,
@@ -163,6 +274,7 @@ export const track = {
 
   userSignupCompleted: (method: string, provider?: string, userId?: string) => {
     // Vercel Analytics
+    if (!shouldTrack()) return;
     vercelTrack('UserSignupCompleted', {
       method,
       ...(provider && { provider }),
@@ -179,12 +291,14 @@ export const track = {
 
   userEmailVerificationSent: (email: string, method: string) => {
     // Vercel Analytics
+    if (!shouldTrack()) return;
     vercelTrack('UserEmailVerificationSent', {
       email,
       method
     })
     
     // Google Analytics
+    if (!shouldTrack()) return;
     trackEngagement('user_email_verification_sent', {
       email,
       method
@@ -193,6 +307,7 @@ export const track = {
 
   userEmailVerified: (email: string, method: string) => {
     // Vercel Analytics
+    if (!shouldTrack()) return;
     vercelTrack('UserEmailVerified', {
       email,
       method
@@ -207,6 +322,7 @@ export const track = {
 
   userLoginSuccessful: (method: string, provider?: string, userId?: string) => {
     // Vercel Analytics
+    if (!shouldTrack()) return;
     vercelTrack('UserLoginSuccessful', {
       method,
       ...(provider && { provider }),
@@ -223,6 +339,7 @@ export const track = {
 
   userLogout: (method: string, userId?: string) => {
     // Vercel Analytics
+    if (!shouldTrack()) return;
     vercelTrack('UserLogout', {
       method,
       ...(userId && { userId })
@@ -237,6 +354,7 @@ export const track = {
 
   userPasswordResetRequested: (email: string) => {
     // Vercel Analytics
+    if (!shouldTrack()) return;
     vercelTrack('UserPasswordResetRequested', {
       email
     })
@@ -249,6 +367,7 @@ export const track = {
 
   userPasswordResetCompleted: (email: string) => {
     // Vercel Analytics
+    if (!shouldTrack()) return;
     vercelTrack('UserPasswordResetCompleted', {
       email
     })
@@ -261,6 +380,7 @@ export const track = {
 
   // ===== ONBOARDING EVENTS =====
   onboardingStarted: (userId: string, method: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OnboardingStarted', {
       userId,
@@ -275,6 +395,7 @@ export const track = {
   },
 
   onboardingStepCompleted: (step: string, userId: string, stepNumber: number) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OnboardingStepCompleted', {
       step,
@@ -291,6 +412,7 @@ export const track = {
   },
 
   onboardingFieldFocused: (fieldName: string, userId: string, step: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OnboardingFieldFocused', {
       fieldName,
@@ -307,6 +429,7 @@ export const track = {
   },
 
   onboardingFieldChanged: (fieldName: string, userId: string, step: string, value?: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OnboardingFieldChanged', {
       fieldName,
@@ -325,6 +448,7 @@ export const track = {
   },
 
   onboardingFieldCompleted: (fieldName: string, userId: string, step: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OnboardingFieldCompleted', {
       fieldName,
@@ -341,6 +465,7 @@ export const track = {
   },
 
   onboardingFieldAbandoned: (fieldName: string, userId: string, step: string, timeSpent?: number) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OnboardingFieldAbandoned', {
       fieldName,
@@ -359,6 +484,7 @@ export const track = {
   },
 
   onboardingDropdownOpened: (dropdownName: string, userId: string, step: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OnboardingDropdownOpened', {
       dropdownName,
@@ -375,6 +501,7 @@ export const track = {
   },
 
   onboardingDropdownSelection: (dropdownName: string, selection: string, userId: string, step: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OnboardingDropdownSelection', {
       dropdownName,
@@ -393,6 +520,7 @@ export const track = {
   },
 
   onboardingSpecialtyAdded: (specialty: string, userId: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OnboardingSpecialtyAdded', {
       specialty,
@@ -407,6 +535,7 @@ export const track = {
   },
 
   onboardingSpecialtyRemoved: (specialty: string, userId: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OnboardingSpecialtyRemoved', {
       specialty,
@@ -421,6 +550,7 @@ export const track = {
   },
 
   onboardingTermsAccepted: (userId: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OnboardingTermsAccepted', {
       userId
@@ -433,6 +563,7 @@ export const track = {
   },
 
   onboardingValidationError: (fieldName: string, errorMessage: string, userId: string, step: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OnboardingValidationError', {
       fieldName,
@@ -451,6 +582,7 @@ export const track = {
   },
 
   onboardingCompleted: (userId: string, timeSpent?: number, specialties?: string[]) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OnboardingCompleted', {
       userId,
@@ -467,6 +599,7 @@ export const track = {
   },
 
   onboardingSkipped: (userId: string, step?: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OnboardingSkipped', {
       userId,
@@ -482,6 +615,7 @@ export const track = {
 
   // ===== NAVIGATION & INTERACTION EVENTS =====
   newSearchClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('NewSearchClicked', {
       userId,
@@ -496,6 +630,7 @@ export const track = {
   },
 
   medicalQuerySubmitted: (query: string, mode: string, userId: string, queryLength: number) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('MedicalQuerySubmitted', {
       query,
@@ -514,6 +649,7 @@ export const track = {
   },
 
   acuteModeEnabled: (userId: string, enabled: boolean) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('AcuteModeEnabled', {
       userId,
@@ -528,6 +664,7 @@ export const track = {
   },
 
   libraryClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('LibraryClicked', {
       userId,
@@ -542,6 +679,7 @@ export const track = {
   },
 
   guidelinesClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('GuidelinesClicked', {
       userId,
@@ -556,6 +694,7 @@ export const track = {
   },
 
   visualAbstractClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('VisualAbstractClicked', {
       userId,
@@ -570,6 +709,7 @@ export const track = {
   },
 
   authMethodSelected: (method: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('AuthMethodSelected', {
       method,
@@ -584,6 +724,7 @@ export const track = {
   },
 
   openReferencesSidebar: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OpenReferencesSidebar', {
       userId,
@@ -598,6 +739,7 @@ export const track = {
   },
 
   closeReferencesSidebar: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('CloseReferencesSidebar', {
       userId,
@@ -612,6 +754,7 @@ export const track = {
   },
 
   openGuidelineModal: (guidelineId: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OpenGuidelineModal', {
       guidelineId,
@@ -628,6 +771,7 @@ export const track = {
   },
 
   openDrugModal: (drugName: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('OpenDrugModal', {
       drugName,
@@ -644,6 +788,7 @@ export const track = {
   },
 
   referencesBackNavigated: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('ReferencesBackNavigated', {
       userId,
@@ -658,6 +803,7 @@ export const track = {
   },
 
   feedbackHelpfulSelected: (feedbackId: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('FeedbackHelpfulSelected', {
       feedbackId,
@@ -674,6 +820,7 @@ export const track = {
   },
 
   feedbackNotHelpfulSelected: (feedbackId: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('FeedbackNotHelpfulSelected', {
       feedbackId,
@@ -690,6 +837,7 @@ export const track = {
   },
 
   retryAnswerRequested: (queryId: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('RetryAnswerRequested', {
       queryId,
@@ -706,6 +854,7 @@ export const track = {
   },
 
   sharePopupOpened: (contentType: string, contentId: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('SharePopupOpened', {
       contentType,
@@ -724,6 +873,7 @@ export const track = {
   },
 
   sharePopupClosed: (contentType: string, contentId: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('SharePopupClosed', {
       contentType,
@@ -743,6 +893,7 @@ export const track = {
 
   // ===== ENGAGEMENT EVENTS =====
   dashboardVisited: (userId: string, userCountry?: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('DashboardVisited', {
       userId,
@@ -757,6 +908,7 @@ export const track = {
   },
 
   chatSessionStarted: (sessionId: string, userId: string, mode: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('ChatSessionStarted', {
       sessionId,
@@ -773,6 +925,7 @@ export const track = {
   },
 
   messageSent: (sessionId: string, userId: string, messageType: string, messageLength: number) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('MessageSent', {
       sessionId,
@@ -791,6 +944,7 @@ export const track = {
   },
 
   messageReceived: (sessionId: string, userId: string, responseTime?: number) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('MessageReceived', {
       sessionId,
@@ -807,6 +961,7 @@ export const track = {
   },
 
   chatSessionEnded: (sessionId: string, userId: string, duration?: number, messageCount?: number) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('ChatSessionEnded', {
       sessionId,
@@ -825,6 +980,7 @@ export const track = {
   },
 
   featureAccessed: (featureName: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('FeatureAccessed', {
       featureName,
@@ -841,6 +997,7 @@ export const track = {
   },
 
   formSubmitted: (formName: string, userId: string, page: string, success: boolean) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('FormSubmitted', {
       formName,
@@ -860,6 +1017,7 @@ export const track = {
 
   // ===== CONTENT EVENTS =====
   guidelineAccessed: (guidelineId: string, guidelineTitle: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('GuidelineAccessed', {
       guidelineId,
@@ -878,6 +1036,7 @@ export const track = {
   },
 
   drugInformationViewed: (drugName: string, drugId: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('DrugInformationViewed', {
       drugName,
@@ -896,6 +1055,7 @@ export const track = {
   },
 
   clinicalTrialSearched: (searchTerm: string, resultsCount: number, userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('ClinicalTrialSearched', {
       searchTerm,
@@ -914,6 +1074,7 @@ export const track = {
   },
 
   referenceClicked: (referenceId: string, referenceType: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('ReferenceClicked', {
       referenceId,
@@ -932,6 +1093,7 @@ export const track = {
   },
 
   contentShared: (contentType: string, contentId: string, shareMethod: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('ContentShared', {
       contentType,
@@ -952,6 +1114,7 @@ export const track = {
   },
 
   feedbackSubmitted: (feedbackType: string, contentId: string, rating: number, userId: string, page: string) => {
+    if (!shouldTrack()) return;
     // Vercel Analytics
     vercelTrack('FeedbackSubmitted', {
       feedbackType,
@@ -971,3 +1134,4 @@ export const track = {
     })
   }
 }
+

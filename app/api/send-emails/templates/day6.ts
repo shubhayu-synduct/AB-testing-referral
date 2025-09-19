@@ -6,7 +6,7 @@ export const day6Template = {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Your Clinical Assistant</title>
+      <title>Your Clinical Assistant. Designed for Speed, Safety & Clarity. </title>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #223258; background-color: #f8fafc; }
@@ -136,49 +136,42 @@ export const day6Template = {
         <div class="main-content">
           <div class="card">
             <p class="greeting">Dear {{name}},</p>
-            <p class="intro-text">From quick lookups to complex case analysis, DR. INFO is your comprehensive medical AI assistant.</p>
+            <p class="intro-text">Over the past few days, you’ve seen what DR. INFO can do. Today, here’s a quick recap of how it all fits together—and how it can support you in practice, every single day: .</p>
             
             <div class="feature-grid">
               <div class="feature">
-                <h3>Quick Diagnostics</h3>
-                <p>Get instant differential diagnoses based on symptoms and patient history</p>
+                <h3>Ask any Clinical Question</h3>
+                <p>Get fast, evidence-based answers built from real guidelines and validated sources.</p>
               </div>
               <div class="feature">
-                <h3>Drug Information</h3>
-                <p>Comprehensive drug data, interactions, and dosing guidelines</p>
+                <h3>Use Follow-Ups to Go Deeper</h3>
+                <p>Clarify, adjust, or expand your question—DR.INFO keeps the context. </p>
               </div>
               <div class="feature">
                 <h3>Visual Abstracts</h3>
-                <p>Generate clear visual representations of complex medical concepts</p>
+                <p>Turn long-form queries into dynamic visuals for rapid review or sharing.</p>
               </div>
               <div class="feature">
-                <h3>Clinical Guidelines</h3>
-                <p>Access the latest treatment protocols and best practices</p>
+                <h3>Explore Global Guidelines</h3>
+                <p>Search across national, European, U.S., and international guidelines—with direct links to official documents.</p>
               </div>
               <div class="feature">
-                <h3>Research Summaries</h3>
-                <p>Get concise summaries of the latest medical research</p>
+                <h3>Access Drug Information</h3>
+                <p>View indications, dosing, and administration directly from the approved and publicly available sources.</p>
               </div>
               <div class="feature">
-                <h3>Report Generation</h3>
-                <p>Create detailed medical reports and documentation</p>
+                <h3>Verify Every Answer</h3>
+                <p>Every response is fully referenced, with source transparency you can true.</p>
               </div>
             </div>
             
-            <h3 class="section-title">Perfect For:</h3>
-            <ul class="feature-list">
-              <li><strong>Physicians:</strong> Quick clinical decision support</li>
-              <li><strong>Nurses:</strong> Patient education and care planning</li>
-              <li><strong>Pharmacists:</strong> Drug consultation and safety checks</li>
-              <li><strong>Students:</strong> Learning and exam preparation</li>
-              <li><strong>Researchers:</strong> Literature review and data analysis</li>
-            </ul>
+            <h3 class="section-title">Built with physicians, for physician</h3>
+            Whether you're in clinic, hospital, or training, Dr.Info is designed to reduce cognitive load, save time, and keep you connected to the best available evidence—without the friction.
             
             <div style="text-align: center;">
-              <a href="https://app.drinfo.ai" class="button" style="display: inline-block; background: #214498; background-color: #214498; color: #ffffff; padding: 18px 48px; text-decoration: none; border-radius: 12px; margin: 20px 0; font-weight: 600; text-align: center; font-size: 16px; font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.4; border: 2px solid #214498; min-height: 44px; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">Put DR. INFO to Work</a>
+              <a href="https://app.drinfo.ai" class="button" style="display: inline-block; background: #214498; background-color: #214498; color: #ffffff; padding: 18px 48px; text-decoration: none; border-radius: 12px; margin: 20px 0; font-weight: 600; text-align: center; font-size: 16px; font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.4; border: 2px solid #214498; min-height: 44px; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">Put DR. INFO to work for you today</a>
             </div>
             
-            <p class="intro-text">Ready to see how DR. INFO can transform your clinical workflow?</p>
             <p class="footer-text">Best regards,<br>The DR. INFO Team</p>
           </div>
         </div>
