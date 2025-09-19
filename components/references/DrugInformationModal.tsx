@@ -478,7 +478,7 @@ export const DrugInformationModal: React.FC<DrugInformationModalProps> = ({ open
         {/* Scrollable content section */}
         <div className="flex-1 overflow-y-auto">
           {/* Document header */}
-          <div className="flex items-start mb-2">
+          <div className="flex items-start mb-6 mt-4">
             <Image src="/answer-icon.svg" alt="Answer Icon" width={24} height={24} className="mt-1 mr-3" />
             <h2 className="text-lg text-[#273561] font-['DM_Sans'] font-regular">
               Drug information from the European Medicines Agency approved Summary of Product Characteristics

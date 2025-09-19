@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronDown, FileText, ExternalLink, Search, ArrowLeft } from 'lucide-react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { useAuth } from "@/hooks/use-auth";
 import ReactMarkdown from 'react-markdown';
@@ -12,6 +12,8 @@ import React from 'react';
 import Image from 'next/image';
 import DrugsLinksIcon from '@/components/ui/DrugsLinksIcon';
 import { logger } from '@/lib/logger';
+import { getCachedAuthStatus } from '@/lib/background-auth';
+import { SparkleIcon } from '@/components/ui/sparkle-icon';
 
 interface DrugData {
   name: string;
@@ -29,6 +31,7 @@ interface Drug {
 export default function DrugDetailPage() {
   const { user } = useAuth();
   const params = useParams();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [drug, setDrug] = useState<DrugData | null>(null);
@@ -169,6 +172,178 @@ export default function DrugDetailPage() {
     }
   }, [drugSlug]);
   
+  // Fetch unified suggestions (both EMA drugs and AI suggestions) for autocomplete
+  const fetchAISuggestions = async (term: string) => {
+    logger.debug('fetchAISuggestions called with:', term);
+    if (term.trim() === '' || term === initialSearchTerm || term.trim().length < 2) {
+      setRecommendations([]);
+      setShowRecommendations(false);
+      return;
+    }
+    setShowRecommendations(true);
+    
+    try {
+      // Fetch both EMA drugs and AI suggestions simultaneously
+      const [emaResults, aiResults] = await Promise.allSettled([
+        // EMA Drug Search (limited to 3 results)
+        (async () => {
+          const authStatus = await getCachedAuthStatus();
+          const { enhancedSearchDrugs } = await import('@/lib/authenticated-api');
+          const data = await enhancedSearchDrugs(term, 3, authStatus.database);
+          
+          let transformedData = [];
+          
+          // Handle direct brand match
+          if (data.direct_match) {
+            transformedData.push({
+              brand_name: data.direct_match.name,
+              active_substance: data.direct_match.active_substance,
+              inn: [],
+              search_type: 'direct_brand'
+            });
+          }
+          
+          // Handle brand options (limit to 2 to make room for AI suggestions)
+          if (data.brand_options && data.brand_options.length > 0) {
+            const brandOptions = data.brand_options.slice(0, 2).map((drug: any) => ({
+              brand_name: drug.brand_name,
+              active_substance: drug.active_substance || [],
+              inn: drug.inn || [],
+              search_type: drug.search_type || 'brand_option'
+            }));
+            transformedData = [...transformedData, ...brandOptions];
+          }
+          
+          return transformedData;
+        })(),
+        
+        // AI Suggestions
+        (async () => {
+          try {
+            const { authenticatedFetch } = await import('@/lib/authenticated-api');
+            const response = await authenticatedFetch('/api/suggestions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ query: term }),
+            });
+            
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            return data.suggestions?.slice(0, 3).map((suggestion: string) => ({
+              brand_name: suggestion,
+              active_substance: ['AI Suggestion'],
+              inn: [],
+              search_type: 'ai_suggestion'
+            })) || [];
+          } catch (error) {
+            logger.error('AI suggestions API failed:', error);
+            
+            // Fallback to real drug suggestions
+            const lowerTerm = term.toLowerCase();
+            let fallbackSuggestions;
+            
+            if (lowerTerm.includes('asp')) {
+              fallbackSuggestions = ['aspirin', 'aspartame', 'asparagine'];
+            } else if (lowerTerm.includes('para')) {
+              fallbackSuggestions = ['paracetamol', 'paroxetine', 'paracetamol/codeine'];
+            } else if (lowerTerm.includes('met')) {
+              fallbackSuggestions = ['metformin', 'metoprolol', 'metronidazole'];
+            } else {
+              fallbackSuggestions = ['acetaminophen', 'ibuprofen', 'aspirin'];
+            }
+            
+            return fallbackSuggestions.slice(0, 3).map(suggestion => ({
+              brand_name: suggestion,
+              active_substance: ['Drug Suggestion'],
+              inn: [],
+              search_type: 'ai_suggestion'
+            }));
+          }
+        })()
+      ]);
+      
+      // Combine results - mix EMA and AI suggestions
+      let allRecommendations = [];
+      
+      // Add EMA results first
+      if (emaResults.status === 'fulfilled' && emaResults.value.length > 0) {
+        allRecommendations = [...allRecommendations, ...emaResults.value];
+      }
+      
+      // Add AI results
+      if (aiResults.status === 'fulfilled' && aiResults.value.length > 0) {
+        allRecommendations = [...allRecommendations, ...aiResults.value];
+      }
+      
+      // Limit total to 6 suggestions (3 EMA + 3 AI)
+      setRecommendations(allRecommendations.slice(0, 6));
+      
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+      }
+    } catch (error) {
+      logger.error('Error fetching unified suggestions:', error);
+      
+      // Fallback: try EMA search with English database + AI fallback
+      try {
+        const { enhancedSearchDrugs } = await import('@/lib/authenticated-api');
+        const data = await enhancedSearchDrugs(term, 3, 'english');
+        
+        let fallbackData = [];
+        if (data.direct_match) {
+          fallbackData.push({
+            brand_name: data.direct_match.name,
+            active_substance: data.direct_match.active_substance,
+            inn: [],
+            search_type: 'direct_brand'
+          });
+        }
+        if (data.brand_options && data.brand_options.length > 0) {
+          const brandOptions = data.brand_options.slice(0, 2).map((drug: any) => ({
+            brand_name: drug.brand_name,
+            active_substance: drug.active_substance || [],
+            inn: drug.inn || [],
+            search_type: drug.search_type || 'brand_option'
+          }));
+          fallbackData = [...fallbackData, ...brandOptions];
+        }
+        
+        // Add AI fallback suggestions
+        const aiFallback = [
+          `${term}`,
+          `${term} generic`,
+          `${term} brand`
+        ].slice(0, 3).map(suggestion => ({
+          brand_name: suggestion,
+          active_substance: ['AI Suggestion'],
+          inn: [],
+          search_type: 'ai_suggestion'
+        }));
+        
+        setRecommendations([...fallbackData.slice(0, 3), ...aiFallback]);
+      } catch (fallbackError) {
+        logger.error('Unified suggestions fallback also failed:', fallbackError);
+        // Final fallback - just AI suggestions
+        const finalFallback = [
+          `${term}`,
+          `${term} generic`,
+          `${term} brand`
+        ].map(suggestion => ({
+          brand_name: suggestion,
+          active_substance: ['AI Suggestion'],
+          inn: [],
+          search_type: 'ai_suggestion'
+        }));
+        setRecommendations(finalFallback);
+      }
+    }
+  };
+
   // Fetch recommendations when search term changes
   useEffect(() => {
     // Don't show recommendations if the search term is empty or matches the initial one
@@ -186,44 +361,8 @@ export default function DrugDetailPage() {
       clearTimeout(searchTimeoutRef.current);
     }
     
-    searchTimeoutRef.current = setTimeout(async () => {
-      try {
-        logger.debug('Searching for term:', searchTerm);
-        const { enhancedSearchDrugs } = await import('@/lib/authenticated-api');
-        const data = await enhancedSearchDrugs(searchTerm.trim(), 10);
-        logger.debug('Response data:', data);
-        
-        let transformedData = [];
-        
-        // Handle direct brand match
-        if (data.direct_match) {
-          transformedData.push({
-            brand_name: data.direct_match.name,
-            active_substance: data.direct_match.active_substance, // Direct matches don't have active substances in the response
-            inn: [],
-            search_type: 'direct_brand'
-          });
-        }
-        
-        // Handle brand options
-        if (data.brand_options && data.brand_options.length > 0) {
-          const brandOptions = data.brand_options.map((drug: any) => ({
-            brand_name: drug.brand_name,
-            active_substance: drug.active_substance || [],
-            inn: drug.inn || [],
-            search_type: drug.search_type || 'brand_option'
-          }));
-          transformedData = [...transformedData, ...brandOptions];
-        }
-        
-        setRecommendations(transformedData);
-        // Ensure focus stays in the input after recommendations update
-        if (searchInputRef.current) {
-          searchInputRef.current.focus();
-        }
-      } catch (error) {
-        logger.error('Error fetching recommendations:', error);
-      }
+    searchTimeoutRef.current = setTimeout(() => {
+      fetchAISuggestions(searchTerm.trim());
     }, 300); // 300ms debounce
     
     return () => {
@@ -307,11 +446,11 @@ export default function DrugDetailPage() {
     return (
       <div className="flex flex-col h-[calc(100vh-64px)]">
         {/* Fixed header section */}
-        <div className="flex-none bg-white border-b border-gray-200 py-3">
-          <div className="max-w-4xl mx-auto px-2 sm:px-4">
+        <div className="bg-white border-b border-gray-200 px-4 py-4">
+          <div className="max-w-4xl mx-auto">
             {/* Search bar with autocomplete and back button */}
             <div className="relative mb-0" ref={searchContainerRef}>
-              <div className="flex items-center border-[2.7px] rounded-lg h-[52px] w-full max-w-4xl mx-auto pr-3 md:pr-4 bg-white transition-all duration-300 relative z-10 border-[#3771FE]/[0.27]">
+              <div className="flex items-center border-[2.7px] rounded-lg h-[52px] w-full pr-3 md:pr-4 bg-white transition-all duration-300 relative z-10 border-[#3771FE]/[0.27]">
                 <Link href="/drug-information" className="pl-3 md:pl-4 flex items-center hover:opacity-70 transition-opacity">
                   <ArrowLeft className="stroke-[1.5] w-[18px] h-[18px] md:w-[20px] md:h-[20px] transition-colors duration-300 text-[#01257C]" fill="none" />
                 </Link>
@@ -348,11 +487,22 @@ export default function DrugDetailPage() {
               {showRecommendations && recommendations.length > 0 && (
                 <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg">
                   {recommendations.map((rec, index) => (
-                    <Link 
+                    <div 
                       key={index}
-                      href={`/drug-information/${slugify(rec.brand_name)}`}
-                      className="block px-4 py-2 hover:bg-blue-50 text-[#223258] font-['DM_Sans'] text-[16px]"
+                      className={`block px-4 py-3 hover:bg-blue-50 text-[#223258] font-['DM_Sans'] font-[400] text-[16px] leading-[100%] tracking-[0%] border-b border-gray-100 last:border-b-0 relative cursor-pointer ${
+                        rec.search_type === 'ai_suggestion' ? 'border-l-4 border-l-[#2196f3]' : rec.search_type === 'ai_search' ? 'border-l-4 border-l-[#ffa500]' : 'border-l-4 border-l-[#28a745]'
+                      }`}
                       onClick={() => {
+                        if (rec.search_type === 'ai_suggestion') {
+                          // Navigate to AI results page for AI suggestions
+                          router.push(`/ai-results?q=${encodeURIComponent(rec.brand_name)}`);
+                        } else if (rec.search_type === 'ai_search') {
+                          // Navigate to AI results page
+                          router.push(`/ai-results?q=${encodeURIComponent(rec.brand_name)}`);
+                        } else {
+                          // Navigate to EMA drug page
+                          router.push(`/drug-information/${slugify(rec.brand_name)}`);
+                        }
                         setShowRecommendations(false);
                         if (searchInputRef.current) {
                           searchInputRef.current.focus();
@@ -362,16 +512,43 @@ export default function DrugDetailPage() {
                         e.preventDefault();
                       }}
                     >
-                      {rec.search_type !== 'direct_brand' ? (
-                        <>
-                          <b>{rec.active_substance.join(', ')}</b> (<i>Brand Name:</i> <b>{rec.brand_name}</b>)
-                        </>
-                      ) : (
-                        <>
-                          <b>{rec.brand_name}</b> (<i>active substances:</i> <b>{rec.active_substance.join(', ')}</b>)
-                        </>
-                      )}
-                    </Link>
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          {rec.search_type === 'ai_suggestion' ? (
+                            <>
+                              <span className="font-semibold">{rec.brand_name}</span>
+                            </>
+                          ) : rec.search_type !== 'direct_brand' ? (
+                            <>
+                              <span className="font-semibold">{rec.active_substance?.join(', ') || rec.inn?.join(', ') || rec.brand_name}</span> <span className="text-gray-600">(<em>Brand Name:</em> <span className="font-semibold">{rec.brand_name}</span>)</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-semibold">{rec.brand_name}</span> <span className="text-gray-600">(<em>active substances:</em> <span className="font-semibold">{rec.active_substance?.join(', ') || rec.inn?.join(', ') || 'N/A'}</span>)</span>
+                            </>
+                          )}
+                        </div>
+                        <span className={`px-2 py-1 rounded-full text-[14px] font-['DM_Sans'] font-semibold uppercase ${
+                          rec.search_type === 'ai_suggestion'
+                            ? 'bg-[#e3f2fd] text-[#1565c0] border border-[#bbdefb]'
+                            : rec.search_type === 'ai_search'
+                            ? 'bg-[#fff3cd] text-[#856404] border border-[#ffeaa7]' 
+                            : 'bg-[#d4edda] text-[#155724] border border-[#c3e6cb]'
+                        }`}>
+                          {rec.search_type === 'ai_suggestion' ? (
+                            <div className="flex items-center">
+                              <span className="mr-1">AI</span>
+                              <SparkleIcon className="w-[14px] h-[14px]" fill="currentColor" />
+                            </div>
+                          ) : rec.search_type === 'ai_search' ? (
+                            <div className="flex items-center">
+                              <span className="mr-1">AI</span>
+                              <SparkleIcon className="w-[14px] h-[14px]" fill="currentColor" />
+                            </div>
+                          ) : 'EMA'}
+                        </span>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -383,7 +560,7 @@ export default function DrugDetailPage() {
         <div className="flex-1 overflow-y-auto px-4 pb-8">
           <div className="max-w-4xl mx-auto">
             {/* Document header */}
-            <div className="flex items-start mb-2">
+            <div className="flex items-start mb-6 mt-4">
               <Image src="/answer-icon.svg" alt="Answer Icon" width={24} height={24} className="mt-1 mr-3" />
               <h2 className="text-lg text-[#273561] font-['DM_Sans'] font-regular">
                 Drug information from the European Medicines Agency approved Summary of Product Characteristics
