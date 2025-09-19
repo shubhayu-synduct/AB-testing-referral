@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       console.log(`Created new customer ${customer.id} with Firebase UID: ${uid}`);
     }
 
-    // Create checkout session
+    // Create checkout session with tax configuration
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
@@ -79,6 +79,21 @@ export async function POST(req: NextRequest) {
         plan,
         interval,
       },
+      // Enable automatic tax calculation
+      automatic_tax: {
+        enabled: true,
+      },
+      // Set customer's tax exempt status (if applicable)
+      customer_update: {
+        address: 'auto',
+        name: 'auto',
+      },
+      // Enable tax ID collection for business customers
+      tax_id_collection: {
+        enabled: true,
+      },
+      // Configure billing address collection
+      billing_address_collection: 'required',
     });
 
     // SECURITY FIX: Do NOT update Firebase database here!

@@ -207,6 +207,16 @@ export async function POST(req: NextRequest) {
       
       console.log(`[Webhook] Payment successful for session ${session.id}. Payment status: ${session.payment_status}, Live mode: ${session.livemode}`);
       
+      // Log tax information if available
+      if (session.total_details) {
+        console.log(`[Webhook] Session tax details:`, {
+          amount_tax: session.total_details.amount_tax,
+          amount_discount: session.total_details.amount_discount,
+          amount_shipping: session.total_details.amount_shipping,
+          breakdown: session.total_details.breakdown
+        });
+      }
+      
       // Additional security: Check for test card usage in live mode
       if (session.livemode && session.payment_intent) {
         try {
