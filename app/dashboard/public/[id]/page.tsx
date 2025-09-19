@@ -680,6 +680,8 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
                         )}
                       </div>
                     )}
+                    
+
                     {msg.answer?.citations && Object.keys(msg.answer.citations).length > 0 && (
                       <div className="mt-4 sm:mt-6">
                         <p className="text-slate-500 text-xs sm:text-sm">
@@ -729,6 +731,15 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
           </ol>
         </div>
       )}
+
+      {/* Disclaimer at the bottom */}
+      <div className="w-full py-3 md:py-4 text-center text-xs text-gray-400 px-4">
+        <p>DR. INFO is an informational and educational tool.</p>
+        <p>Do not insert protected health information or personal data.</p>
+        <Link href="https://www.drinfo.ai/termsofservice/" className="text-black hover:text-[#3771FE] underline inline-block" target="_blank" rel="noopener noreferrer">
+          Terms and Conditions
+        </Link>
+      </div>
     </div>
   );
 }

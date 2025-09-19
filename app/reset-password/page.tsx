@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Eye, EyeOff } from "lucide-react"
 import { getFirebaseAuth } from "@/lib/firebase"
+import { track } from "@/lib/analytics"
 
 function ResetPasswordContent() {
   const router = useRouter()
@@ -30,6 +31,11 @@ function ResetPasswordContent() {
       const { confirmPasswordReset } = await import("firebase/auth")
       const auth = await getFirebaseAuth()
       await confirmPasswordReset(auth, oobCode, password)
+      
+      // Track password reset completion
+      // Note: We don't have the email here, but we can track the completion
+      track.userPasswordResetCompleted('password_reset_completed')
+      
       setSuccess(true)
     } catch (err: any) {
       setError(err.message || "An error occurred")
