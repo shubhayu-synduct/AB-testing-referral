@@ -151,10 +151,51 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             <div className={`flex ${isOpen ? 'items-center justify-between' : 'flex-col items-center'} mb-8`}>
               <div className="flex items-center">
                 {isOpen ? (
-                  <img src="/login-logo.svg" alt="DR. INFO Logo" className="h-8" />
+                  <svg 
+                    width="120" 
+                    height="32" 
+                    viewBox="0 0 5471 1584" 
+                    fill="none" 
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="cursor-pointer hover:opacity-80 transition-opacity" 
+                    onClick={() => router.push('/dashboard')}
+                  >
+                    <path d="M75 415V1480H843V1584H0V415H75ZM918 1376V1480H843V1376H918ZM225 415V1272H843V1376H150V415H225ZM993 1376H918V1272H993V1376ZM1068 1272H993V1168H1068V1272ZM918 1168V1272H843V1168H918ZM843 415V1168H298V415H843ZM993 1168H918V312H298V208H993V1168ZM1143 1168H1068V104H298V0H1143V1168ZM298 415H225V312H298V415ZM150 415H75V312H150V415ZM225 312H150V208H225V312ZM298 208H225V104H298V208Z" fill="url(#paint0_linear_2221_19099)"/>
+                    <path d="M2948.44 1019.98C2994.39 1019.98 3031.9 1056.56 3031.9 1102.5C3031.9 1148.45 2994.39 1186.9 2948.44 1186.9C2902.49 1186.9 2864.98 1148.45 2864.98 1102.5C2864.98 1056.56 2902.49 1019.98 2948.44 1019.98Z" fill="#214498"/>
+                    <path d="M2618.72 869.946L2818.45 1168.14H2651.54L2479.94 883.074H2478.06V1168.14H2340.22V461.102H2526.82C2666.54 461.102 2763.13 522.991 2763.13 673.963C2763.13 763.984 2713.43 854.005 2618.72 869.946ZM2478.06 573.628V786.489H2495.88C2571.83 786.489 2625.28 763.984 2625.28 677.714C2625.28 590.506 2569.96 573.628 2496.82 573.628H2478.06Z" fill="#214498"/>
+                    <path d="M1734 1168.14V461.102H1930.92C2135.34 461.102 2272.25 613.949 2272.25 815.559C2272.25 1014.35 2131.59 1168.14 1929.98 1168.14H1734ZM1871.84 581.129V1048.11H1894.35C2064.08 1048.11 2129.72 954.341 2129.72 814.621C2129.72 660.835 2050.95 581.129 1894.35 581.129H1871.84Z" fill="#214498"/>
+                    <path d="M5345.46 813.336C5345.46 1021.51 5211.37 1186.55 4995.69 1186.55C4780.02 1186.55 4645.92 1021.51 4645.92 813.336C4645.92 603.287 4784.7 442 4995.69 442C5206.68 442 5345.46 603.287 5345.46 813.336ZM5202.93 807.71C5202.93 693.308 5126.03 577.969 4995.69 577.969C4865.35 577.969 4788.45 693.308 4788.45 807.71C4788.45 916.485 4842.84 1050.58 4995.69 1050.58C5148.54 1050.58 5202.93 916.485 5202.93 807.71Z" fill="#214498"/>
+                    <path d="M4596.33 580.778H4383.47V736.439H4583.2V856.467H4383.47V1167.79H4245.62V460.75H4596.33V580.778Z" fill="#214498"/>
+                    <path d="M3534.09 1167.79V442H3633.49L4005.77 936.177H4007.64V460.754H4145.49V1181.86H4046.09L3673.81 687.682H3671.94V1167.79H3534.09Z" fill="#214498"/>
+                    <path d="M3433.84 460.75V1167.79H3296V460.75H3433.84Z" fill="#214498"/>
+                    <defs>
+                      <linearGradient id="paint0_linear_2221_19099" x1="1184" y1="-14" x2="1.95015" y2="1596.12" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#9BB8FF"/>
+                        <stop offset="0.45098" stopColor="#3771FE"/>
+                        <stop offset="1" stopColor="#214498"/>
+                      </linearGradient>
+                    </defs>
+                  </svg>
                 ) : (
                   <div className="relative w-8 h-8">
-                    <img src="/favicon.png" alt="DR. INFO Logo" className="w-8 h-8" />
+                    <svg 
+                      width="32" 
+                      height="32" 
+                      viewBox="0 0 1143 1584" 
+                      fill="none" 
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="cursor-pointer hover:opacity-80 transition-opacity" 
+                      onClick={() => router.push('/dashboard')}
+                    >
+                      <path d="M75 415V1480H843V1584H0V415H75ZM918 1376V1480H843V1376H918ZM225 415V1272H843V1376H150V415H225ZM993 1376H918V1272H993V1376ZM1068 1272H993V1168H1068V1272ZM918 1168V1272H843V1168H918ZM843 415V1168H298V415H843ZM993 1168H918V312H298V208H993V1168ZM1143 1168H1068V104H298V0H1143V1168ZM298 415H225V312H298V415ZM150 415H75V312H150V415ZM225 312H150V208H225V312ZM298 208H225V104H298V208Z" fill="url(#paint0_linear_2221_19099)"/>
+                      <defs>
+                        <linearGradient id="paint0_linear_2221_19099" x1="1184" y1="-14" x2="1.95015" y2="1596.12" gradientUnits="userSpaceOnUse">
+                          <stop stopColor="#9BB8FF"/>
+                          <stop offset="0.45098" stopColor="#3771FE"/>
+                          <stop offset="1" stopColor="#214498"/>
+                        </linearGradient>
+                      </defs>
+                    </svg>
                   </div>
                 )}
               </div>
