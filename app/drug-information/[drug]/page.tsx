@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, ChevronDown, FileText, ExternalLink, Search } from 'lucide-react';
+import { ChevronLeft, ChevronDown, FileText, ExternalLink, Search, ArrowLeft } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { useAuth } from "@/hooks/use-auth";
@@ -307,26 +307,19 @@ export default function DrugDetailPage() {
     return (
       <div className="flex flex-col h-[calc(100vh-64px)]">
         {/* Fixed header section */}
-        <div className="flex-none px-4 py-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="mb-6">
-              <Link href="/drug-information" className="flex items-center justify-center bg-[#01257C] text-white w-8 h-8 rounded-[4px] font-['DM_Sans'] text-sm hover:bg-[#1a3780] transition-colors" style={{ width: 32, height: 32 }}>
-                <ChevronLeft size={16} />
-                <ChevronLeft size={16} className="-ml-3" />
-              </Link>
-            </div>
-            
-            {/* Search bar with autocomplete */}
-            <div className="relative mb-4" ref={searchContainerRef}>
-              <div className="flex items-center border-[2.7px] border-[#3771FE]/[0.27] rounded-lg h-[69px] w-full max-w-[1118px] mx-auto pr-4 rounded-xl bg-white">
-                <div className="pl-2 flex items-center">
-                  <Search className="text-[#9599A8] stroke-[1.5]" size={20} fill="none" />
-                </div>
+        <div className="flex-none bg-white border-b border-gray-200 py-3">
+          <div className="max-w-4xl mx-auto px-2 sm:px-4">
+            {/* Search bar with autocomplete and back button */}
+            <div className="relative mb-0" ref={searchContainerRef}>
+              <div className="flex items-center border-[2.7px] rounded-lg h-[52px] w-full max-w-4xl mx-auto pr-3 md:pr-4 bg-white transition-all duration-300 relative z-10 border-[#3771FE]/[0.27]">
+                <Link href="/drug-information" className="pl-3 md:pl-4 flex items-center hover:opacity-70 transition-opacity">
+                  <ArrowLeft className="stroke-[1.5] w-[18px] h-[18px] md:w-[20px] md:h-[20px] transition-colors duration-300 text-[#01257C]" fill="none" />
+                </Link>
                 <input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Search by a drug brand name or an active ingredient name or scroll the drug list.."
-                  className="w-full py-3 px-2 outline-none text-[#223258] font-['DM_Sans'] text-[16px] placeholder:text-[#9599A8]"
+                  placeholder="Search drugs or ask medical questions..."
+                  className="flex-1 py-2 md:py-3 px-2 md:px-3 outline-none text-[#223258] font-['DM_Sans'] font-[400] text-[14px] md:text-[16px] leading-[100%] tracking-[0%] placeholder-[#9599A8] placeholder:font-['DM_Sans'] placeholder:text-[14px] md:placeholder:text-[16px]"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onFocus={() => {
@@ -346,17 +339,9 @@ export default function DrugDetailPage() {
                     }, 100);
                   }}
                 />
-                {searchTerm && (
-                  <button 
-                    className="hover:bg-blue-700 p-1 text-white flex items-center justify-center"
-                    onClick={() => {
-                      setSearchTerm('');
-                      setShowRecommendations(true);
-                    }}
-                  >
-                    <Image src="/search.svg" alt="Search" width={32} height={32} />
-                  </button>
-                )}
+                <div className="flex items-center">
+                  <Search className="text-[#9599A8] stroke-[1.5] w-[18px] h-[18px] md:w-[20px] md:h-[20px]" fill="none" />
+                </div>
               </div>
               
               {/* Recommendations dropdown */}

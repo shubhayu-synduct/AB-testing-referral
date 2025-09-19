@@ -90,6 +90,13 @@ function AIResultsContent() {
   
   // UI state
   const [followUpQuestion, setFollowUpQuestion] = useState('');
+  
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showRecommendations, setShowRecommendations] = useState(false);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState(false);
   const [showCitationsSidebar, setShowCitationsSidebar] = useState(false);
@@ -452,7 +459,82 @@ function AIResultsContent() {
     };
   };
 
+  // Fetch AI suggestions for autocomplete
+  const fetchAISuggestions = async (term: string) => {
+    if (!term.trim()) {
+      setRecommendations([]);
+      setShowRecommendations(false);
+      return;
+    }
 
+    setShowRecommendations(true);
+
+    try {
+      // Fetch both EMA drugs and AI suggestions simultaneously
+      const [emaResponse, aiResponse] = await Promise.allSettled([
+        // EMA drug search
+        fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: term, limit: 3 })
+        }),
+        // AI suggestions
+        fetch('/api/suggestions/drugs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: term })
+        })
+      ]);
+
+      let allRecommendations: any[] = [];
+
+      // Handle EMA results
+      if (emaResponse.status === 'fulfilled' && emaResponse.value.ok) {
+        const emaData = await emaResponse.value.json();
+        const emaResults = emaData.results?.slice(0, 3).map((drug: any) => ({
+          ...drug,
+          search_type: 'ema'
+        })) || [];
+        allRecommendations = [...allRecommendations, ...emaResults];
+      }
+
+      // Handle AI suggestions
+      if (aiResponse.status === 'fulfilled' && aiResponse.value.ok) {
+        const aiData = await aiResponse.value.json();
+        const suggestions = aiData.suggestions || [];
+        const aiResults = suggestions.slice(0, 3).map((suggestion: string) => ({
+          brand_name: suggestion,
+          search_type: 'ai',
+          inn: [],
+          active_substance: []
+        }));
+        allRecommendations = [...allRecommendations, ...aiResults];
+      }
+
+      // Limit total to 6 suggestions
+      setRecommendations(allRecommendations.slice(0, 6));
+    } catch (error) {
+      logger.error('Error fetching suggestions:', error);
+      // Fallback suggestions
+      const fallbackSuggestions = ['aspirin', 'ibuprofen', 'paracetamol'].map(suggestion => ({
+        brand_name: suggestion,
+        search_type: 'ai',
+        inn: [],
+        active_substance: []
+      }));
+      setRecommendations(fallbackSuggestions);
+    }
+  };
+
+  // Handle search from search bar
+  const handleSearchBarSubmit = () => {
+    if (!searchTerm.trim()) return;
+    
+    // Navigate to new AI results with the search term
+    const searchParams = new URLSearchParams();
+    searchParams.set('q', searchTerm.trim());
+    router.push(`/ai-results?${searchParams.toString()}`);
+  };
 
   // Handle showing all citations
   const handleShowAllCitations = (citations: Citation[]) => {
@@ -566,6 +648,32 @@ function AIResultsContent() {
       return true;
     }).length;
   };
+
+  // Fetch AI suggestions when search term changes (debounced)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm.trim()) {
+        fetchAISuggestions(searchTerm);
+      } else {
+        setRecommendations([]);
+        setShowRecommendations(false);
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  // Handle clicking outside the recommendations to close them
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowRecommendations(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Handle sharing
   const handleShare = async () => {
@@ -851,6 +959,15 @@ function AIResultsContent() {
       html {
         scroll-behavior: smooth;
       }
+      
+      @keyframes border-flow {
+        0%, 100% {
+          background-position: 0% 50%;
+        }
+        50% {
+          background-position: 100% 50%;
+        }
+      }
     `;
     document.head.appendChild(style);
     
@@ -863,24 +980,105 @@ function AIResultsContent() {
     <DashboardLayout>
       {user && (
       <div className="flex-1 flex flex-col bg-gray-50">
-        {/* Top Bar */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex justify-between items-center">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              <span>Back</span>
-            </button>
-            <button
-              onClick={handleShare}
-              disabled={isSharing || messages.length === 0}
-              className="flex items-center space-x-2 px-4 py-2 bg-white border border-[#C8C8C8] text-[#223258] rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <img src="/Share icon.svg" alt="Share" className="w-5 h-5" />
-              <span>{isSharing ? 'Sharing...' : 'Share'}</span>
-            </button>
+        {/* Search Bar */}
+        <div className="sticky top-0 z-50 bg-white border-b border-gray-200 py-3">
+          <div className="max-w-4xl mx-auto px-2 sm:px-4">
+            <div className="relative mb-0" ref={searchContainerRef}>
+              {/* Unified search with gradient border */}
+              <div className="absolute inset-0 w-full max-w-4xl mx-auto rounded-lg p-[2px] pointer-events-none">
+                <div className="w-full h-full rounded-lg bg-gradient-to-r from-[#3771FE]/[0.4] via-[#2563eb]/[0.6] to-[#3771FE]/[0.4] animate-[border-flow_3s_ease-in-out_infinite] bg-[length:200%_100%]" />
+              </div>
+              <div className="flex items-center border-[2.7px] rounded-lg h-[52px] w-full max-w-4xl mx-auto pr-3 md:pr-4 bg-white transition-all duration-300 relative z-10 border-[#3771FE]/[0.27] shadow-[0_0_12px_rgba(55,113,254,0.2)]">
+                <button 
+                  onClick={() => router.back()}
+                  className="pl-3 md:pl-4 flex items-center hover:opacity-70 transition-opacity"
+                >
+                  <ArrowLeft className="stroke-[1.5] w-[18px] h-[18px] md:w-[20px] md:h-[20px] transition-colors duration-300 text-[#3771FE]" fill="none" />
+                </button>
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  placeholder="Search drugs or ask medical questions..."
+                  className="flex-1 py-2 md:py-3 px-2 md:px-3 outline-none text-[#223258] font-['DM_Sans'] font-[400] text-[14px] md:text-[16px] leading-[100%] tracking-[0%] placeholder-[#9599A8] placeholder:font-['DM_Sans'] placeholder:text-[14px] md:placeholder:text-[16px]"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onFocus={() => {
+                    if (searchTerm.trim() !== '') {
+                      setShowRecommendations(true);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && searchTerm.trim() !== '') {
+                      handleSearchBarSubmit();
+                    }
+                  }}
+                  onBlur={(e) => {
+                    setTimeout(() => {
+                      if (searchContainerRef.current && !searchContainerRef.current.contains(document.activeElement)) {
+                        setShowRecommendations(false);
+                      } else {
+                        if (searchInputRef.current) {
+                          searchInputRef.current.focus();
+                        }
+                      }
+                    }, 100);
+                  }}
+                />
+                <button 
+                  className="flex items-center justify-center border-none bg-transparent relative ml-2 md:ml-3 hover:opacity-80 transition-opacity text-[#6366f1] p-1"
+                  onClick={handleSearchBarSubmit}
+                  disabled={!searchTerm.trim()}
+                >
+                  <Search className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Recommendations dropdown */}
+              {showRecommendations && recommendations.length > 0 && (
+                <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 mt-1 max-h-80 overflow-y-auto">
+                  {recommendations.map((drug, index) => (
+                    <div
+                      key={index}
+                      className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      onClick={() => {
+                        if (drug.search_type === 'ai') {
+                          // Navigate to AI results page for AI suggestions
+                          const searchParams = new URLSearchParams();
+                          searchParams.set('q', drug.brand_name);
+                          router.push(`/ai-results?${searchParams.toString()}`);
+                        } else {
+                          // Navigate to drug information page for EMA drugs
+                          router.push(`/drug-information/${encodeURIComponent(drug.brand_name)}`);
+                        }
+                        setShowRecommendations(false);
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">{drug.brand_name}</div>
+                          {drug.inn && drug.inn.length > 0 && (
+                            <div className="text-sm text-gray-500">
+                              {drug.inn.join(', ')}
+                            </div>
+                          )}
+                        </div>
+                        <div className="ml-2">
+                          {drug.search_type === 'ai' ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              AI
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                              EMA
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

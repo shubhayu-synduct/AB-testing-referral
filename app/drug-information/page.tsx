@@ -495,7 +495,7 @@ export default function DrugInformationPage() {
           <div className="text-center mb-4 md:mb-0">
             <h1 className="hidden md:block text-[36px] font-semibold text-[#214498] mb-[4px] mt-0 font-['DM_Sans'] font-[600]">Drug Information</h1>
             <p className="hidden md:block text-[14px] md:text-[16px] text-[#64748B] font-['DM_Sans'] mt-2">
-              AI-generated drug summaries with citations, EMA Product Information when available
+              Drug insights from EMA and AI literature summaries
             </p>
           </div>
           <div>
@@ -508,11 +508,11 @@ export default function DrugInformationPage() {
         <div className="relative mb-6 md:mb-10" ref={searchContainerRef}>
           {/* Unified search with gradient border */}
           <div className="absolute inset-0 w-full max-w-[1118px] mx-auto rounded-lg p-[2px] pointer-events-none">
-            <div className="w-full h-full rounded-lg bg-gradient-to-r from-[#6366f1]/[0.4] via-[#3b82f6]/[0.6] to-[#6366f1]/[0.4] animate-[border-flow_3s_ease-in-out_infinite] bg-[length:200%_100%]" />
+            <div className="w-full h-full rounded-lg bg-gradient-to-r from-[#3771FE]/[0.4] via-[#2563eb]/[0.6] to-[#3771FE]/[0.4] animate-[border-flow_3s_ease-in-out_infinite] bg-[length:200%_100%]" />
           </div>
-          <div className="flex items-center border-[2.7px] rounded-lg h-[48px] md:h-[56px] w-full max-w-[1118px] mx-auto pr-3 md:pr-4 bg-white transition-all duration-300 relative z-10 border-[#6366f1]/[0.3] shadow-[0_0_12px_rgba(99,102,241,0.2)]">
+          <div className="flex items-center border-[2.7px] rounded-lg h-[48px] md:h-[56px] w-full max-w-[1118px] mx-auto pr-3 md:pr-4 bg-white transition-all duration-300 relative z-10 border-[#3771FE]/[0.27] shadow-[0_0_12px_rgba(55,113,254,0.2)]">
             <div className="pl-3 md:pl-4 flex items-center">
-              <Search className="stroke-[1.5] w-[18px] h-[18px] md:w-[20px] md:h-[20px] transition-colors duration-300 text-[#6366f1]" fill="none" />
+              <Search className="stroke-[1.5] w-[18px] h-[18px] md:w-[20px] md:h-[20px] transition-colors duration-300 text-[#3771FE]" fill="none" />
             </div>
             <input
               ref={searchInputRef}
@@ -609,7 +609,17 @@ export default function DrugInformationPage() {
                         ? 'bg-[#fff3cd] text-[#856404] border border-[#ffeaa7]' 
                         : 'bg-[#d4edda] text-[#155724] border border-[#c3e6cb]'
                     }`}>
-                      {drug.search_type === 'ai_suggestion' ? <SparkleIcon className="w-[14px] h-[14px]" fill="currentColor" /> : drug.search_type === 'ai_search' ? <SparkleIcon className="w-[14px] h-[14px]" fill="currentColor" /> : 'EMA'}
+                      {drug.search_type === 'ai_suggestion' ? (
+                        <div className="flex items-center">
+                          <span className="mr-1">AI</span>
+                          <SparkleIcon className="w-[14px] h-[14px]" fill="currentColor" />
+                        </div>
+                      ) : drug.search_type === 'ai_search' ? (
+                        <div className="flex items-center">
+                          <span className="mr-1">AI</span>
+                          <SparkleIcon className="w-[14px] h-[14px]" fill="currentColor" />
+                        </div>
+                      ) : 'EMA'}
                     </span>
                   </div>
                 </div>
@@ -621,7 +631,7 @@ export default function DrugInformationPage() {
          {/* Explanatory text for alphabet navigation */}
          <div className="w-full max-w-[1118px] mx-auto mb-4">
            <p className="text-[14px] md:text-[16px] text-[#64748B] font-['DM_Sans'] text-center">
-             Alphabetical list of all medicine is registered with the European Medicines Agency.
+             List of EMA drugs
            </p>
          </div>
         
