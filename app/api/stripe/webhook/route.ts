@@ -111,6 +111,54 @@ export async function POST(req: NextRequest) {
       console.log(`[Webhook] Processing checkout.session.completed event`);
       const session = event.data.object as Stripe.Checkout.Session;
       
+      // CRITICAL: Check if payment was actually successful
+      if (session.payment_status !== 'paid') {
+        console.error(`[Webhook] Payment not successful for session ${session.id}. Payment status: ${session.payment_status}`);
+        return NextResponse.json({ 
+          error: `Payment not successful. Status: ${session.payment_status}` 
+        }, { status: 400 });
+      }
+      
+      // Additional validation: Check if this is a test session in live mode
+      if (session.livemode && session.payment_intent) {
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent as string);
+          if (paymentIntent.status !== 'succeeded') {
+            console.error(`[Webhook] Payment intent not succeeded for session ${session.id}. Status: ${paymentIntent.status}`);
+            return NextResponse.json({ 
+              error: `Payment intent not succeeded. Status: ${paymentIntent.status}` 
+            }, { status: 400 });
+          }
+          console.log(`[Webhook] Payment intent verified as succeeded for session ${session.id}`);
+        } catch (piError) {
+          console.error(`[Webhook] Error retrieving payment intent for session ${session.id}:`, piError);
+          return NextResponse.json({ 
+            error: 'Error verifying payment intent' 
+          }, { status: 400 });
+        }
+      }
+      
+      console.log(`[Webhook] Payment successful for session ${session.id}. Payment status: ${session.payment_status}, Live mode: ${session.livemode}`);
+      
+      // Additional security: Check for test card usage in live mode
+      if (session.livemode && session.payment_intent) {
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent as string);
+          if (paymentIntent.charges && paymentIntent.charges.data.length > 0) {
+            const charge = paymentIntent.charges.data[0];
+            if (charge.payment_method_details?.card?.last4 === '4242') {
+              console.error(`[Webhook] Test card detected in live mode for session ${session.id}. Rejecting subscription.`);
+              return NextResponse.json({ 
+                error: 'Test cards are not allowed in live mode' 
+              }, { status: 400 });
+            }
+          }
+        } catch (testCardError) {
+          console.error(`[Webhook] Error checking for test card usage:`, testCardError);
+          // Don't fail the webhook for this check, just log it
+        }
+      }
+      
       // Get customer to find Firebase UID
       const customer = await stripe.customers.retrieve(session.customer as string);
       const uid = (customer as any).metadata.firebaseUID;
@@ -179,6 +227,26 @@ export async function POST(req: NextRequest) {
       }, { merge: true });
       
       console.log(`[Webhook] Updated user ${uid} with complete subscription data: ${subscriptionTier} ${interval}, expires: ${expiryDate ? new Date(expiryDate).toISOString() : 'null'}`);
+      
+      // Log successful subscription creation for monitoring
+      try {
+        await db.collection('subscription_logs').add({
+          event: 'subscription_created',
+          userId: uid,
+          sessionId: session.id,
+          subscriptionTier,
+          interval,
+          priceId,
+          paymentStatus: session.payment_status,
+          livemode: session.livemode,
+          timestamp: new Date().toISOString(),
+          success: true
+        });
+        console.log(`[Webhook] Subscription creation logged for user ${uid}`);
+      } catch (logError) {
+        console.error(`[Webhook] Failed to log subscription creation:`, logError);
+      }
+      
       return NextResponse.json({ received: true });
     }
     
