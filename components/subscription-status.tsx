@@ -40,40 +40,8 @@ export default function SubscriptionStatus() {
   };
 
   const updateSubscriptionTier = async (tier: string) => {
-    if (!user) return;
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const idToken = await user.getIdToken();
-      
-      const response = await fetch('/api/test-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          uid: user.uid,
-          subscriptionTier: tier,
-          idToken,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update subscription tier');
-      }
-
-      // Refresh the status
-      await fetchSubscriptionStatus();
-    } catch (err: any) {
-      console.error('Error updating subscription tier:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    // SECURITY FIX: Direct subscription tier updates are disabled
+    setError('Direct subscription updates are disabled for security. Only Stripe webhooks can update subscription tiers after successful payment.');
   };
 
   useEffect(() => {
@@ -138,16 +106,23 @@ export default function SubscriptionStatus() {
       )}
 
       <div className="mt-4 space-y-2">
-        <p className="text-sm text-gray-600">Test Tier Updates:</p>
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-800 font-medium">⚠️ Security Notice</p>
+          <p className="text-xs text-red-700 mt-1">
+            Direct subscription tier updates have been disabled for security. 
+            Subscription tiers can only be updated by Stripe webhooks after successful payment.
+          </p>
+        </div>
+        <p className="text-sm text-gray-600">Test Tier Updates (DISABLED):</p>
         <div className="flex flex-wrap gap-2">
           {['free', 'student', 'clinician'].map((tier) => (
             <button
               key={tier}
               onClick={() => updateSubscriptionTier(tier)}
-              disabled={loading}
-              className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+              disabled={true}
+              className="px-3 py-1 text-sm bg-gray-400 text-white rounded cursor-not-allowed opacity-50"
             >
-              Set to {tier}
+              Set to {tier} (DISABLED)
             </button>
           ))}
         </div>

@@ -99,6 +99,50 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
+    // Handle payment failures - CRITICAL: Never update database for failed payments
+    if (event.type === 'payment_intent.payment_failed' || event.type === 'invoice.payment_failed') {
+      console.log(`[Webhook] Payment failed event: ${event.type}`);
+      
+      let customerId = null;
+      let sessionId = null;
+      
+      if (event.type === 'payment_intent.payment_failed') {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+        customerId = paymentIntent.customer;
+        console.log(`[Webhook] Payment intent failed for customer: ${customerId}`);
+      } else if (event.type === 'invoice.payment_failed') {
+        const invoice = event.data.object as Stripe.Invoice;
+        customerId = invoice.customer;
+        console.log(`[Webhook] Invoice payment failed for customer: ${customerId}`);
+      }
+      
+      // Log the payment failure
+      if (customerId) {
+        try {
+          const customer = await stripe.customers.retrieve(customerId as string);
+          const uid = (customer as any).metadata.firebaseUID;
+          
+          if (uid) {
+            await db.collection('subscription_logs').add({
+              event: 'payment_failed',
+              userId: uid,
+              customerId,
+              sessionId,
+              eventType: event.type,
+              timestamp: new Date().toISOString(),
+              success: false,
+              reason: 'Payment failed - no subscription created'
+            });
+            console.log(`[Webhook] Payment failure logged for user ${uid}`);
+          }
+        } catch (logError) {
+          console.error(`[Webhook] Failed to log payment failure:`, logError);
+        }
+      }
+      
+      return NextResponse.json({ received: true });
+    }
+
     // Handle invoice creation and other invoice events
     if (event.type === 'invoice.created' || event.type === 'invoice.finalized' || event.type === 'invoice.paid') {
       const invoice = event.data.object as Stripe.Invoice;
@@ -114,6 +158,29 @@ export async function POST(req: NextRequest) {
       // CRITICAL: Check if payment was actually successful
       if (session.payment_status !== 'paid') {
         console.error(`[Webhook] Payment not successful for session ${session.id}. Payment status: ${session.payment_status}`);
+        
+        // Log the failed payment attempt
+        try {
+          const customer = await stripe.customers.retrieve(session.customer as string);
+          const uid = (customer as any).metadata.firebaseUID;
+          
+          if (uid) {
+            await db.collection('subscription_logs').add({
+              event: 'payment_failed',
+              userId: uid,
+              sessionId: session.id,
+              paymentStatus: session.payment_status,
+              livemode: session.livemode,
+              timestamp: new Date().toISOString(),
+              success: false,
+              reason: `Payment failed with status: ${session.payment_status}`
+            });
+            console.log(`[Webhook] Failed payment logged for user ${uid}`);
+          }
+        } catch (logError) {
+          console.error(`[Webhook] Failed to log failed payment:`, logError);
+        }
+        
         return NextResponse.json({ 
           error: `Payment not successful. Status: ${session.payment_status}` 
         }, { status: 400 });
@@ -144,8 +211,14 @@ export async function POST(req: NextRequest) {
       if (session.livemode && session.payment_intent) {
         try {
           const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent as string);
-          if (paymentIntent.charges && paymentIntent.charges.data.length > 0) {
-            const charge = paymentIntent.charges.data[0];
+          // Get charges for this payment intent
+          const charges = await stripe.charges.list({
+            payment_intent: session.payment_intent as string,
+            limit: 1
+          });
+          
+          if (charges.data.length > 0) {
+            const charge = charges.data[0];
             if (charge.payment_method_details?.card?.last4 === '4242') {
               console.error(`[Webhook] Test card detected in live mode for session ${session.id}. Rejecting subscription.`);
               return NextResponse.json({ 
@@ -209,24 +282,60 @@ export async function POST(req: NextRequest) {
         expiryDateISO: expiryDate ? new Date(expiryDate).toISOString() : 'null'
       });
       
-      // Update Firebase with complete subscription information
-      const userRef = db.collection('users').doc(uid);
-      await userRef.set({
-        subscriptionTier,
-        subscription: {
-          status: 'active',
-          checkoutSessionId: session.id,
-          currentPeriodEnd: expiryDate,
-          priceId,
-          plan: subscriptionTier,
-          interval: interval,
-          cancelAtPeriodEnd: false,
-          updatedAt: new Date().toISOString()
-        },
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
+      // CRITICAL SAFETY CHECK: Double-verify payment status before database update
+      if (session.payment_status !== 'paid') {
+        console.error(`[Webhook] CRITICAL: Payment status changed to ${session.payment_status} before database update. Aborting subscription creation.`);
+        return NextResponse.json({ 
+          error: `Payment status changed to ${session.payment_status}. Subscription not created.` 
+        }, { status: 400 });
+      }
       
-      console.log(`[Webhook] Updated user ${uid} with complete subscription data: ${subscriptionTier} ${interval}, expires: ${expiryDate ? new Date(expiryDate).toISOString() : 'null'}`);
+      // Additional safety: Verify payment intent one more time
+      if (session.payment_intent) {
+        try {
+          const finalPaymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent as string);
+          if (finalPaymentIntent.status !== 'succeeded') {
+            console.error(`[Webhook] CRITICAL: Payment intent status changed to ${finalPaymentIntent.status} before database update. Aborting subscription creation.`);
+            return NextResponse.json({ 
+              error: `Payment intent status changed to ${finalPaymentIntent.status}. Subscription not created.` 
+            }, { status: 400 });
+          }
+          console.log(`[Webhook] Final payment verification successful: ${finalPaymentIntent.status}`);
+        } catch (finalPiError) {
+          console.error(`[Webhook] CRITICAL: Error in final payment verification:`, finalPiError);
+          return NextResponse.json({ 
+            error: 'Final payment verification failed. Subscription not created.' 
+          }, { status: 400 });
+        }
+      }
+      
+      console.log(`[Webhook] All payment verifications passed. Proceeding with database update for user ${uid}`);
+      
+      // Update Firebase with complete subscription information
+      try {
+        const userRef = db.collection('users').doc(uid);
+        await userRef.set({
+          subscriptionTier,
+          subscription: {
+            status: 'active',
+            checkoutSessionId: session.id,
+            currentPeriodEnd: expiryDate,
+            priceId,
+            plan: subscriptionTier,
+            interval: interval,
+            cancelAtPeriodEnd: false,
+            updatedAt: new Date().toISOString()
+          },
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        
+        console.log(`[Webhook] Successfully updated user ${uid} with complete subscription data: ${subscriptionTier} ${interval}, expires: ${expiryDate ? new Date(expiryDate).toISOString() : 'null'}`);
+      } catch (dbError) {
+        console.error(`[Webhook] CRITICAL: Database update failed for user ${uid}:`, dbError);
+        return NextResponse.json({ 
+          error: 'Database update failed. Subscription not created.' 
+        }, { status: 500 });
+      }
       
       // Log successful subscription creation for monitoring
       try {

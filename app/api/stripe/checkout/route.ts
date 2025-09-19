@@ -81,36 +81,11 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Calculate expiry date based on interval
-    const now = new Date();
-    let expiryDate = null;
+    // SECURITY FIX: Do NOT update Firebase database here!
+    // The subscription tier should ONLY be updated by the webhook after successful payment.
+    // Updating it here allows users to get premium access without paying.
     
-    if (interval === 'monthly') {
-      expiryDate = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate()).getTime();
-    } else if (interval === 'yearly') {
-      expiryDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).getTime();
-    } else if (interval === 'biyearly') {
-      expiryDate = new Date(now.getFullYear() + 2, now.getMonth(), now.getDate()).getTime();
-    }
-    
-    // Update Firebase with pending subscription status
-    try {
-      await db.collection('users').doc(uid).set({
-        subscriptionTier: plan,
-        subscription: {
-          checkoutSessionId: session.id,
-          createdAt: new Date().toISOString(),
-          currentPeriodEnd: expiryDate,
-          priceId: priceId
-        },
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-      
-      console.log(`[Checkout] Updated Firebase for user ${uid} with pending ${plan} subscription, expires: ${expiryDate ? new Date(expiryDate).toISOString() : 'null'}`);
-    } catch (firebaseError) {
-      console.error('[Checkout] Firebase update error:', firebaseError);
-      // Don't fail the checkout if Firebase update fails
-    }
+    console.log(`[Checkout] Created checkout session ${session.id} for user ${uid}. Database will only be updated after successful payment via webhook.`);
 
     return NextResponse.json({ url: session.url });
   } catch (error: any) {
