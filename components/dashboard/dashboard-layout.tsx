@@ -172,7 +172,7 @@ export function DashboardLayout({ children, sessionId, user: propUser }: Dashboa
 
   const shareViaEmail = () => {
     if (!shareLink) return;
-    const subject = 'Shared Chat from DrInfo';
+    const subject = 'Shared Chat from DR. INFO';
     const body = `I wanted to share this chat with you: ${shareLink}`;
     const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.open(url);
@@ -203,8 +203,8 @@ export function DashboardLayout({ children, sessionId, user: propUser }: Dashboa
           // console.log("User data:", userData);
           
           // Check if user has given necessary or all consent
-          if (cookieConsent && (cookieConsent.consentType === 'necessary' || cookieConsent.consentType === 'all')) {
-            // console.log("User has valid consent, hiding banner");
+          if (cookieConsent && (cookieConsent.consentType === 'necessary' || cookieConsent.consentType === 'all' || cookieConsent.consentType === 'custom')) {
+            console.log("User has valid consent, hiding banner");
             setShowCookieBanner(false);
           } else {
             console.log("User has no valid consent, showing banner");
@@ -425,7 +425,7 @@ export function DashboardLayout({ children, sessionId, user: propUser }: Dashboa
             {pathname !== '/dashboard' && !pathname.startsWith('/drug-information') && pathname !== '/ai-results' && pathname !== '/guidelines' ? (
               <button
                 onClick={handleShare}
-                className="p-2 hover:bg-gray-100 rounded-md"
+                className="p-2 hover:bg-gray-100 rounded-md drinfo-share-step"
               >
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-7 h-7">
                   <path d="M9.40104 4.5H8.35938H2.10938V10.5V14.5V20.5H8.35938H12.566H18.776V17" stroke="#223258" strokeWidth="1.5" strokeLinecap="square"/>

@@ -648,20 +648,20 @@ export const track = {
     })
   },
 
-  acuteModeEnabled: (userId: string, enabled: boolean) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('AcuteModeEnabled', {
-      userId,
-      enabled
-    })
+  // acuteModeEnabled: (userId: string, enabled: boolean) => {
+  //   if (!shouldTrack()) return;
+  //   // Vercel Analytics
+  //   vercelTrack('AcuteModeEnabled', {
+  //     userId,
+  //     enabled
+  //   })
     
-    // Google Analytics
-    trackEngagement('acute_mode_enabled', {
-      user_id: userId,
-      enabled
-    })
-  },
+  //   // Google Analytics
+  //   trackEngagement('acute_mode_enabled', {
+  //     user_id: userId,
+  //     enabled
+  //   })
+  // },
 
   libraryClicked: (userId: string, page: string) => {
     if (!shouldTrack()) return;

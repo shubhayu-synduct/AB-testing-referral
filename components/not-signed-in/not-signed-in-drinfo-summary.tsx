@@ -943,8 +943,9 @@ export function NotSignedInDrInfoSummary() {
                           style={{ height: '24px' }}
                         />
                       </div>
-                      <div className="flex justify-between items-center mt-2">
-                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <div className="flex justify-end items-center mt-2">
+                        {/* Toggle switch for Acute/Research mode - COMMENTED OUT */}
+                        {/* <label className="flex items-center gap-2 cursor-pointer select-none">
                           <input
                             type="checkbox"
                             checked={activeMode === 'instant'}
@@ -958,7 +959,7 @@ export function NotSignedInDrInfoSummary() {
                                 style={{ fontSize: "16px", fontFamily: 'DM Sans, sans-serif' }}>
                             Acute
                           </span>
-                        </label>
+                        </label> */}
                         <button onClick={handleFollowUpQuestion} className="flex-shrink-0" disabled={isLoading}>
                           {isLoading ? (
                             <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />

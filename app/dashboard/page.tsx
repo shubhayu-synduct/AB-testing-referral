@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from 'next/link'
-import { collection, addDoc, query as firestoreQuery, where, orderBy, getDocs, doc, setDoc } from 'firebase/firestore'
+import { collection, addDoc, query as firestoreQuery, where, orderBy, getDocs, doc, setDoc, getDoc } from 'firebase/firestore'
 import { getSessionCookie } from '@/lib/auth-service'
 import { getFirebaseFirestore } from '@/lib/firebase'
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
@@ -54,9 +54,60 @@ export default function Dashboard() {
   // Tour functionality
   const tourContext = useTour()
   const [showTourPrompt, setShowTourPrompt] = useState(false)
+  const [hasValidCookieConsent, setHasValidCookieConsent] = useState(false)
 
-  // Show tour prompt after 5 seconds, but only if user hasn't completed/skipped before
+  // Check cookie consent status from Firebase
   useEffect(() => {
+    if (!user) return;
+
+    const checkCookieConsent = async () => {
+      try {
+        const db = getFirebaseFirestore();
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const cookieConsent = userData.cookieConsent;
+          
+          // Check if user has given necessary or all consent
+          if (cookieConsent && (cookieConsent.consentType === 'necessary' || cookieConsent.consentType === 'all' || cookieConsent.consentType === 'custom')) {
+            setHasValidCookieConsent(true);
+          } else {
+            setHasValidCookieConsent(false);
+          }
+        } else {
+          setHasValidCookieConsent(false);
+        }
+      } catch (err) {
+        console.error("Error checking cookie consent:", err);
+        setHasValidCookieConsent(false);
+      }
+    };
+
+    checkCookieConsent();
+
+    // Listen for cookie consent updates from the banner
+    const handleCookieConsentUpdate = () => {
+      checkCookieConsent();
+    };
+
+    window.addEventListener('cookie-consent-updated', handleCookieConsentUpdate);
+    
+    return () => {
+      window.removeEventListener('cookie-consent-updated', handleCookieConsentUpdate);
+    };
+  }, [user]);
+
+  // Show tour prompt after 5 seconds, but only if user has valid cookie consent and hasn't completed/skipped before
+  useEffect(() => {
+    // Don't show tour if no valid cookie consent
+    if (!hasValidCookieConsent) {
+      console.log('cookie consent not valid, not showing tour',hasValidCookieConsent);
+      setShowTourPrompt(false);
+      return;
+    }
+
     // Check if tour should be shown based on saved preferences
     if (tourContext && tourContext.shouldShowTour) {
       const shouldShow = tourContext.shouldShowTour();
@@ -70,7 +121,7 @@ export default function Dashboard() {
       setShowTourPrompt(true);
     }, 5000);
     return () => clearTimeout(timeout);
-  }, [tourContext]);
+  }, [tourContext, hasValidCookieConsent]);
 
   // Check if there's a meaningful change in the query
   const hasMeaningfulChange = (newQuery: string) => {
@@ -457,9 +508,9 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-center mt-2">
-                      {/* Toggle switch for Acute/Research mode */}
-                      <label className="flex items-center gap-2 cursor-pointer select-none dashboard-acute-toggle">
+                    <div className="flex justify-end items-center mt-2">
+                      {/* Toggle switch for Acute/Research mode - COMMENTED OUT */}
+                      {/* <label className="flex items-center gap-2 cursor-pointer select-none dashboard-acute-toggle">
                         <input
                           type="checkbox"
                           checked={activeMode === 'instant'}
@@ -473,7 +524,7 @@ export default function Dashboard() {
                         <span className={`font-medium`} style={{ fontSize: '16px', color: activeMode === 'instant' ? '#3771FE' : '#6B7280', fontFamily: 'DM Sans, sans-serif' }}>
                           Acute
                         </span>
-                      </label>
+                      </label> */}
                       <button 
                         type="submit" 
                         disabled={isLoading}

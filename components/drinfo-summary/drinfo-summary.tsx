@@ -2551,9 +2551,9 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                           disabled={isLoading || (status !== null && status !== 'complete' && status !== 'complete_image')}
                         />
                       </div>
-                      <div className="flex justify-between items-center mt-2">
-                        {/* Toggle switch for Acute/Research mode */}
-                        <label className={`flex items-center gap-2 select-none ${
+                      <div className="flex justify-end items-center mt-2">
+                        {/* Toggle switch for Acute/Research mode - COMMENTED OUT */}
+                        {/* <label className={`flex items-center gap-2 select-none ${
                           isLoading || (status && status !== 'complete' && status !== 'complete_image') 
                             ? 'cursor-not-allowed opacity-50' 
                             : 'cursor-pointer'
@@ -2585,7 +2585,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                 style={{ fontSize: '16px', fontFamily: 'DM Sans, sans-serif' }}>
                             Acute
                           </span>
-                        </label>
+                        </label> */}
                         <button 
                           onClick={handleFollowUpQuestion} 
                           className="flex-shrink-0" 

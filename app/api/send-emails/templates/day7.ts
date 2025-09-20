@@ -215,7 +215,7 @@ export const day7Template = {
               <div class="feature-item">
                 <div class="feature-text">
                   <h4>Full Feature Access</h4>
-                  <p>Acute Mode, follow-ups, EMA drug info, global guideline search, and transparent references</p>
+                  <p>Follow-ups, EMA drug info, global guideline search, and transparent references</p>
                 </div>
               </div>
               

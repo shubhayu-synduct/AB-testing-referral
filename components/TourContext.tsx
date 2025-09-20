@@ -267,10 +267,29 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
     return run;
   }, [run]);
 
+  // Filter out steps with missing targets
+  const getValidSteps = useCallback(() => {
+    if (typeof window === 'undefined') return steps;
+    
+    return steps.filter((step: any) => {
+      if (!step.target) return true; // Keep steps without targets
+      
+      // Check if any of the target selectors exist
+      const selectors = step.target.split(',').map((s: string) => s.trim());
+      return selectors.some((selector: string) => {
+        try {
+          return document.querySelector(selector) !== null;
+        } catch (error) {
+          return false;
+        }
+      });
+    });
+  }, []);
+
   return (
     <TourContext.Provider value={{ startTour, stopTour, run, forceStartTour, checkTourPreference, resetTourPreference, shouldShowTour, saveTourPreference, isTourActive }}>
       <Joyride
-        steps={steps as any}
+        steps={getValidSteps() as any}
         run={run}
         stepIndex={stepIndex}
         continuous
@@ -765,6 +784,25 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
     return run;
   }, [run]);
 
+  // Filter out steps with missing targets for DrinfoSummary tour
+  const getValidDrinfoSummarySteps = useCallback(() => {
+    if (typeof window === 'undefined') return drinfoSummaryTourSteps;
+    
+    return drinfoSummaryTourSteps.filter((step: any) => {
+      if (!step.target) return true; // Keep steps without targets
+      
+      // Check if any of the target selectors exist
+      const selectors = step.target.split(',').map((s: string) => s.trim());
+      return selectors.some((selector: string) => {
+        try {
+          return document.querySelector(selector) !== null;
+        } catch (error) {
+          return false;
+        }
+      });
+    });
+  }, []);
+
   return (
     <DrinfoSummaryTourContext.Provider value={{ 
       startTour, 
@@ -782,7 +820,7 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
       isTourActive
     }}>
       <Joyride
-        steps={drinfoSummaryTourSteps as any}
+        steps={getValidDrinfoSummarySteps() as any}
         run={run}
         stepIndex={stepIndex}
         continuous

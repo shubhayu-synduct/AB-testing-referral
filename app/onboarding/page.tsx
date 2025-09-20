@@ -149,6 +149,7 @@ export default function Onboarding() {
       'Pharmacist',
       'Advanced practice nurse',
       'Clinical Researcher',
+      'Medical student'
     ]
     
     const isMedical = medicalProfessions.includes(occupation)
@@ -180,6 +181,7 @@ export default function Onboarding() {
       'Pharmacist',
       'Advanced practice nurse',
       'Clinical Researcher',
+      'Medical student'
     ]
     
     const isMedical = medicalProfessions.includes(formData.occupation)
@@ -254,6 +256,7 @@ export default function Onboarding() {
       'Pharmacist',
       'Advanced practice nurse',
       'Clinical Researcher',
+      'Medical student'
     ]
     
     const isMedicalProfessional = medicalProfessions.includes(formData.occupation)
@@ -1192,7 +1195,7 @@ export default function Onboarding() {
                       checked={isHealthcareProfessional}
                       onChange={(e) => handleHealthcareProfessionalAgreement(e.target.checked)}
                       className={`mt-0.5 w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500 ${
-                        !formData.occupation || ['Physician', 'Medical fellow', 'Medical consultant', 'Medical intern/resident', 'Dentist', 'Pharmacist', 'Advanced practice nurse', 'Clinical Researcher'].includes(formData.occupation) 
+                        !formData.occupation || ['Physician', 'Medical fellow', 'Medical consultant', 'Medical intern/resident', 'Dentist', 'Pharmacist', 'Advanced practice nurse', 'Clinical Researcher', 'Medical student'].includes(formData.occupation) 
                           ? 'cursor-not-allowed' 
                           : isHealthcareProfessional ? 'cursor-pointer' : 'cursor-not-allowed'
                       }`}
@@ -1200,14 +1203,14 @@ export default function Onboarding() {
                         backgroundColor: !isHealthcareProfessional ? '#DEE8FF' : undefined, 
                         minWidth: '12px', 
                         minHeight: '12px',
-                        opacity: !formData.occupation || ['Physician', 'Medical fellow', 'Medical consultant', 'Medical intern/resident', 'Dentist', 'Pharmacist', 'Advanced practice nurse', 'Clinical Researcher'].includes(formData.occupation) ? 0.7 : 1
+                        opacity: !formData.occupation || ['Physician', 'Medical fellow', 'Medical consultant', 'Medical intern/resident', 'Dentist', 'Pharmacist', 'Advanced practice nurse', 'Clinical Researcher', 'Medical student'].includes(formData.occupation) ? 0.7 : 1
                       }}
-                      disabled={!formData.occupation || ['Physician', 'Medical fellow', 'Medical consultant', 'Medical intern/resident', 'Dentist', 'Pharmacist', 'Advanced practice nurse', 'Clinical Researcher'].includes(formData.occupation)}
+                      disabled={!formData.occupation || ['Physician', 'Medical fellow', 'Medical consultant', 'Medical intern/resident', 'Dentist', 'Pharmacist', 'Advanced practice nurse', 'Clinical Researcher', 'Medical student'].includes(formData.occupation)}
                     />
                     <label 
                       htmlFor="healthcare-professional" 
                       className={`${
-                        !formData.occupation || ['Physician', 'Medical fellow', 'Medical consultant', 'Medical intern/resident', 'Dentist', 'Pharmacist', 'Advanced practice nurse', 'Clinical Researcher'].includes(formData.occupation) 
+                        !formData.occupation || ['Physician', 'Medical fellow', 'Medical consultant', 'Medical intern/resident', 'Dentist', 'Pharmacist', 'Advanced practice nurse', 'Clinical Researcher', 'Medical student'].includes(formData.occupation) 
                           ? 'cursor-not-allowed' 
                           : isHealthcareProfessional ? 'cursor-pointer' : 'cursor-not-allowed'
                       }`} 
