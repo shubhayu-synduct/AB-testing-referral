@@ -49,6 +49,9 @@ function generateBlockedPage(country: string): string {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Access Restricted</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
         <style>
             * {
                 margin: 0;
@@ -56,7 +59,7 @@ function generateBlockedPage(country: string): string {
                 box-sizing: border-box;
             }
             body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
                 background: #3771FE;
                 min-height: 100vh;
                 display: flex;
@@ -70,55 +73,36 @@ function generateBlockedPage(country: string): string {
                 border-radius: 16px;
                 box-shadow: 0 20px 60px rgba(55, 113, 254, 0.2);
                 text-align: center;
-                max-width: 500px;
+                max-width: 400px;
                 margin: 2rem;
                 border: 1px solid rgba(55, 113, 254, 0.1);
             }
             .icon {
                 font-size: 4rem;
-                margin-bottom: 1rem;
+                margin-bottom: 1.5rem;
                 color: #3771FE;
             }
             h1 {
-                font-size: 2rem;
-                margin-bottom: 1rem;
+                font-size: 1.75rem;
+                margin-bottom: 1.5rem;
                 color: #3771FE;
                 font-weight: 600;
+                font-family: 'DM Sans', sans-serif;
             }
             p {
                 color: #6b7280;
                 line-height: 1.6;
-                margin-bottom: 1rem;
-            }
-            .country {
-                background: rgba(55, 113, 254, 0.1);
-                padding: 0.5rem 1rem;
-                border-radius: 8px;
-                display: inline-block;
-                margin: 1rem 0;
-                font-weight: 500;
-                color: #3771FE;
-                border: 1px solid rgba(55, 113, 254, 0.2);
-            }
-            .footer {
-                margin-top: 2rem;
-                padding-top: 2rem;
-                border-top: 1px solid rgba(55, 113, 254, 0.1);
-                font-size: 0.875rem;
-                color: #9ca3af;
+                font-size: 1rem;
+                font-family: 'DM Sans', sans-serif;
+                font-weight: 400;
             }
         </style>
     </head>
     <body>
         <div class="container">
             <div class="icon">🌍</div>
-            <h1>Access Restricted</h1>
-            <p>We apologize, but access to this service is currently restricted in your region.</p>
-            <div class="country">Detected Location: ${country}</div>
-            <p>This restriction is in place due to regulatory compliance requirements. We appreciate your understanding.</p>
-            <div class="footer">
-                <p>If you believe this is an error, please contact our support team.</p>
-            </div>
+            <h1>Not Available</h1>
+            <p>We are sorry, we are not available in your region at this time.</p>
         </div>
     </body>
     </html>
