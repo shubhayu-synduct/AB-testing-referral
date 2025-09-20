@@ -220,8 +220,7 @@ export default function DrugDetailPage() {
         // AI Suggestions
         (async () => {
           try {
-            const { authenticatedFetch } = await import('@/lib/authenticated-api');
-            const response = await authenticatedFetch('/api/suggestions', {
+            const response = await fetch('/api/suggestions', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -268,7 +267,7 @@ export default function DrugDetailPage() {
       ]);
       
       // Combine results - mix EMA and AI suggestions
-      let allRecommendations = [];
+      let allRecommendations: Drug[] = [];
       
       // Add EMA results first
       if (emaResults.status === 'fulfilled' && emaResults.value.length > 0) {
@@ -446,7 +445,7 @@ export default function DrugDetailPage() {
     return (
       <div className="flex flex-col h-[calc(100vh-64px)]">
         {/* Fixed header section */}
-        <div className="bg-white border-b border-gray-200 px-4 py-4">
+        <div className="bg-gray-50 px-4 py-4">
           <div className="max-w-4xl mx-auto">
             {/* Search bar with autocomplete and back button */}
             <div className="relative mb-0" ref={searchContainerRef}>
@@ -457,7 +456,7 @@ export default function DrugDetailPage() {
                 <input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Search drugs or ask medical questions..."
+                  placeholder="Search drugs..."
                   className="flex-1 py-2 md:py-3 px-2 md:px-3 outline-none text-[#223258] font-['DM_Sans'] font-[400] text-[14px] md:text-[16px] leading-[100%] tracking-[0%] placeholder-[#9599A8] placeholder:font-['DM_Sans'] placeholder:text-[14px] md:placeholder:text-[16px]"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -563,7 +562,7 @@ export default function DrugDetailPage() {
             <div className="flex items-start mb-6 mt-4">
               <Image src="/answer-icon.svg" alt="Answer Icon" width={24} height={24} className="mt-1 mr-3" />
               <h2 className="text-lg text-[#273561] font-['DM_Sans'] font-regular">
-                Drug information from the European Medicines Agency approved Summary of Product Characteristics
+                Drug information from the EMA approved Summary of Product Characteristics
               </h2>
             </div>
             
