@@ -385,47 +385,57 @@ export function DashboardLayout({ children, sessionId, user: propUser }: Dashboa
     <div className="flex h-screen bg-gray-50">
       {/* Mobile Top Navbar */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 z-40 flex items-center px-4">
-        <div className="flex items-center justify-between w-full">
-          {isOpen ? (
-            <button
-              className="p-2 hover:bg-gray-100 rounded-md"
-              onClick={() => setIsOpen(false)}
-            >
-              <svg width="28" height="28" viewBox="0 0 26 27" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-7 h-7">
-                <path d="M14.1 4H11.9H2.15712L2 14V24H11.9H14.1H24V14V4H14.1Z" stroke="#223258" strokeWidth="1.625"/>
-                <path d="M10 4V24" stroke="#223258" strokeWidth="1.625" strokeLinejoin="round"/>
-                <path d="M5 8H7" stroke="#223258" strokeWidth="1.625" strokeLinecap="square" strokeLinejoin="round"/>
-                <path d="M18 12L16 14L17.9 16" stroke="#223258" strokeWidth="1.625" strokeLinecap="square"/>
-              </svg>
-            </button>
-          ) : (
-            <button
-              className="p-2 hover:bg-gray-100 rounded-md"
-              onClick={() => setIsOpen(true)}
-            >
-              <svg width="28" height="28" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-7 h-7">
-                <path d="M11.8961 3.00106H14.0961L23.9961 3V13.0005V23H14.0961H11.8961H1.99609V13.0005V3.00106H11.8961Z" stroke="#223258" strokeWidth="1.625"/>
-                <path d="M15.9961 4V22" stroke="#223258" strokeWidth="1.625" strokeLinecap="square"/>
-                <path d="M20.9961 7H18.9961" stroke="#223258" strokeWidth="1.625" strokeLinecap="square" strokeLinejoin="round"/>
-                <path d="M8.99609 11L10.1328 12.0572L10.9961 13.0084L10.1328 13.9428L8.99609 15" stroke="#223258" strokeWidth="1.625" strokeLinecap="square"/>
-              </svg>
-            </button>
-          )}
-          <div className="flex-1 flex justify-center">
-            <h1 className="text-[#204398] font-semibold text-lg">{getPageTitle()}</h1>
+        <div className="flex items-center w-full relative">
+          {/* Left side - Sidebar button */}
+          <div className="flex-shrink-0">
+            {isOpen ? (
+              <button
+                className="p-2 hover:bg-gray-100 rounded-md"
+                onClick={() => setIsOpen(false)}
+              >
+                <svg width="28" height="28" viewBox="0 0 26 27" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-7 h-7">
+                  <path d="M14.1 4H11.9H2.15712L2 14V24H11.9H14.1H24V14V4H14.1Z" stroke="#223258" strokeWidth="1.625"/>
+                  <path d="M10 4V24" stroke="#223258" strokeWidth="1.625" strokeLinejoin="round"/>
+                  <path d="M5 8H7" stroke="#223258" strokeWidth="1.625" strokeLinecap="square" strokeLinejoin="round"/>
+                  <path d="M18 12L16 14L17.9 16" stroke="#223258" strokeWidth="1.625" strokeLinecap="square"/>
+                </svg>
+              </button>
+            ) : (
+              <button
+                className="p-2 hover:bg-gray-100 rounded-md"
+                onClick={() => setIsOpen(true)}
+              >
+                <svg width="28" height="28" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-7 h-7">
+                  <path d="M11.8961 3.00106H14.0961L23.9961 3V13.0005V23H14.0961H11.8961H1.99609V13.0005V3.00106H11.8961Z" stroke="#223258" strokeWidth="1.625"/>
+                  <path d="M15.9961 4V22" stroke="#223258" strokeWidth="1.625" strokeLinecap="square"/>
+                  <path d="M20.9961 7H18.9961" stroke="#223258" strokeWidth="1.625" strokeLinecap="square" strokeLinejoin="round"/>
+                  <path d="M8.99609 11L10.1328 12.0572L10.9961 13.0084L10.1328 13.9428L8.99609 15" stroke="#223258" strokeWidth="1.625" strokeLinecap="square"/>
+                </svg>
+              </button>
+            )}
           </div>
-          {pathname !== '/dashboard' && !pathname.startsWith('/drug-information') && pathname !== '/ai-results' && pathname !== '/guidelines' && (
-            <button
-              onClick={handleShare}
-              className="p-2 hover:bg-gray-100 rounded-md"
-            >
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-7 h-7">
-                <path d="M9.40104 4.5H8.35938H2.10938V10.5V14.5V20.5H8.35938H12.566H18.776V17" stroke="#223258" strokeWidth="1.5" strokeLinecap="square"/>
-                <path d="M16.1667 3.85355V7H12.5208C9.64435 7 7.3125 9.23858 7.3125 12V14.5C7.3125 14.5 8.875 11 13.1157 11H16.1667V14.1464C16.1667 14.3417 16.3316 14.5 16.535 14.5C16.6326 14.5 16.7263 14.4628 16.7954 14.3964L21.8958 9L16.7954 3.60355C16.7263 3.53725 16.6326 3.5 16.535 3.5C16.3316 3.5 16.1667 3.65829 16.1667 3.85355Z" stroke="#223258" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-            </button>
-          )}
-          {pathname === '/dashboard' && <div className="w-11" />}
+          
+          {/* Center - Title */}
+          <div className="absolute left-1/2 transform -translate-x-1/2">
+            <h1 className="text-[#204398] font-semibold text-lg whitespace-nowrap">{getPageTitle()}</h1>
+          </div>
+          
+          {/* Right side - Share button or spacer */}
+          <div className="flex-shrink-0 ml-auto">
+            {pathname !== '/dashboard' && !pathname.startsWith('/drug-information') && pathname !== '/ai-results' && pathname !== '/guidelines' ? (
+              <button
+                onClick={handleShare}
+                className="p-2 hover:bg-gray-100 rounded-md"
+              >
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-7 h-7">
+                  <path d="M9.40104 4.5H8.35938H2.10938V10.5V14.5V20.5H8.35938H12.566H18.776V17" stroke="#223258" strokeWidth="1.5" strokeLinecap="square"/>
+                  <path d="M16.1667 3.85355V7H12.5208C9.64435 7 7.3125 9.23858 7.3125 12V14.5C7.3125 14.5 8.875 11 13.1157 11H16.1667V14.1464C16.1667 14.3417 16.3316 14.5 16.535 14.5C16.6326 14.5 16.7263 14.4628 16.7954 14.3964L21.8958 9L16.7954 3.60355C16.7263 3.53725 16.6326 3.5 16.535 3.5C16.3316 3.5 16.1667 3.65829 16.1667 3.85355Z" stroke="#223258" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </button>
+            ) : (
+              <div className="w-11" />
+            )}
+          </div>
         </div>
       </div>
       
