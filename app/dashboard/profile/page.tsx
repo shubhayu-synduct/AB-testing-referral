@@ -18,7 +18,7 @@ function ProfilePageContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'subscription' | 'feedback'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'subscription' | 'feedback'>('profile');
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('yearly');
   const [currentSubscription, setCurrentSubscription] = useState<any>(null);
   const [showSpecialtiesDropdown, setShowSpecialtiesDropdown] = useState(false);
@@ -37,6 +37,18 @@ function ProfilePageContent() {
   const [countrySearchTerm, setCountrySearchTerm] = useState('');
   const [occupationSearchTerm, setOccupationSearchTerm] = useState('');
   const [placeOfWorkSearchTerm, setPlaceOfWorkSearchTerm] = useState('');
+  const [cookiePreferences, setCookiePreferences] = useState({
+    analytics: false,
+    marketing: false,
+    functional: false
+  });
+  const [originalCookiePreferences, setOriginalCookiePreferences] = useState({
+    analytics: false,
+    marketing: false,
+    functional: false
+  });
+  const [preferencesSaving, setPreferencesSaving] = useState(false);
+  const [preferencesSuccess, setPreferencesSuccess] = useState(false);
 
   // Occupation and Specialties options
   const occupationOptions = [
@@ -96,6 +108,8 @@ function ProfilePageContent() {
     const tabParam = searchParams.get('tab');
     if (tabParam === 'subscription') {
       setActiveTab('subscription');
+    } else if (tabParam === 'preferences') {
+      setActiveTab('preferences');
     } else if (tabParam === 'profile') {
       setActiveTab('profile');
     }
@@ -136,6 +150,18 @@ function ProfilePageContent() {
           tier: docSnap.data().subscriptionTier || 'free',
           subscription: docSnap.data().subscription || null
         });
+
+        // Set cookie preferences from Firebase
+        const cookieConsent = docSnap.data().cookieConsent;
+        if (cookieConsent) {
+          const preferences = {
+            analytics: cookieConsent.analytics || false,
+            marketing: cookieConsent.marketing || false,
+            functional: cookieConsent.functional || false
+          };
+          setCookiePreferences(preferences);
+          setOriginalCookiePreferences(preferences);
+        }
       }
       setLoading(false);
     };
@@ -148,6 +174,13 @@ function ProfilePageContent() {
       return () => clearTimeout(timer);
     }
   }, [success]);
+
+  useEffect(() => {
+    if (preferencesSuccess) {
+      const timer = setTimeout(() => setPreferencesSuccess(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [preferencesSuccess]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -186,6 +219,62 @@ function ProfilePageContent() {
     setProfile((prev: any) => ({ ...prev, specialties: e.target.value.split(",").map((s) => s.trim()) }));
   };
 
+  const toggleCookie = (type: 'analytics' | 'marketing' | 'functional') => {
+    setCookiePreferences(prev => ({
+      ...prev,
+      [type]: !prev[type]
+    }));
+  };
+
+  const handlePreferencesSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPreferencesSaving(true);
+    setPreferencesSuccess(false);
+    
+    const auth = await getFirebaseAuth();
+    const user = auth.currentUser;
+    if (user) {
+      const db = getFirebaseFirestore();
+      const docRef = doc(db, "users", user.uid);
+      
+      const consent: any = {
+        necessary: true, // Always true
+        analytics: cookiePreferences.analytics,
+        marketing: cookiePreferences.marketing,
+        functional: cookiePreferences.functional,
+        consentedAt: new Date().toISOString(),
+        consentType: 'custom'
+      };
+      
+      // Update Firebase with new cookie preferences
+      await updateDoc(docRef, {
+        "cookieConsent": consent
+      });
+      
+      // Also update localStorage
+      localStorage.setItem('drinfo-cookie-consent', JSON.stringify(consent));
+      
+      // Dispatch event to notify other components about consent update
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('cookie-consent-updated'));
+      }
+      
+      // Update original preferences to match current
+      setOriginalCookiePreferences(cookiePreferences);
+      setPreferencesSuccess(true);
+    }
+    setPreferencesSaving(false);
+  };
+
+  // Check if preferences have changed
+  const hasPreferencesChanged = () => {
+    return (
+      cookiePreferences.analytics !== originalCookiePreferences.analytics ||
+      cookiePreferences.marketing !== originalCookiePreferences.marketing ||
+      cookiePreferences.functional !== originalCookiePreferences.functional
+    );
+  };
+
   const getCurrentPlanDisplay = () => {
     if (!currentSubscription) return 'Free';
     
@@ -221,7 +310,7 @@ function ProfilePageContent() {
     return currentSubscription.subscription.interval === interval;
   };
 
-  const handleTabChange = (tab: 'profile' | 'subscription' | 'feedback') => {
+  const handleTabChange = (tab: 'profile' | 'preferences' | 'subscription' | 'feedback') => {
     setActiveTab(tab);
     router.push(`/dashboard/profile?tab=${tab}`);
   };
@@ -475,6 +564,13 @@ function ProfilePageContent() {
             onClick={() => handleTabChange('profile')}
           >
             Profile
+          </button>
+          <button
+            className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
+              ${activeTab === 'preferences' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
+            onClick={() => handleTabChange('preferences')}
+          >
+            Preferences
           </button>
           <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
@@ -1005,6 +1101,198 @@ function ProfilePageContent() {
               >
                 Delete Profile
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Preferences Tab Content */}
+        {activeTab === 'preferences' && (
+          <div>
+            <h2 className="text-xl font-regular text-[#000000] mb-1">Cookie Preferences</h2>
+            <p className="text-[#747474] text-sm mb-6">Manage your cookie preferences and privacy settings</p>
+            <div className="border border-[#B5C9FC] rounded-[10px] p-4 md:p-8 bg-[#F4F7FF] w-full">
+              <form onSubmit={handlePreferencesSubmit}>
+                <div className="space-y-4">
+                  {/* Necessary Cookies - Locked */}
+                  <div className="bg-[#E4ECFF] rounded-lg p-4 border border-[#B5C9FC]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center border border-[#223258]">
+                          <svg className="w-4 h-4 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-[#223258] font-['DM_Sans']">Necessary</h4>
+                          <p className="text-xs text-[#747474] font-['DM_Sans']">Authentication & security</p>
+                        </div>
+                      </div>
+                      <div className="relative w-12 h-6 rounded-full bg-[#223258]">
+                        <div className="absolute top-0.5 right-0.5 w-5 h-5 bg-white rounded-full flex items-center justify-center">
+                          <svg className="w-3 h-3 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Analytics Cookies */}
+                  <div className="bg-white rounded-lg p-4 border border-[#B5C9FC]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-[#E4ECFF] rounded-full flex items-center justify-center">
+                          <svg className="w-4 h-4 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-[#223258] font-['DM_Sans']">Analytics</h4>
+                          <p className="text-xs text-[#747474] font-['DM_Sans']">Website performance & usage</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleCookie('analytics')}
+                        className={`relative w-12 h-6 rounded-full transition-all duration-300 ease-in-out ${
+                          cookiePreferences.analytics ? 'bg-[#214498]' : 'bg-gray-300'
+                        }`}
+                      >
+                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all duration-300 ease-in-out flex items-center justify-center ${
+                          cookiePreferences.analytics ? 'left-6' : 'left-0.5'
+                        }`}>
+                          {cookiePreferences.analytics ? (
+                            <svg className="w-3 h-3 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Marketing Cookies */}
+                  <div className="bg-white rounded-lg p-4 border border-[#B5C9FC]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-[#E4ECFF] rounded-full flex items-center justify-center">
+                          <svg className="w-4 h-4 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-[#223258] font-['DM_Sans']">Marketing</h4>
+                          <p className="text-xs text-[#747474] font-['DM_Sans']">Personalized ads & content</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleCookie('marketing')}
+                        className={`relative w-12 h-6 rounded-full transition-all duration-300 ease-in-out ${
+                          cookiePreferences.marketing ? 'bg-[#214498]' : 'bg-gray-300'
+                        }`}
+                      >
+                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all duration-300 ease-in-out flex items-center justify-center ${
+                          cookiePreferences.marketing ? 'left-6' : 'left-0.5'
+                        }`}>
+                          {cookiePreferences.marketing ? (
+                            <svg className="w-3 h-3 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Functional Cookies */}
+                  <div className="bg-white rounded-lg p-4 border border-[#B5C9FC]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-[#E4ECFF] rounded-full flex items-center justify-center">
+                          <svg className="w-4 h-4 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-[#223258] font-['DM_Sans']">Functional</h4>
+                          <p className="text-xs text-[#747474] font-['DM_Sans']">User preferences & customization</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleCookie('functional')}
+                        className={`relative w-12 h-6 rounded-full transition-all duration-300 ease-in-out ${
+                          cookiePreferences.functional ? 'bg-[#214498]' : 'bg-gray-300'
+                        }`}
+                      >
+                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all duration-300 ease-in-out flex items-center justify-center ${
+                          cookiePreferences.functional ? 'left-6' : 'left-0.5'
+                        }`}>
+                          {cookiePreferences.functional ? (
+                            <svg className="w-3 h-3 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <div className="flex items-top justify-between">
+                    <p className="text-xs text-[#747474] font-['DM_Sans']">
+                      Read our{' '}
+                      <a 
+                        href="https://drinfo.ai/privacy-policy/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-black underline hover:text-[#3771FE] transition-colors"
+                      >
+                        privacy policy
+                      </a>
+                      {' '}and{' '}
+                      <a 
+                        href="https://drinfo.ai/cookie-policy/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-black underline hover:text-[#3771FE] transition-colors"
+                      >
+                        cookie policy
+                      </a>
+                    </p>
+                    
+                    <button
+                      type="submit"
+                      disabled={preferencesSaving}
+                      className="bg-[#F4F7FF] border border-[#B5C9FC] text-[#747474] font-regular px-8 py-2 rounded-[8px] transition-colors text-lg w-56 hover:bg-[#E8F0FF] hover:text-[#223258]"
+                    >
+                      {preferencesSaving ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                  
+                  {preferencesSuccess && (
+                    <div className="mt-2 font-medium text-right" style={{ color: '#8991AA' }}>
+                      Preferences saved successfully!
+                    </div>
+                  )}
+                </div>
+              </form>
             </div>
           </div>
         )}
