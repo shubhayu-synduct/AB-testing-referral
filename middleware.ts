@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 // Blocked countries list - Cuba, Iran, North Korea, Syria, Sudan, Belarus, Russia,
-const BLOCKED_COUNTRIES = ['CU', 'IR', 'KP', 'SY', 'SD', 'BY', 'RU', ]
+const BLOCKED_COUNTRIES = ['CU', 'IR', 'KP', 'SY', 'SD', 'BY', 'RU']
 
 // Check if geo-fencing is enabled (can be disabled via environment variable)
 const GEO_FENCING_ENABLED = process.env.NEXT_PUBLIC_GEO_FENCING_ENABLED !== 'false'
