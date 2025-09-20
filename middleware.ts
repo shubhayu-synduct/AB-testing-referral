@@ -1,9 +1,196 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
+// Blocked countries list - Cuba, Iran, North Korea, Syria, Sudan, Belarus, Russia, India
+const BLOCKED_COUNTRIES = ['CU', 'IR', 'KP', 'SY', 'SD', 'BY', 'RU', 'IN']
+
+// Check if geo-fencing is enabled (can be disabled via environment variable)
+const GEO_FENCING_ENABLED = process.env.NEXT_PUBLIC_GEO_FENCING_ENABLED !== 'false'
+
+// Function to check if country is blocked
+function isCountryBlocked(country: string | undefined): boolean {
+  if (!country) return false
+  return BLOCKED_COUNTRIES.includes(country.toUpperCase())
+}
+
+// Function to check if path should be whitelisted (allowed even for blocked countries)
+function isPathWhitelisted(path: string): boolean {
+  const whitelistedPaths = [
+    // Static files
+    '/_next',
+    '/favicon.ico',
+    '/robots.txt',
+    '/sitemap.xml',
+    // Images and assets
+    '.svg',
+    '.ico',
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.webp',
+    '.css',
+    '.js',
+    // API routes (optional - you may want to block these too)
+    '/api',
+  ]
+  
+  return whitelistedPaths.some(whitelist => 
+    path.startsWith(whitelist) || path.endsWith(whitelist)
+  )
+}
+
+// Function to generate blocked country page
+function generateBlockedPage(country: string): string {
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Access Restricted</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                background: #3771FE;
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #333;
+            }
+            .container {
+                background: white;
+                padding: 3rem 2rem;
+                border-radius: 16px;
+                box-shadow: 0 20px 60px rgba(55, 113, 254, 0.2);
+                text-align: center;
+                max-width: 500px;
+                margin: 2rem;
+                border: 1px solid rgba(55, 113, 254, 0.1);
+            }
+            .icon {
+                font-size: 4rem;
+                margin-bottom: 1rem;
+                color: #3771FE;
+            }
+            h1 {
+                font-size: 2rem;
+                margin-bottom: 1rem;
+                color: #3771FE;
+                font-weight: 600;
+            }
+            p {
+                color: #6b7280;
+                line-height: 1.6;
+                margin-bottom: 1rem;
+            }
+            .country {
+                background: rgba(55, 113, 254, 0.1);
+                padding: 0.5rem 1rem;
+                border-radius: 8px;
+                display: inline-block;
+                margin: 1rem 0;
+                font-weight: 500;
+                color: #3771FE;
+                border: 1px solid rgba(55, 113, 254, 0.2);
+            }
+            .footer {
+                margin-top: 2rem;
+                padding-top: 2rem;
+                border-top: 1px solid rgba(55, 113, 254, 0.1);
+                font-size: 0.875rem;
+                color: #9ca3af;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="icon">🌍</div>
+            <h1>Access Restricted</h1>
+            <p>We apologize, but access to this service is currently restricted in your region.</p>
+            <div class="country">Detected Location: ${country}</div>
+            <p>This restriction is in place due to regulatory compliance requirements. We appreciate your understanding.</p>
+            <div class="footer">
+                <p>If you believe this is an error, please contact our support team.</p>
+            </div>
+        </div>
+    </body>
+    </html>
+  `
+}
+
 export async function middleware(request: NextRequest) {
   // Get the path of the request
   const path = request.nextUrl.pathname
+
+  // Step 1: Geo-detection - Try multiple methods to get country
+  let country: string | undefined
+
+  // Method 1: Vercel's edge runtime geo detection
+  country = (request as any).geo?.country
+
+  // Method 2: Cloudflare headers (fallback)
+  if (!country) {
+    country = request.headers.get('cf-ipcountry') || undefined
+  }
+
+  // Method 3: Vercel country headers (fallback)
+  if (!country) {
+    country = request.headers.get('x-vercel-ip-country') || undefined
+  }
+
+  // Method 4: Default fallback
+  if (!country) {
+    country = 'US'
+  }
+
+  // Step 2: Check if geo-fencing is enabled
+  if (!GEO_FENCING_ENABLED) {
+    // Geo-fencing is disabled, skip to auth logic
+    // Log for monitoring
+    console.log('ℹ️ Geo-fencing disabled, allowing all countries:', { country, path })
+  } else {
+    // Step 3: Check if country is blocked and path is not whitelisted
+    const countryBlocked = isCountryBlocked(country)
+    const pathWhitelisted = isPathWhitelisted(path)
+
+    // Log geo-detection for monitoring (only in production)
+    if (process.env.NODE_ENV === 'production') {
+      console.log('🌍 Geo-detection:', { country, path, blocked: countryBlocked, whitelisted: pathWhitelisted })
+    }
+
+    // Step 4: Block if country is blocked AND path is not whitelisted
+    if (countryBlocked && !pathWhitelisted) {
+      // Log the blocked attempt
+      console.log('🚫 Geo-fence block:', {
+        country,
+        path,
+        userAgent: request.headers.get('user-agent') || 'Unknown',
+        ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'Unknown',
+        timestamp: new Date().toISOString()
+      })
+
+      // Return blocked page with proper headers
+      return new NextResponse(generateBlockedPage(country), {
+        status: 403,
+        headers: {
+          'Content-Type': 'text/html',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'X-Robots-Tag': 'noindex, nofollow',
+          'X-Blocked-Country': country,
+          'X-Blocked-Reason': 'geo-restriction'
+        }
+      })
+    }
+  }
+
+  // Step 5: If not blocked or path is whitelisted, continue with existing auth logic
 
   // Define public paths that don't require authentication
   const isPublicPath = path === "/" || 
@@ -65,17 +252,13 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next()
 }
 
-// Configure the middleware to run on specific paths
+// Configure the middleware to run on all paths for geo-fencing
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - verify-email (email verification flow)
+     * Match all request paths - geo-fencing needs to check every request
+     * The middleware will handle whitelisting internally
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|verify-email).*)',
+    '/((?!_next/static|_next/image).*)',
   ],
 }
