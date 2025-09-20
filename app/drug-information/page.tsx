@@ -174,7 +174,9 @@ export default function DrugInformationPage() {
               brand_name: suggestion,
               active_substance: ['Drug Suggestion'],
               inn: [],
-              search_type: 'ai_suggestion'
+              search_type: 'ai_suggestion',
+              first_letter: suggestion.charAt(0).toUpperCase(),
+              pdf_url: ''
             }));
           } catch (error) {
             logger.error('Gemini drug suggestions failed:', error);
@@ -196,14 +198,16 @@ export default function DrugInformationPage() {
               brand_name: suggestion,
               active_substance: ['Drug Suggestion'],
               inn: [],
-              search_type: 'ai_suggestion'
+              search_type: 'ai_suggestion',
+              first_letter: suggestion.charAt(0).toUpperCase(),
+              pdf_url: ''
             }));
           }
         })()
       ]);
       
       // Combine results - mix EMA and AI suggestions
-      let allRecommendations = [];
+      let allRecommendations: Drug[] = [];
       
       // Add EMA results first
       if (emaResults.status === 'fulfilled' && emaResults.value.length > 0) {
@@ -257,7 +261,9 @@ export default function DrugInformationPage() {
           brand_name: suggestion,
           active_substance: ['AI Suggestion'],
           inn: [],
-          search_type: 'ai_suggestion'
+          search_type: 'ai_suggestion',
+          first_letter: suggestion.charAt(0).toUpperCase(),
+          pdf_url: ''
         }));
         
         setRecommendations([...fallbackData.slice(0, 3), ...aiFallback]);
@@ -272,7 +278,9 @@ export default function DrugInformationPage() {
           brand_name: suggestion,
           active_substance: ['AI Suggestion'],
           inn: [],
-          search_type: 'ai_suggestion'
+          search_type: 'ai_suggestion',
+          first_letter: suggestion.charAt(0).toUpperCase(),
+          pdf_url: ''
         }));
         setRecommendations(finalFallback);
       }
@@ -366,7 +374,7 @@ export default function DrugInformationPage() {
       ]);
       
       // Combine results
-      let allRecommendations = [];
+      let allRecommendations: Drug[] = [];
       
       // Add EMA results
       if (emaResults.status === 'fulfilled' && emaResults.value.length > 0) {
@@ -495,7 +503,7 @@ export default function DrugInformationPage() {
           <div className="text-center mb-4 md:mb-0">
             <h1 className="hidden md:block text-[36px] font-semibold text-[#214498] mb-[4px] mt-0 font-['DM_Sans'] font-[600]">Drug Information</h1>
             <p className="hidden md:block text-[14px] md:text-[16px] text-[#64748B] font-['DM_Sans'] mt-2">
-              Drug insights from EMA and AI literature summaries
+              Drug information from EMA and AI generated summaries from trusted drug sources.
             </p>
           </div>
           <div>
@@ -517,7 +525,7 @@ export default function DrugInformationPage() {
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Search drugs or ask medical questions..."
+              placeholder="Search drugs..."
               className="flex-1 py-2 md:py-3 px-2 md:px-3 outline-none text-[#223258] font-['DM_Sans'] font-[400] text-[14px] md:text-[16px] leading-[100%] tracking-[0%] placeholder-[#9599A8] placeholder:font-['DM_Sans'] placeholder:text-[14px] md:placeholder:text-[16px]"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}

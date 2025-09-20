@@ -2147,8 +2147,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
           </div>
         </div>
       )}
-      {/* Top Bar with Share Button */}
-      <div className="flex justify-between items-center mb-4 px-2 sm:px-4">
+      {/* Top Bar with Share Button - Hidden on mobile, shown on desktop */}
+      <div className="hidden md:flex justify-between items-center mb-4 px-2 sm:px-4">
         <div className="flex-1"></div>
         <button
           onClick={handleShare}

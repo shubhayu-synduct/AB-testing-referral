@@ -28,9 +28,11 @@ interface Citation {
   text: string;
   source: string;
   url?: string;
-  title?: string;
+  title: string;
   description?: string;
   type?: string;
+  source_type?: string;
+  drug_citation_type?: string;
 }
 
 interface Message {
@@ -143,12 +145,12 @@ function AIResultsContent() {
     }
   }, [sessionId, user, query]);
 
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
+  // Auto-scroll to bottom when new messages arrive - DISABLED
+  // useEffect(() => {
+  //   if (messagesEndRef.current) {
+  //     messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  //   }
+  // }, [messages]);
 
   // Add citation tooltip functionality
   useEffect(() => {
@@ -363,17 +365,12 @@ function AIResultsContent() {
     setIsStreaming(true);
     setStreamedContent('');
     
-    let accumulatedContent = '';
-    
     try {
       await sendDrugFollowUpQuestion(
         question,
         currentThreadId,
-        // onChunk callback
-        (chunk: string) => {
-          accumulatedContent += chunk;
-          setStreamedContent(accumulatedContent);
-        },
+        // onChunk callback - not used for non-streaming
+        () => {},
         // onStatus callback
         (status: string, message?: string) => {
           logger.info(`Follow-up question status: ${status} - ${message || ''}`);
@@ -384,7 +381,7 @@ function AIResultsContent() {
           const updatedMessages = newMessages.map(msg => 
             msg.id === assistantMessage.id ? {
               ...msg,
-              content: data.processed_content || accumulatedContent,
+              content: data.processed_content || '',
               citations: (data.citations as any) || {},
               sources: [],
               threadId: currentThreadId,
@@ -566,7 +563,7 @@ function AIResultsContent() {
       ]);
       
       // Combine results - mix EMA and AI suggestions
-      let allRecommendations = [];
+      let allRecommendations: any[] = [];
       
       // Add EMA results first
       if (emaResults.status === 'fulfilled' && emaResults.value.length > 0) {
@@ -643,6 +640,7 @@ function AIResultsContent() {
   const handleSearchBarSubmit = () => {
     if (!searchTerm.trim()) return;
     
+    setShowRecommendations(false);
     // Navigate to new AI results with the search term
     const searchParams = new URLSearchParams();
     searchParams.set('q', searchTerm.trim());
@@ -654,37 +652,31 @@ function AIResultsContent() {
     setShowCitationsSidebar(true);
   };
 
-  // Main search function with content streaming using drug summary service
+  // Main search function without streaming - display final answer directly
   const handleSearchWithContent = async (searchQuery: string, messageId: string, currentMessages: Message[]) => {
     setIsStreaming(true);
     setStreamedContent('');
     setCurrentThreadId(null);
     
-    let accumulatedContent = '';
-    let sessionId: string | null = null;
-    
     try {
       await fetchDrugSummary(
         searchQuery,
-        // onChunk callback
-        (chunk: string) => {
-          accumulatedContent += chunk;
-          setStreamedContent(accumulatedContent);
-        },
+        // onChunk callback - not used for non-streaming
+        () => {},
         // onStatus callback
         (status: string, message?: string) => {
           logger.info(`Drug summary status: ${status} - ${message || ''}`);
         },
         // onComplete callback
         (data: DrugSummaryData) => {
-          sessionId = data.session_id || null;
+          const sessionId = data.session_id || null;
           setCurrentThreadId(sessionId);
           
           // Update the assistant message with final content and citations from backend
           const updatedMessages = currentMessages.map(msg => 
             msg.id === messageId ? {
               ...msg,
-              content: data.processed_content || accumulatedContent,
+              content: data.processed_content || '',
               citations: (data.citations as any) || {},
               sources: [],
               threadId: sessionId,
@@ -694,12 +686,12 @@ function AIResultsContent() {
             } : msg
           );
           
-          setMessages(updatedMessages);
+          setMessages(updatedMessages as Message[]);
           setStreamedContent('');
           setIsStreaming(false);
           
           // Save to Firebase
-          saveChatSession(updatedMessages).catch(error => {
+          saveChatSession(updatedMessages as Message[]).catch(error => {
             logger.error('Failed to save chat session:', error);
           });
           
@@ -1094,7 +1086,7 @@ function AIResultsContent() {
       {user && (
       <div className="flex-1 flex flex-col bg-gray-50">
         {/* Search Bar */}
-        <div className="sticky top-0 z-50 bg-white border-b border-gray-200 py-3">
+        <div className="sticky top-0 z-30 md:z-50 bg-gray-50 py-3">
           <div className="max-w-4xl mx-auto px-2 sm:px-4">
             <div className="relative mb-0" ref={searchContainerRef}>
               {/* Unified search with gradient border */}
@@ -1111,7 +1103,7 @@ function AIResultsContent() {
                 <input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Search drugs or ask medical questions..."
+                  placeholder="Search drugs..."
                   className="flex-1 py-2 md:py-3 px-2 md:px-3 outline-none text-[#223258] font-['DM_Sans'] font-[400] text-[14px] md:text-[16px] leading-[100%] tracking-[0%] placeholder-[#9599A8] placeholder:font-['DM_Sans'] placeholder:text-[14px] md:placeholder:text-[16px]"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -1122,6 +1114,7 @@ function AIResultsContent() {
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && searchTerm.trim() !== '') {
+                      setShowRecommendations(false);
                       handleSearchBarSubmit();
                     }
                   }}
@@ -1216,8 +1209,10 @@ function AIResultsContent() {
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto scroll-smooth" style={{ scrollPaddingTop: '120px' }}>
           <div className="max-w-4xl mx-auto w-full px-2 sm:px-4 py-6" style={{ fontFamily: 'DM Sans, sans-serif' }}>
+            {/* Scroll snap point to keep search bar visible */}
+            <div className="scroll-mt-32" id="content-start"></div>
           
           {/* Error Display */}
           {error && (
@@ -1230,8 +1225,11 @@ function AIResultsContent() {
         {isLoading && messages.length === 0 && (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading your session...</p>
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              </div>
             </div>
           </div>
         )}
@@ -1250,18 +1248,23 @@ function AIResultsContent() {
                     <div className="flex items-start gap-2 mb-3 sm:mb-4">
                       <div className="flex-shrink-0 mt-1">
                         <div className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center">
-                          <img src="/answer-icon.svg" alt="Answer" className="w-5 h-5 sm:w-6 sm:h-6" />
+                          <svg width="28" height="34" viewBox="0 0 28 34" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 sm:w-6 sm:h-6">
+                            <g clipPath="url(#clip0_2546_32659)">
+                              <path d="M-10 44.1162H9.61914V47.9912H-14V17.5625H-10V44.1162ZM13.6191 40.2412V44.1162H9.61914V40.2412H13.6191ZM-2 36.3037H9.61914V40.2412H-6V17.5625H-2V36.3037ZM17.6191 40.2412H13.6191V36.3037H17.6191V40.2412ZM21.6191 36.3037H17.6191V32.4287H21.6191V36.3037ZM13.6191 32.4287V36.3037H9.61914V32.4287H13.6191ZM9.61914 32.4287H1.80859V17.5625H9.61914V32.4287ZM17.6191 32.4287H13.6191V13.6875H1.80859V9.8125H17.6191V32.4287ZM25.4277 32.4287H21.6191V5.875H1.80859V2H25.4277V32.4287ZM-6 17.5625H-10V13.6875H-6V17.5625ZM1.80859 17.5625H-2V13.6875H1.80859V17.5625ZM-2 13.6875H-6V9.8125H-2V13.6875ZM1.80859 9.8125H-2V5.875H1.80859V9.8125Z" fill="#3771FE"/>
+                            </g>
+                            <defs>
+                              <clipPath id="clip0_2546_32659">
+                                <rect width="26" height="32" fill="white" transform="translate(2)"/>
+                              </clipPath>
+                            </defs>
+                          </svg>
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
-                        {index === messages.length - 1 && isStreaming && !message.content ? (
-                          <span className="shimmer-text italic text-sm sm:text-base">Generating response...</span>
-                        ) : (
-                          message.type === 'assistant' && message.content && (
-                            <span className="font-semibold font-['DM_Sans'] mt-1 text-base text-blue-900">
-                              Answer
-                            </span>
-                          )
+                        {message.type === 'assistant' && (
+                          <span className="font-semibold font-['DM_Sans'] mt-1 text-base text-blue-900">
+                            Answer
+                          </span>
                         )}
                       </div>
                     </div>
@@ -1279,12 +1282,19 @@ function AIResultsContent() {
                      {!message.isStreaming && message.citations && Object.keys(message.citations).length > 0 && (
                         <div className="mb-6">
                           <ReferenceGrid 
-                            citations={message.citations}
+                            citations={message.citations as Record<string, any>}
                             onShowAll={(citations) => {
-                              setSelectedCitation(Object.values(citations)[0] || null);
+                              const citation = Object.values(citations)[0];
+                              setSelectedCitation(citation ? {
+                                id: citation.title || '',
+                                text: citation.title || '',
+                                source: citation.source_type || 'Unknown',
+                                title: citation.title,
+                                url: citation.url
+                              } as Citation : null);
                               setShowCitationsSidebar(true);
                             }}
-                            getCitationCount={getCitationCount}
+                            getCitationCount={(citations: Record<string, any>) => getCitationCount(citations)}
                           />
                         </div>
                       )}
@@ -1315,74 +1325,22 @@ function AIResultsContent() {
 
 
 
-          {/* Streaming Content */}
-          {isStreaming && streamedContent && messages.length > 0 && messages[messages.length - 1].type === 'assistant' && (
+          {/* Loading indicator for streaming */}
+          {isStreaming && (
             <div className="mb-4">
-              <div className="flex items-start gap-2 mb-3 sm:mb-4">
-                <div className="flex-shrink-0 mt-1">
-                  <div className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center">
-                    <img src="/answer-icon.svg" alt="Answer" className="w-5 h-5 sm:w-6 sm:h-6" />
-                  </div>
-                </div>
-                <div className="flex items-center">
-                  <span className="font-semibold font-['DM_Sans'] mt-1 text-base text-blue-900">
-                    Answer
-                  </span>
-                </div>
-              </div>
-              <div className="mb-4 sm:mb-6">
-                <div 
-                  className="prose prose-slate prose-ul:text-black marker:text-black max-w-none text-base sm:text-base prose-h2:text-base prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold"
-                  style={{ fontFamily: 'DM Sans, sans-serif' }}
-                  dangerouslySetInnerHTML={{ __html: formatWithDummyCitations(marked.parse(stripReferencesSection(streamedContent), { async: false })) }}
-                />
+              <div className="space-y-4">
+                <div className="h-6 bg-gray-200 rounded animate-pulse w-full"></div>
+                <div className="h-6 bg-gray-200 rounded animate-pulse w-3/4"></div>
+                <div className="h-6 bg-gray-200 rounded animate-pulse w-5/6"></div>
+                <div className="h-6 bg-gray-200 rounded animate-pulse w-full"></div>
+                <div className="h-6 bg-gray-200 rounded animate-pulse w-2/3"></div>
+                <div className="h-6 bg-gray-200 rounded animate-pulse w-4/5"></div>
               </div>
             </div>
           )}
 
           <div ref={messagesEndRef} />
           
-          {/* Follow-up Question Section - Moved to bottom */}
-          {/* COMMENTED OUT: Follow-up search bar
-          {messages.length > 0 && !isStreaming && (
-            <>
-              <div style={{ marginBottom: '120px sm:140px' }} />
-              <div className="sticky bottom-0 bg-gray-50 pt-2 pb-4 z-10">
-                <div className="max-w-4xl mx-auto px-2 sm:px-4">
-                  <div className="relative w-full bg-white rounded border-2 border-[#3771fe44] shadow-[0px_0px_11px_#0000000c] p-3 md:p-4">
-                    <div className="relative">
-                      <textarea
-                        value={followUpQuestion}
-                        onChange={(e) => {
-                          setFollowUpQuestion(e.target.value);
-                          // Auto-resize the textarea
-                          e.target.style.height = 'auto';
-                          e.target.style.height = e.target.scrollHeight + 'px';
-                        }}
-                        placeholder="Ask a follow-up question..."
-                        className="w-full text-base md:text-[16px] text-[#223258] font-normal font-['DM_Sans'] outline-none resize-none min-h-[24px] max-h-[200px] overflow-y-auto"
-                        onKeyDown={(e) => e.key === 'Enter' && handleFollowUpQuestion()}
-                        rows={1}
-                        style={{ height: '24px' }}
-                      />
-                    </div>
-                    <div className="flex justify-end items-center mt-2">
-                       <button onClick={handleFollowUpQuestion} className="flex-shrink-0" disabled={isLoading}>
-                         {isLoading ? (
-                           <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                         ) : (
-                           <img src="/search.svg" alt="Search" width={30} height={30} />
-                         )}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="w-full py-3 text-center text-[14px] text-gray-400">
-                    <p>Generated by AI, apply professional/physicians' judgment. <a href="https://synduct.com/terms-and-conditions/" target="_blank" rel="noopener noreferrer" className="font-regular underline text-black hover:text-[#3771FE] transition-colors duration-200">Click here</a> for further information.</p>
-                  </div>
-                </div>
-              </div>
-          </>)}
-          */}
           </div>
         </div>
       </div>
@@ -1393,7 +1351,7 @@ function AIResultsContent() {
         open={showCitationsSidebar}
         citations={messages.reduce((acc, msg) => {
           if (msg.citations && typeof msg.citations === 'object' && !Array.isArray(msg.citations)) {
-            return { ...acc, ...msg.citations };
+            return { ...acc, ...(msg.citations as Record<string, any>) };
           }
           return acc;
         }, {} as Record<string, any>)}
@@ -1516,14 +1474,20 @@ function AIResultsContent() {
         </div>
       )} */}
       
-      {/* Disclaimer Footer */}
-      <div className="w-full py-3 md:py-4 text-center text-xs text-gray-400 px-4">
-        <p>DR. INFO is an informational and educational tool.</p>
-        <p>Do not insert protected health information or personal data.</p>
-        <Link href="https://www.drinfo.ai/termsofservice/" className="text-black hover:text-[#3771FE] underline inline-block" target="_blank" rel="noopener noreferrer">
-          Terms and Conditions
-        </Link>
-      </div>
+      {/* Disclaimer Footer - Only show after answer is complete */}
+      {messages.length > 0 && !isStreaming && (
+        <div className="sticky bottom-0 bg-gray-50 pt-2 pb-0 z-10 mt-0">
+          <div className="max-w-4xl mx-auto px-2 sm:px-4">
+            <div className="w-full py-3 md:py-4 text-center text-xs text-gray-400 px-4">
+              <p>DR. INFO is an informational and educational tool.</p>
+              <p>Do not insert protected health information or personal data.</p>
+              <Link href="https://synduct.com/terms-and-conditions/" className="text-black hover:text-[#3771FE] underline inline-block" target="_blank" rel="noopener noreferrer">
+                Terms and Conditions
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

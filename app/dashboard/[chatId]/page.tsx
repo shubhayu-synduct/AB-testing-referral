@@ -11,7 +11,7 @@ export default function ChatSession() {
   const sessionId = params?.chatId as string
 
   return (
-    <DashboardLayout>
+    <DashboardLayout sessionId={sessionId} user={user}>
       {user && <DrInfoSummary user={user} sessionId={sessionId} />}
     </DashboardLayout>
   )
