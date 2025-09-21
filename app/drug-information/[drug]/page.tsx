@@ -29,7 +29,7 @@ interface Drug {
 }
 
 export default function DrugDetailPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const params = useParams();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -113,9 +113,14 @@ export default function DrugDetailPage() {
     return sections;
   }, []);
   
-  // Fetch drug data when drugSlug changes
+  // Fetch drug data when drugSlug changes and user is authenticated
   useEffect(() => {
-    // Reset loading state when drug param changes
+    // Don't fetch if user is not authenticated or auth is still loading
+    if (!user || authLoading) {
+      return;
+    }
+    
+    // Reset drug loading state when drug param changes
     setLoading(true);
     setError(null);
     
@@ -168,7 +173,7 @@ export default function DrugDetailPage() {
     if (drugSlug) {
       fetchDrugData();
     }
-  }, [drugSlug]);
+  }, [drugSlug, user, authLoading]);
   
   // Fetch unified suggestions (both EMA drugs and AI suggestions) for autocomplete
   const fetchAISuggestions = useCallback(async (term: string) => {
@@ -388,7 +393,7 @@ export default function DrugDetailPage() {
     return processMarkdownContent(drug.markdown_content);
   }, [drug?.markdown_content, processMarkdownContent]);
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <DashboardLayout>
         {user && (

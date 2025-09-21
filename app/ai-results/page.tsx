@@ -1329,12 +1329,12 @@ function AIResultsContent() {
           {isStreaming && (
             <div className="mb-4">
               <div className="space-y-4">
-                <div className="h-6 bg-gray-200 rounded animate-pulse w-full"></div>
-                <div className="h-6 bg-gray-200 rounded animate-pulse w-3/4"></div>
-                <div className="h-6 bg-gray-200 rounded animate-pulse w-5/6"></div>
-                <div className="h-6 bg-gray-200 rounded animate-pulse w-full"></div>
-                <div className="h-6 bg-gray-200 rounded animate-pulse w-2/3"></div>
-                <div className="h-6 bg-gray-200 rounded animate-pulse w-4/5"></div>
+                <div className="h-6 bg-gray-200 rounded animate-pulse w-full" style={{ animationDelay: '0ms' }}></div>
+                <div className="h-6 bg-gray-200 rounded animate-pulse w-3/4" style={{ animationDelay: '150ms' }}></div>
+                <div className="h-6 bg-gray-200 rounded animate-pulse w-5/6" style={{ animationDelay: '300ms' }}></div>
+                <div className="h-6 bg-gray-200 rounded animate-pulse w-full" style={{ animationDelay: '450ms' }}></div>
+                <div className="h-6 bg-gray-200 rounded animate-pulse w-2/3" style={{ animationDelay: '600ms' }}></div>
+                <div className="h-6 bg-gray-200 rounded animate-pulse w-4/5" style={{ animationDelay: '750ms' }}></div>
               </div>
             </div>
           )}
