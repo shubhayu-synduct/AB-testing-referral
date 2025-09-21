@@ -92,6 +92,7 @@ function AIResultsContent() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamedContent, setStreamedContent] = useState('');
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
   
   // UI state
   const [followUpQuestion, setFollowUpQuestion] = useState('');
@@ -127,23 +128,95 @@ function AIResultsContent() {
   const citationRefs = useRef<{ [key: string]: HTMLElement }>({});
   const drugNameRefs = useRef<{ [key: string]: HTMLElement }>({});
   const contentRef = useRef<HTMLDivElement>(null);
+  const hasProcessedInitialQuery = useRef<boolean>(false);
   
   // Session and user data
   const [sessionData, setSessionData] = useState<any>(null);
   const [userCountry, setUserCountry] = useState<string>('US');
+  
+  // Persistent session storage key
+  const PERSISTENT_SESSION_KEY = 'drinfo_latest_ai_session';
+
+  // Helper functions for localStorage persistence
+  const saveSessionToStorage = (sessionId: string, query: string, messages: Message[]) => {
+    try {
+      const sessionData = {
+        sessionId,
+        query,
+        messages: messages.map(msg => ({
+          ...msg,
+          timestamp: msg.timestamp.toISOString()
+        })),
+        lastUpdated: new Date().toISOString()
+      };
+      localStorage.setItem(PERSISTENT_SESSION_KEY, JSON.stringify(sessionData));
+    } catch (error) {
+      console.error('Failed to save session to localStorage:', error);
+    }
+  };
+
+  const getSessionFromStorage = () => {
+    try {
+      const stored = localStorage.getItem(PERSISTENT_SESSION_KEY);
+      if (stored) {
+        const sessionData = JSON.parse(stored);
+        return {
+          ...sessionData,
+          messages: sessionData.messages.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          }))
+        };
+      }
+    } catch (error) {
+      console.error('Failed to load session from localStorage:', error);
+    }
+    return null;
+  };
+
+  const clearSessionFromStorage = () => {
+    try {
+      localStorage.removeItem(PERSISTENT_SESSION_KEY);
+    } catch (error) {
+      console.error('Failed to clear session from localStorage:', error);
+    }
+  };
 
   // Load chat session on mount
   useEffect(() => {
     if (sessionId && user) {
       loadChatSession();
-    } else if (query) {
-      // Clear previous messages and start new search
-      setMessages([]);
-      // Create new session for direct query
-      const newSessionId = uuidv4();
-      router.replace(`/ai-results?q=${encodeURIComponent(query)}&sessionId=${newSessionId}`);
+    } else if (query && !isSearching && !hasProcessedInitialQuery.current) {
+      hasProcessedInitialQuery.current = true;
+      
+      // Check if we have a persistent session for this query
+      const persistentSession = getSessionFromStorage();
+      
+      if (persistentSession && persistentSession.query === query && persistentSession.messages.length > 0) {
+        // Use existing persistent session
+        setMessages(persistentSession.messages);
+        setIsLoading(false);
+        // Update URL to include the persistent sessionId
+        router.replace(`/ai-results?q=${encodeURIComponent(query)}&sessionId=${persistentSession.sessionId}`);
+      } else {
+        // Display the user's question immediately
+        const userMessage: Message = {
+          id: uuidv4(),
+          type: 'user',
+          content: query,
+          timestamp: new Date()
+        };
+        
+        // Clear previous messages and show the question immediately
+        setMessages([userMessage]);
+        setIsLoading(false);
+        
+        // Create new session for direct query
+        const newSessionId = uuidv4();
+        router.replace(`/ai-results?q=${encodeURIComponent(query)}&sessionId=${newSessionId}`);
+      }
     }
-  }, [sessionId, user, query]);
+  }, [sessionId, user, query, isSearching]);
 
   // Auto-scroll to bottom when new messages arrive - DISABLED
   // useEffect(() => {
@@ -268,7 +341,17 @@ function AIResultsContent() {
           setMessages(loadedMessages);
         }
       } else if (query) {
-        // Start new search if no session exists - clear previous messages
+        // Display the user's question immediately before starting search
+        const userMessage: Message = {
+          id: uuidv4(),
+          type: 'user',
+          content: query,
+          timestamp: new Date()
+        };
+        setMessages([userMessage]);
+        setIsLoading(false);
+        
+        // Start new search if no session exists
         await handleSearch(query, true);
       }
     } catch (error) {
@@ -279,7 +362,7 @@ function AIResultsContent() {
     }
   };
 
-  // Save chat session to Firebase
+  // Save chat session to Firebase and localStorage
   const saveChatSession = async (updatedMessages: Message[]) => {
     if (!sessionId || !user) return;
 
@@ -296,6 +379,9 @@ function AIResultsContent() {
       };
 
       await setDoc(sessionRef, sessionData, { merge: true });
+      
+      // Also save to localStorage for persistence
+      saveSessionToStorage(sessionId, query, updatedMessages);
     } catch (error) {
       console.error('Error saving chat session:', error);
     }
@@ -303,15 +389,10 @@ function AIResultsContent() {
 
   // Handle search
   const handleSearch = async (searchQuery: string, clearPrevious: boolean = false) => {
-    if (!searchQuery.trim()) return;
+    if (!searchQuery.trim() || isSearching) return;
     
-    const userMessage: Message = {
-      id: uuidv4(),
-      type: 'user',
-      content: searchQuery,
-      timestamp: new Date()
-    };
-
+    setIsSearching(true);
+    
     const assistantMessage: Message = {
       id: uuidv4(),
       type: 'assistant',
@@ -320,8 +401,8 @@ function AIResultsContent() {
       isStreaming: true
     };
 
-    // If clearPrevious is true, start with empty messages array, otherwise append to existing
-    const newMessages = clearPrevious ? [userMessage, assistantMessage] : [...messages, userMessage, assistantMessage];
+    // If clearPrevious is true, keep existing messages (user question already displayed), otherwise append assistant message
+    const newMessages = clearPrevious ? [...messages, assistantMessage] : [...messages, assistantMessage];
     setMessages(newMessages);
     setIsStreaming(true);
     setStreamedContent('');
@@ -333,6 +414,8 @@ function AIResultsContent() {
       console.error('Search failed:', error);
       setError('Failed to get AI response. Please try again.');
       setIsStreaming(false);
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -638,12 +721,25 @@ function AIResultsContent() {
 
   // Handle search from search bar
   const handleSearchBarSubmit = () => {
-    if (!searchTerm.trim()) return;
+    if (!searchTerm.trim() || isSearching) return;
+    
+    const searchQuery = searchTerm.trim();
     
     setShowRecommendations(false);
+    // Reset the processed flag for new search
+    hasProcessedInitialQuery.current = false;
+    
+    // Clear persistent session for new search
+    clearSessionFromStorage();
+    
+    // Clear the search bar immediately
+    setSearchTerm('');
+    
     // Navigate to new AI results with the search term
     const searchParams = new URLSearchParams();
-    searchParams.set('q', searchTerm.trim());
+    searchParams.set('q', searchQuery);
+    
+    // Don't preserve existing sessionId for new search - let it create a new one
     router.push(`/ai-results?${searchParams.toString()}`);
   };
 
@@ -967,6 +1063,9 @@ function AIResultsContent() {
       abortControllerRef.current.abort();
     }
     
+    // Clear persistent session for new search
+    clearSessionFromStorage();
+    
     router.push('/dashboard');
   };
 
@@ -1133,9 +1232,20 @@ function AIResultsContent() {
                 <button 
                   className="flex items-center justify-center border-none bg-transparent relative ml-2 md:ml-3 hover:opacity-80 transition-opacity text-[#6366f1] p-1"
                   onClick={handleSearchBarSubmit}
-                  disabled={!searchTerm.trim()}
+                  disabled={!searchTerm.trim() || isSearching}
                 >
-                  <Search className="w-5 h-5" />
+                  <svg 
+                    width="28" 
+                    height="28" 
+                    viewBox="0 0 46 46" 
+                    fill="none" 
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-[28px] h-[28px] md:w-[32px] md:h-[32px]"
+                  >
+                    <rect width="46" height="46" rx="6.57143" fill="#3771FE"/>
+                    <path d="M29.8594 16.5703L13.3594 33.0703" stroke="white" strokeWidth="2.25" strokeLinecap="round"/>
+                    <path d="M20.4297 14.6406H31.6426V24.9263" stroke="white" strokeWidth="2.25" strokeLinecap="round"/>
+                  </svg>
                 </button>
               </div>
 
@@ -1240,34 +1350,36 @@ function AIResultsContent() {
             {messages.map((message, index) => (
               <div key={message.id} className="">
                 {message.type === 'user' ? (
-                  <div className="p-3 sm:p-4 border rounded-5px" style={{ borderColor: 'rgba(55, 113, 254, 0.5)', fontFamily: 'DM Sans, sans-serif', fontWeight: 500, fontSize: '16px sm:text-[18px]', color: '#223258', backgroundColor: '#E4ECFF' }}>
+                  <div className="p-3 sm:p-4 border rounded-5px mb-6" style={{ borderColor: 'rgba(55, 113, 254, 0.5)', fontFamily: 'DM Sans, sans-serif', fontWeight: 500, fontSize: '16px sm:text-[18px]', color: '#223258', backgroundColor: '#E4ECFF' }}>
                     <p className="m-0">{message.content}</p>
                   </div>
                 ) : (
                   <div className="mb-4">
-                    <div className="flex items-start gap-2 mb-3 sm:mb-4">
-                      <div className="flex-shrink-0 mt-1">
-                        <div className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center">
-                          <svg width="28" height="34" viewBox="0 0 28 34" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 sm:w-6 sm:h-6">
-                            <g clipPath="url(#clip0_2546_32659)">
-                              <path d="M-10 44.1162H9.61914V47.9912H-14V17.5625H-10V44.1162ZM13.6191 40.2412V44.1162H9.61914V40.2412H13.6191ZM-2 36.3037H9.61914V40.2412H-6V17.5625H-2V36.3037ZM17.6191 40.2412H13.6191V36.3037H17.6191V40.2412ZM21.6191 36.3037H17.6191V32.4287H21.6191V36.3037ZM13.6191 32.4287V36.3037H9.61914V32.4287H13.6191ZM9.61914 32.4287H1.80859V17.5625H9.61914V32.4287ZM17.6191 32.4287H13.6191V13.6875H1.80859V9.8125H17.6191V32.4287ZM25.4277 32.4287H21.6191V5.875H1.80859V2H25.4277V32.4287ZM-6 17.5625H-10V13.6875H-6V17.5625ZM1.80859 17.5625H-2V13.6875H1.80859V17.5625ZM-2 13.6875H-6V9.8125H-2V13.6875ZM1.80859 9.8125H-2V5.875H1.80859V9.8125Z" fill="#3771FE"/>
-                            </g>
-                            <defs>
-                              <clipPath id="clip0_2546_32659">
-                                <rect width="26" height="32" fill="white" transform="translate(2)"/>
-                              </clipPath>
-                            </defs>
-                          </svg>
+                    {!isStreaming && (
+                      <div className="flex items-start gap-2 mb-3 sm:mb-4">
+                        <div className="flex-shrink-0 mt-1">
+                          <div className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center">
+                            <svg width="28" height="34" viewBox="0 0 28 34" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 sm:w-6 sm:h-6">
+                              <g clipPath="url(#clip0_2546_32659)">
+                                <path d="M-10 44.1162H9.61914V47.9912H-14V17.5625H-10V44.1162ZM13.6191 40.2412V44.1162H9.61914V40.2412H13.6191ZM-2 36.3037H9.61914V40.2412H-6V17.5625H-2V36.3037ZM17.6191 40.2412H13.6191V36.3037H17.6191V40.2412ZM21.6191 36.3037H17.6191V32.4287H21.6191V36.3037ZM13.6191 32.4287V36.3037H9.61914V32.4287H13.6191ZM9.61914 32.4287H1.80859V17.5625H9.61914V32.4287ZM17.6191 32.4287H13.6191V13.6875H1.80859V9.8125H17.6191V32.4287ZM25.4277 32.4287H21.6191V5.875H1.80859V2H25.4277V32.4287ZM-6 17.5625H-10V13.6875H-6V17.5625ZM1.80859 17.5625H-2V13.6875H1.80859V17.5625ZM-2 13.6875H-6V9.8125H-2V13.6875ZM1.80859 9.8125H-2V5.875H1.80859V9.8125Z" fill="#3771FE"/>
+                              </g>
+                              <defs>
+                                <clipPath id="clip0_2546_32659">
+                                  <rect width="26" height="32" fill="white" transform="translate(2)"/>
+                                </clipPath>
+                              </defs>
+                            </svg>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          {message.type === 'assistant' && (
+                            <span className="font-semibold font-['DM_Sans'] mt-1 text-base text-blue-900">
+                              Answer
+                            </span>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        {message.type === 'assistant' && (
-                          <span className="font-semibold font-['DM_Sans'] mt-1 text-base text-blue-900">
-                            Answer
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                    )}
                     {message.content && (
                       <div className="mb-4 sm:mb-6">
                         <div 
@@ -1327,7 +1439,28 @@ function AIResultsContent() {
 
           {/* Loading indicator for streaming */}
           {isStreaming && (
-            <div className="mb-4">
+            <div className="mb-4 mt-6">
+              <div className="flex items-start gap-2 mb-3 sm:mb-4">
+                <div className="flex-shrink-0 mt-1">
+                  <div className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center">
+                    <svg width="28" height="34" viewBox="0 0 28 34" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 sm:w-6 sm:h-6">
+                      <g clipPath="url(#clip0_2546_32659)">
+                        <path d="M-10 44.1162H9.61914V47.9912H-14V17.5625H-10V44.1162ZM13.6191 40.2412V44.1162H9.61914V40.2412H13.6191ZM-2 36.3037H9.61914V40.2412H-6V17.5625H-2V36.3037ZM17.6191 40.2412H13.6191V36.3037H17.6191V40.2412ZM21.6191 36.3037H17.6191V32.4287H21.6191V36.3037ZM13.6191 32.4287V36.3037H9.61914V32.4287H13.6191ZM9.61914 32.4287H1.80859V17.5625H9.61914V32.4287ZM17.6191 32.4287H13.6191V13.6875H1.80859V9.8125H17.6191V32.4287ZM25.4277 32.4287H21.6191V5.875H1.80859V2H25.4277V32.4287ZM-6 17.5625H-10V13.6875H-6V17.5625ZM1.80859 17.5625H-2V13.6875H1.80859V17.5625ZM-2 13.6875H-6V9.8125H-2V13.6875ZM1.80859 9.8125H-2V5.875H1.80859V9.8125Z" fill="#3771FE"/>
+                      </g>
+                      <defs>
+                        <clipPath id="clip0_2546_32659">
+                          <rect width="26" height="32" fill="white" transform="translate(2)"/>
+                        </clipPath>
+                      </defs>
+                    </svg>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="font-semibold font-['DM_Sans'] mt-1 text-base text-blue-900">
+                    Answer
+                  </span>
+                </div>
+              </div>
               <div className="space-y-4">
                 <div className="h-6 bg-gray-200 rounded animate-pulse w-full" style={{ animationDelay: '0ms' }}></div>
                 <div className="h-6 bg-gray-200 rounded animate-pulse w-3/4" style={{ animationDelay: '150ms' }}></div>
@@ -1338,6 +1471,8 @@ function AIResultsContent() {
               </div>
             </div>
           )}
+
+          
 
           <div ref={messagesEndRef} />
           
@@ -1474,8 +1609,8 @@ function AIResultsContent() {
         </div>
       )} */}
       
-      {/* Disclaimer Footer - Only show after answer is complete */}
-      {messages.length > 0 && !isStreaming && (
+      {/* Disclaimer Footer - Only show after answer is complete and not streaming */}
+      {messages.length > 0 && !isStreaming && messages.some(msg => msg.type === 'assistant' && msg.content && !msg.isStreaming) && (
         <div className="sticky bottom-0 bg-gray-50 pt-2 pb-0 z-10 mt-0">
           <div className="max-w-4xl mx-auto px-2 sm:px-4">
             <div className="w-full py-3 md:py-4 text-center text-xs text-gray-400 px-4">
