@@ -422,7 +422,7 @@ export function DashboardLayout({ children, sessionId, user: propUser }: Dashboa
           
           {/* Right side - Share button or spacer */}
           <div className="flex-shrink-0 ml-auto">
-            {pathname !== '/dashboard' && !pathname.startsWith('/drug-information') && pathname !== '/ai-results' && pathname !== '/guidelines' ? (
+            {pathname !== '/dashboard' && !pathname.startsWith('/drug-information') && pathname !== '/ai-results' && pathname !== '/library' && pathname !== '/image-generator'  && pathname !== '/guidelines' ? (
               <button
                 onClick={handleShare}
                 className="p-2 hover:bg-gray-100 rounded-md drinfo-share-step"

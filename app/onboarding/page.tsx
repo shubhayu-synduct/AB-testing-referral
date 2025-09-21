@@ -224,6 +224,11 @@ export default function Onboarding() {
       hasErrors = true
     }
 
+    if (formData.placeOfWork === "other" && !formData.otherPlaceOfWork) {
+      errors.otherPlaceOfWork = "Please specify your place of work"
+      hasErrors = true
+    }
+
     if (formData.specialties.includes("other") && !formData.otherSpecialty) {
       errors.otherSpecialty = "Please specify your specialty"
       hasErrors = true
@@ -851,16 +856,18 @@ export default function Onboarding() {
                        )}
                                              {formData.occupation !== "" && (
                          <span className="text-[#223258] select-none" style={{ fontSize: '12px' }}>
-                           {formData.occupation === "other" ? formData.otherOccupation : formData.occupation.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}
+                           {formData.occupation === "other" ? "Others" : formData.occupation.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}
                          </span>
                        )}
                     </div>
                     {showProfessionDropdown && (
                       <div className="absolute z-10 left-0 right-0 bg-white border border-[#3771FE]/50 rounded-b-[5px] shadow-lg max-h-48 overflow-y-auto mt-1">
-                        {professionOptions.filter(opt => opt.value !== formData.occupation).map(opt => (
+                        {professionOptions.map(opt => (
                            <div
                              key={opt.value}
-                             className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
+                             className={`px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer ${
+                               formData.occupation === opt.value ? 'bg-[#C6D7FF]/50' : ''
+                             }`}
                              style={{ fontSize: '12px', color: '#223258' }}
                              onClick={() => {
                                handleOccupationChange(opt.value);
@@ -875,7 +882,7 @@ export default function Onboarding() {
                   </div>
                   {formData.occupation === "other" && (
                     <div className="mt-2">
-                      <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>Specify Profession</label>
+                      <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>Specify Profession <span className="text-black">*</span></label>
                       <input
                         type="text"
                         name="otherOccupation"
@@ -913,10 +920,12 @@ export default function Onboarding() {
                     </div>
                     {showExperienceDropdown && (
                       <div className="absolute z-10 left-0 right-0 bg-white border border-[#3771FE]/50 rounded-b-[5px] shadow-lg max-h-48 overflow-y-auto mt-1">
-                        {experienceOptions.filter(opt => opt.value !== formData.experience).map(opt => (
+                        {experienceOptions.map(opt => (
                            <div
                              key={opt.value}
-                             className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
+                             className={`px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer ${
+                               formData.experience === opt.value ? 'bg-[#C6D7FF]/50' : ''
+                             }`}
                              style={{ fontSize: '12px', color: '#223258' }}
                              onClick={() => {
                                setFormData(prev => ({
@@ -954,16 +963,18 @@ export default function Onboarding() {
                        )}
                                              {formData.placeOfWork !== "" && (
                          <span className="text-[#223258] select-none" style={{ fontSize: '12px' }}>
-                           {formData.placeOfWork === "other" ? formData.otherPlaceOfWork : formData.placeOfWork.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}
+                           {formData.placeOfWork === "other" ? "Others" : formData.placeOfWork.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}
                          </span>
                        )}
                     </div>
                     {showPlaceOfWorkDropdown && (
                       <div className="absolute z-10 left-0 right-0 bg-white border border-[#3771FE]/50 rounded-b-[5px] shadow-lg max-h-48 overflow-y-auto mt-1">
-                        {placeOfWorkOptions.filter(opt => opt.value !== formData.placeOfWork).map(opt => (
+                        {placeOfWorkOptions.map(opt => (
                            <div
                              key={opt.value}
-                             className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
+                             className={`px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer ${
+                               formData.placeOfWork === opt.value ? 'bg-[#C6D7FF]/50' : ''
+                             }`}
                              style={{ fontSize: '12px', color: '#223258' }}
                              onClick={() => {
                                setFormData(prev => ({
@@ -982,7 +993,7 @@ export default function Onboarding() {
                   </div>
                   {formData.placeOfWork === "other" && (
                     <div className="mt-2">
-                      <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>Specify Place of Work</label>
+                      <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>Specify Place of Work <span className="text-black">*</span></label>
                       <input
                         type="text"
                         name="otherPlaceOfWork"
@@ -1034,7 +1045,7 @@ export default function Onboarding() {
                         key={specialty}
                         className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-[#C6D7FF]/50 text-[#223258] border border-[#3771FE]/50 mr-1 mt-1"
                       >
-                        {specialty === "other" ? "Other" : specialty.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}
+                        {specialty === "other" ? "Others" : specialty.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ")}
                         <button
                           type="button"
                           onClick={e => {
@@ -1079,19 +1090,22 @@ export default function Onboarding() {
                         />
                       </div>
                       {specialtiesOptions
-                        .filter(opt => !formData.specialties.includes(opt.value))
                         .filter(opt => opt.label.toLowerCase().includes(specialtiesSearchTerm.toLowerCase()))
                         .map(opt => (
                         <div
                           key={opt.value}
-                          className="px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer"
+                          className={`px-3 py-2 hover:bg-[#C6D7FF]/30 cursor-pointer ${
+                            formData.specialties.includes(opt.value) ? 'bg-[#C6D7FF]/50' : ''
+                          }`}
                           style={{ fontSize: '12px', color: '#223258' }}
                           onClick={() => {
                             setFormData(prev => ({
                               ...prev,
-                              specialties: [...prev.specialties, opt.value]
+                              specialties: prev.specialties.includes(opt.value)
+                                ? prev.specialties.filter(s => s !== opt.value)
+                                : [...prev.specialties, opt.value]
                             }));
-                            setShowSpecialtiesDropdown(false);
+                            // Don't close dropdown for specialties since multiple selections are allowed
                             setSpecialtiesSearchTerm('');
                           }}
                         >
@@ -1106,7 +1120,7 @@ export default function Onboarding() {
                 )}
                 {formData.specialties.includes("other") && (
                   <div className="mt-2">
-                    <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>Specify Other Specialty</label>
+                    <label className="block text-sm font-medium text-black mb-1" style={{ fontFamily: 'DM Sans', fontWeight: 200 }}>Specify Other Specialty <span className="text-black">*</span></label>
                     <input
                       type="text"
                       name="otherSpecialty"
@@ -1238,9 +1252,29 @@ export default function Onboarding() {
 
               <button
                 onClick={handleCompleteRegistration}
-                disabled={!formData.country || !formData.firstName || !formData.specialties.length || !formData.experience || !formData.placeOfWork || !formData.occupation || !termsAgreed}
+                disabled={
+                  !formData.country || 
+                  !formData.firstName || 
+                  !formData.specialties.length || 
+                  !formData.experience || 
+                  !formData.placeOfWork || 
+                  !formData.occupation || 
+                  !termsAgreed ||
+                  (formData.occupation === "other" && !formData.otherOccupation) ||
+                  (formData.placeOfWork === "other" && !formData.otherPlaceOfWork) ||
+                  (formData.specialties.includes("other") && !formData.otherSpecialty)
+                }
                 className={`w-full py-2 sm:py-2.5 px-4 rounded-[5px] font-dm-sans font-medium transition-colors duration-200 text-sm ${
-                  formData.country && formData.firstName && formData.specialties.length && formData.experience && formData.placeOfWork && formData.occupation && termsAgreed
+                  formData.country && 
+                  formData.firstName && 
+                  formData.specialties.length && 
+                  formData.experience && 
+                  formData.placeOfWork && 
+                  formData.occupation && 
+                  termsAgreed &&
+                  !(formData.occupation === "other" && !formData.otherOccupation) &&
+                  !(formData.placeOfWork === "other" && !formData.otherPlaceOfWork) &&
+                  !(formData.specialties.includes("other") && !formData.otherSpecialty)
                     ? 'bg-[#C6D7FF]/50 text-[#3771FE] border border-[#3771FE]/50 hover:bg-[#C6D7FF]/60'
                     : 'bg-[#C6D7FF]/50 text-[#3771FE] border border-[#3771FE]/50 cursor-not-allowed opacity-50'
                 }`}

@@ -384,7 +384,12 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           <div className="mt-auto w-full p-2 border-t border-gray-200">
             <div className="relative">
               <button
-                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                onClick={() => {
+                  if (!isOpen) {
+                    setIsOpen(true);
+                  }
+                  setIsProfileOpen(!isProfileOpen);
+                }}
                 className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-gray-50 sidebar-profile"
               >
                 <div className="flex items-center">
