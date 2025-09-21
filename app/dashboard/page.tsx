@@ -582,7 +582,7 @@ export default function Dashboard() {
       {showTourPrompt && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black bg-opacity-40">
           <div 
-            className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center border"
+            className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center border mx-4"
             style={{
               borderRadius: "8px",
               border: "1px solid #E4ECFF",

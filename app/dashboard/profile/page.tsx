@@ -131,39 +131,64 @@ function ProfilePageContent() {
     if (!user) return; // Optionally redirect to login here
 
     const fetchProfile = async () => {
-      const db = getFirebaseFirestore();
-      const docRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        // Convert country value to match dropdown format if needed
-        const country = docSnap.data().country || docSnap.data().profile || docSnap.data().profile?.country || 'united-states';
-        const formattedCountry = country.toLowerCase().replace(/\s+/g, '-');
-        
-        setProfile({
-          ...docSnap.data().profile || {},
-          email: docSnap.data().email || user.email,
-          country: formattedCountry
-        });
+      try {
+        const db = getFirebaseFirestore();
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          // Convert country value to match dropdown format if needed
+          const country = docSnap.data().country || docSnap.data().profile || docSnap.data().profile?.country || 'united-states';
+          const formattedCountry = country.toLowerCase().replace(/\s+/g, '-');
+          
+          setProfile({
+            ...docSnap.data().profile || {},
+            email: docSnap.data().email || user.email,
+            country: formattedCountry
+          });
 
-        // Set current subscription data
-        setCurrentSubscription({
-          tier: docSnap.data().subscriptionTier || 'free',
-          subscription: docSnap.data().subscription || null
-        });
-
-        // Set cookie preferences from Firebase
-        const cookieConsent = docSnap.data().cookieConsent;
-        if (cookieConsent) {
-          const preferences = {
-            analytics: cookieConsent.analytics || false,
-            marketing: cookieConsent.marketing || false,
-            functional: cookieConsent.functional || false
+          // Set current subscription data
+          const subscriptionData = {
+            tier: docSnap.data().subscriptionTier || 'free',
+            subscription: docSnap.data().subscription || null
           };
-          setCookiePreferences(preferences);
-          setOriginalCookiePreferences(preferences);
+          setCurrentSubscription(subscriptionData);
+
+          // Set cookie preferences from Firebase
+          const cookieConsent = docSnap.data().cookieConsent;
+          if (cookieConsent) {
+            const preferences = {
+              analytics: cookieConsent.analytics || false,
+              marketing: cookieConsent.marketing || false,
+              functional: cookieConsent.functional || false
+            };
+            setCookiePreferences(preferences);
+            setOriginalCookiePreferences(preferences);
+          }
+        } else {
+          // User document doesn't exist, set default values
+          setProfile({
+            email: user.email,
+            country: 'united-states'
+          });
+          setCurrentSubscription({
+            tier: 'free',
+            subscription: null
+          });
         }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+        // Set default values on error
+        setProfile({
+          email: user.email,
+          country: 'united-states'
+        });
+        setCurrentSubscription({
+          tier: 'free',
+          subscription: null
+        });
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchProfile();
   }, [user, authLoading]);
@@ -287,18 +312,22 @@ function ProfilePageContent() {
     return 'Free';
   };
 
-  // Debug logging for subscription data
+
+  // Sync billing interval with current subscription
   useEffect(() => {
-    if (currentSubscription) {
-      console.log('🔍 Current Subscription Data:', {
-        tier: currentSubscription.tier,
-        status: currentSubscription.subscription?.status,
-        cancelAtPeriodEnd: currentSubscription.subscription?.cancelAtPeriodEnd,
-        currentPeriodEnd: currentSubscription.subscription?.currentPeriodEnd,
-        interval: currentSubscription.subscription?.interval
-      });
+    if (currentSubscription?.subscription?.interval) {
+      const subscriptionInterval = currentSubscription.subscription.interval;
+      
+      // Map subscription interval to billing interval state
+      if (subscriptionInterval === 'monthly' || subscriptionInterval === 'yearly' || subscriptionInterval === 'biyearly') {
+        const newInterval = subscriptionInterval === 'monthly' ? 'monthly' : 'yearly';
+        // Only update if different to prevent unnecessary re-renders
+        if (newInterval !== billingInterval) {
+          setBillingInterval(newInterval);
+        }
+      }
     }
-  }, [currentSubscription]);
+  }, [currentSubscription, billingInterval]);
 
   const isCurrentPlan = (plan: string) => {
     if (!currentSubscription) return plan === 'free';
@@ -308,6 +337,18 @@ function ProfilePageContent() {
   const isCurrentBillingInterval = (interval: string) => {
     if (!currentSubscription?.subscription?.interval) return false;
     return currentSubscription.subscription.interval === interval;
+  };
+
+  // Helper function to check if a plan should be highlighted
+  const shouldHighlightPlan = (plan: string) => {
+    if (!currentSubscription) return plan === 'free';
+    
+    if (plan === 'free') {
+      return currentSubscription.tier === 'free' || !currentSubscription.subscription;
+    }
+    
+    // For paid plans, check both tier and billing interval
+    return currentSubscription.tier === plan && isCurrentBillingInterval(billingInterval);
   };
 
   const handleTabChange = (tab: 'profile' | 'preferences' | 'subscription' | 'feedback') => {
@@ -1365,8 +1406,8 @@ function ProfilePageContent() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Free Plan */}
               <div className={`border rounded-[10px] p-6 ${
-                isCurrentPlan('free') 
-                  ? 'border-[#3771FE] bg-[#F4F7FF]' 
+                shouldHighlightPlan('free') 
+                  ? 'border-[#3771FE] bg-blue-50 ring-2 ring-blue-200' 
                   : 'border-[#B5C9FC] bg-white'
               }`}>
                 <h4 className="text-xl font-semibold text-[#000000] mb-2">Free</h4>
@@ -1375,7 +1416,7 @@ function ProfilePageContent() {
                 
                 {/* Button positioned above features */}
                 <div className="w-full py-3 px-4 rounded-[8px] font-medium border border-[#3771FE] text-[#3771FE] bg-white text-center mb-6">
-                  {isCurrentPlan('free') ? 'Current Plan' : 'Free Plan'}
+                  {shouldHighlightPlan('free') ? 'Current Plan' : 'Free Plan'}
                 </div>
                 
                 <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
@@ -1392,8 +1433,8 @@ function ProfilePageContent() {
 
               {/* Premium Student Plan */}
               <div className={`border rounded-[10px] p-6 relative ${
-                isCurrentPlan('student') && isCurrentBillingInterval(billingInterval)
-                  ? 'border-[#3771FE] bg-[#F4F7FF]' 
+                shouldHighlightPlan('student')
+                  ? 'border-[#3771FE] bg-blue-50 ring-2 ring-blue-200' 
                   : 'border-[#B5C9FC] bg-white'
               }`}>
                 {/* Save Badge for Yearly */}
@@ -1416,15 +1457,15 @@ function ProfilePageContent() {
                 
                 {/* Button positioned above description */}
                 <button
-                  onClick={isCurrentPlan('student') && isCurrentBillingInterval(billingInterval) ? undefined : () => handlePlanSelect('student', billingInterval)}
+                  onClick={shouldHighlightPlan('student') ? undefined : () => handlePlanSelect('student', billingInterval)}
                   className={`w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-4 ${
-                    isCurrentPlan('student') && isCurrentBillingInterval(billingInterval)
+                    shouldHighlightPlan('student')
                       ? 'border border-[#3771FE] text-[#3771FE] bg-white cursor-not-allowed'
                       : 'bg-[#3771FE] text-white hover:bg-[#2A5CDB]'
                   }`}
-                  disabled={isCurrentPlan('student') && isCurrentBillingInterval(billingInterval)}
+                  disabled={shouldHighlightPlan('student')}
                 >
-                  {isCurrentPlan('student') && isCurrentBillingInterval(billingInterval) ? 'Current Plan' : 'Get Pro Student'}
+                  {shouldHighlightPlan('student') ? 'Current Plan' : 'Get Pro Student'}
                 </button>
                 
                 <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
@@ -1437,8 +1478,8 @@ function ProfilePageContent() {
 
               {/* Premium Physician Plan */}
               <div className={`border rounded-[10px] p-6 relative ${
-                isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval)
-                  ? 'border-[#3771FE] bg-[#F4F7FF]' 
+                shouldHighlightPlan('clinician')
+                  ? 'border-[#3771FE] bg-blue-50 ring-2 ring-blue-200' 
                   : 'border-[#B5C9FC] bg-white'
               }`}>
                 {/* Save Badge for Yearly */}
@@ -1461,15 +1502,15 @@ function ProfilePageContent() {
                 
                 {/* Button positioned above description */}
                 <button
-                  onClick={isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval) ? undefined : () => handlePlanSelect('clinician', billingInterval)}
+                  onClick={shouldHighlightPlan('clinician') ? undefined : () => handlePlanSelect('clinician', billingInterval)}
                   className={`w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-4 ${
-                    isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval)
+                    shouldHighlightPlan('clinician')
                       ? 'border border-[#3771FE] text-[#3771FE] bg-white cursor-not-allowed'
                       : 'bg-[#3771FE] text-white hover:bg-[#2A5CDB]'
                   }`}
-                  disabled={isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval)}
+                  disabled={shouldHighlightPlan('clinician')}
                 >
-                  {isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval) ? 'Current Plan' : 'Get Pro Physician'}
+                  {shouldHighlightPlan('clinician') ? 'Current Plan' : 'Get Pro Physician'}
                 </button>
                 
                 <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
@@ -1506,15 +1547,7 @@ function ProfilePageContent() {
             {/* Cancel Subscription Button */}
             {(() => {
               const shouldShowCancel = currentSubscription?.subscription?.status === 'active' && 
-                                     !currentSubscription?.subscription?.cancelAtPeriodEnd && 
-                                     currentSubscription?.subscription?.status !== 'canceled';
-              
-              console.log('🔍 Cancel Button Debug:', {
-                status: currentSubscription?.subscription?.status,
-                cancelAtPeriodEnd: currentSubscription?.subscription?.cancelAtPeriodEnd,
-                shouldShowCancel,
-                subscription: currentSubscription?.subscription
-              });
+                                     !currentSubscription?.subscription?.cancelAtPeriodEnd;
               
               return shouldShowCancel ? (
                 <div className="flex justify-end mt-8 mb-4">
