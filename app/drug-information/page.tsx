@@ -519,14 +519,11 @@ export default function DrugInformationPage() {
             <div className="w-full h-full rounded-lg bg-gradient-to-r from-[#3771FE]/[0.4] via-[#2563eb]/[0.6] to-[#3771FE]/[0.4] animate-[border-flow_3s_ease-in-out_infinite] bg-[length:200%_100%]" />
           </div>
           <div className="flex items-center border-[2.7px] rounded-lg h-[48px] md:h-[56px] w-full max-w-[1118px] mx-auto pr-3 md:pr-4 bg-white transition-all duration-300 relative z-10 border-[#3771FE]/[0.27] shadow-[0_0_12px_rgba(55,113,254,0.2)]">
-            <div className="pl-3 md:pl-4 flex items-center">
-              <Search className="stroke-[1.5] w-[18px] h-[18px] md:w-[20px] md:h-[20px] transition-colors duration-300 text-[#3771FE]" fill="none" />
-            </div>
             <input
               ref={searchInputRef}
               type="text"
               placeholder="Search drugs..."
-              className="flex-1 py-2 md:py-3 px-2 md:px-3 outline-none text-[#223258] font-['DM_Sans'] font-[400] text-[14px] md:text-[16px] leading-[100%] tracking-[0%] placeholder-[#9599A8] placeholder:font-['DM_Sans'] placeholder:text-[14px] md:placeholder:text-[16px]"
+              className="flex-1 py-2 md:py-3 pl-3 md:pl-4 pr-2 md:pr-3 outline-none text-[#223258] font-['DM_Sans'] font-[400] text-[14px] md:text-[16px] leading-[100%] tracking-[0%] placeholder-[#9599A8] placeholder:font-['DM_Sans'] placeholder:text-[14px] md:placeholder:text-[16px]"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onFocus={() => {
@@ -558,12 +555,12 @@ export default function DrugInformationPage() {
               onClick={handleSearch}
             >
               <svg 
-                width="36" 
-                height="36" 
+                width="28" 
+                height="28" 
                 viewBox="0 0 46 46" 
                 fill="none" 
                 xmlns="http://www.w3.org/2000/svg"
-                className="w-[36px] h-[36px] md:w-[40px] md:h-[40px]"
+                className="w-[28px] h-[28px] md:w-[32px] md:h-[32px]"
               >
                 <rect width="46" height="46" rx="6.57143" fill="#3771FE"/>
                 <path d="M29.8594 16.5703L13.3594 33.0703" stroke="white" strokeWidth="2.25" strokeLinecap="round"/>
@@ -754,8 +751,11 @@ export default function DrugInformationPage() {
                   <tr>
                     <td colSpan={2} className="text-center py-12">
                       <div className="flex justify-center items-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#214498]"></div>
-                        <span className="ml-3 text-[#263969] font-['DM_Sans']">Loading drugs...</span>
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        </div>
                       </div>
                     </td>
                   </tr>
