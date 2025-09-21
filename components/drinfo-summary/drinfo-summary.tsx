@@ -2043,6 +2043,33 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }, 100);
   };
 
+  // Custom scroll function to scroll to bottom of page (steps 2-6)
+  const scrollToVisualAbstractButton = () => {
+    setTimeout(() => {
+      // Scroll to the very bottom of the content container
+      const contentRef = document.querySelector('.flex-1.overflow-y-auto');
+      if (contentRef) {
+        contentRef.scrollTop = contentRef.scrollHeight;
+      }
+      
+      // Also scroll the window to the bottom
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior: 'smooth'
+      });
+      
+      // Scroll to the visual abstract button specifically
+      const visualAbstractButton = document.querySelector('.drinfo-visual-abstract-step');
+      if (visualAbstractButton) {
+        visualAbstractButton.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        });
+      }
+    }, 100);
+  };
+
   // Modified tour start function with 2-second delay
   const startTourWithDelay = () => {
     if (!tourContext) return;
@@ -2072,12 +2099,25 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     return () => clearTimeout(timeout);
   }, [tourContext]);
 
+  // Listen for tour step changes and trigger custom scroll from step 2 onwards
+  useEffect(() => {
+    if (tourContext && tourContext.run) {
+      // Get current step index from tour context
+      const currentStepIndex = tourContext.stepIndex || 0;
+      
+      // If we're on step 2 or later (index 1+), scroll to bottom and stay there
+      if (currentStepIndex >= 1) {
+        scrollToVisualAbstractButton();
+      }
+    }
+  }, [tourContext?.run, tourContext?.stepIndex]);
+
   return (
     <div className="p-2 sm:p-4 md:p-6 h-[100dvh] flex flex-col relative overflow-hidden">
       {showTourPrompt && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black bg-opacity-40">
           <div 
-            className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center border"
+            className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center border mx-4"
             style={{
               borderRadius: "8px",
               border: "1px solid #E4ECFF",
