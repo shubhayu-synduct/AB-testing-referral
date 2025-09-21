@@ -21,14 +21,59 @@ export const day4Template = {
         .card-subtitle { font-size: 18px; font-style: italic; text-align: center; margin-bottom: 24px; color: #223258; }
         .section-title { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #223258; }
         .section-text { font-size: 16px; color: #223258; margin-bottom: 16px; line-height: 1.6; }
-        .quote { padding: 20px; margin: 20px 0; font-style: italic; }
+        .quote { 
+          background: white;
+          border: none;
+          border-radius: 12px;
+          padding: 24px; 
+          margin: 24px 0; 
+          font-style: italic;
+          position: relative;
+        }
+        .quote p {
+          font-size: 18px;
+          line-height: 1.7;
+          color: #223258;
+          margin: 0;
+        }
         .quote strong { color: #223258; font-weight: 600; }
-        .use-cases { padding: 20px; margin: 20px 0; }
-        .use-cases h3 { color: #223258; margin-bottom: 12px; font-weight: 600; }
-        .use-cases ul { list-style-type: disc; padding-left: 20px; margin-bottom: 16px; }
-        .use-cases li { margin-bottom: 8px; font-size: 16px; color: #223258; }
-        .why-matters { padding: 20px; margin: 20px 0; }
-        .why-matters h3 { color: #223258; margin-bottom: 12px; font-weight: 600; }
+        .use-cases { 
+          background: white;
+          border: none;
+          border-radius: 12px;
+          padding: 24px; 
+          margin: 24px 0; 
+        }
+        .use-cases h3 { 
+          color: #223258; 
+          margin-bottom: 8px; 
+          font-weight: 600;
+          font-size: 18px;
+        }
+        .use-cases p {
+          margin-bottom: 20px;
+          font-size: 16px;
+          color: #223258;
+          line-height: 1.6;
+        }
+        .why-matters { 
+          background: white;
+          border: none;
+          border-radius: 12px;
+          padding: 24px; 
+          margin: 24px 0; 
+        }
+        .why-matters h3 { 
+          color: #223258; 
+          margin-bottom: 8px; 
+          font-weight: 600;
+          font-size: 18px;
+        }
+        .why-matters p {
+          font-size: 16px;
+          color: #223258;
+          line-height: 1.6;
+        }
         .button { 
           display: inline-block !important; 
           background: #214498 !important; 
@@ -106,7 +151,20 @@ export const day4Template = {
           .card-subtitle { font-size: 16px; }
           .section-title { font-size: 16px; }
           .section-text { font-size: 15px; }
-          .quote, .use-cases, .why-matters { padding: 16px; }
+          .quote { 
+            padding: 20px; 
+            margin: 20px 0;
+          }
+          .quote p {
+            font-size: 16px;
+          }
+          .use-cases, .why-matters { 
+            padding: 20px; 
+            margin: 20px 0;
+          }
+          .use-cases h3, .why-matters h3 {
+            font-size: 16px;
+          }
           .greeting { font-size: 16px; }
           .intro-text { font-size: 15px; }
           .footer-text { font-size: 15px; }
@@ -120,7 +178,20 @@ export const day4Template = {
           .card-subtitle { font-size: 15px; }
           .section-title { font-size: 15px; }
           .section-text { font-size: 14px; }
-          .quote, .use-cases, .why-matters { padding: 12px; }
+          .quote { 
+            padding: 16px; 
+            margin: 16px 0;
+          }
+          .quote p {
+            font-size: 15px;
+          }
+          .use-cases, .why-matters { 
+            padding: 16px; 
+            margin: 16px 0;
+          }
+          .use-cases h3, .why-matters h3 {
+            font-size: 15px;
+          }
           .greeting { font-size: 15px; }
           .intro-text { font-size: 14px; }
           .footer-text { font-size: 14px; }
@@ -139,7 +210,7 @@ export const day4Template = {
           <div class="card">
             <p class="greeting">Dear {{name}},</p>
             
-            <p class="intro-text">For Dr. Marta Isidoro, anesthesiologist and chronic pain specialist, speed and safety aren't optional, they're essential.</p>
+            <p class="intro-text">For <strong>Dr. Marta Isidoro, anesthesiologist and chronic pain specialist</strong>, speed and safety aren't optional, they're essential.</p>
             
             <div class="quote">
               <p><strong>"Being an anesthesiologist means thinking fast. Having DR. INFO on hand is like having a medical book with you every minute, one that actually answers your questions."</strong></p>
