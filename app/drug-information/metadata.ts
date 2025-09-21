@@ -1,0 +1,43 @@
+import type { Metadata } from "next"
+
+export const drugInformationMetadata: Metadata = {
+  title: "Drug Information - Dr.Info AI Drug Safety Assistant",
+  description: "Comprehensive drug information database with AI-powered drug safety checks, interactions, and clinical guidelines. Trusted by doctors for evidence-based drug information and safety protocols.",
+  keywords: [
+    "drug information AI",
+    "drug safety AI assistant",
+    "drug interaction checker AI",
+    "medication safety AI",
+    "pharmaceutical AI tools",
+    "drug database AI",
+    "medication interaction AI",
+    "drug contraindications AI",
+    "pharmacology AI assistant",
+    "drug side effects AI",
+    "medication guidelines AI",
+    "drug dosage AI",
+    "pharmaceutical research AI",
+    "drug efficacy AI",
+    "medication management AI",
+    "drug therapy AI",
+    "pharmacovigilance AI",
+    "drug monitoring AI",
+    "medication adherence AI",
+    "drug discovery AI",
+    "pharmaceutical AI platform",
+    "drug information system AI",
+    "medication safety platform",
+    "drug interaction database",
+    "pharmaceutical decision support",
+    "drug safety protocols AI",
+    "medication error prevention AI",
+    "drug contraindication checker",
+    "pharmaceutical AI research",
+    "drug information assistant"
+  ],
+  openGraph: {
+    title: "Drug Information - Dr.Info AI Drug Safety Assistant",
+    description: "Comprehensive drug information database with AI-powered drug safety checks and interactions.",
+    type: "website",
+  },
+}

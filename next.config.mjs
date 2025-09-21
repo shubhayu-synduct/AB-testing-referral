@@ -9,7 +9,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  swcMinify: false,
   skipTrailingSlashRedirect: true,
   skipMiddlewareUrlNormalize: true,
   // Ignore build errors for specific pages
