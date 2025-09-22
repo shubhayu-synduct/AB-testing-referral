@@ -1447,7 +1447,7 @@ function ProfilePageContent() {
                 <p className="text-sm text-[#747474] mb-4">Unlimited, guideline-backed answers with transparent citations</p>
                 <div className="flex items-baseline gap-1 mb-4 flex-nowrap justify-center">
                   <span className="text-2xl font-bold text-[#000000]">
-                    {billingInterval === 'monthly' ? '€12.50' : '€9.92'}
+                    {billingInterval === 'monthly' ? '€11.99' : '€9.92'}
                   </span>
                   <span className="text-sm text-[#000000] whitespace-nowrap">/ mo</span>
                   {billingInterval === 'yearly' && (
@@ -1492,7 +1492,7 @@ function ProfilePageContent() {
                 <p className="text-sm text-[#747474] mb-4">Unlimited, guideline-backed answers with transparent citations</p>
                 <div className="flex items-baseline gap-1 mb-4 flex-nowrap justify-center">
                   <span className="text-2xl font-bold text-[#000000]">
-                    {billingInterval === 'monthly' ? '€19.90' : '€16.58'}
+                    {billingInterval === 'monthly' ? '€19.99' : '€16.58'}
                   </span>
                   <span className="text-sm text-[#000000] whitespace-nowrap">/ mo</span>
                   {billingInterval === 'yearly' && (
