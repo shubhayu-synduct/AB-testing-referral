@@ -16,11 +16,10 @@ const nextConfig = {
     maxInactiveAge: 25 * 1000,
     pagesBufferLength: 2,
   },
-  // Remove console statements in production builds
+  // Remove ALL console statements in production builds (including Vercel Analytics)
   webpack: (config, { dev, isServer }) => {
-    if (!dev && !isServer) {
-      // Remove console.log, console.info, console.warn in production client builds
-      // Keep console.error for critical error reporting
+    if (!dev) {
+      // Remove ALL console statements in production (both client and server)
       config.optimization.minimizer.forEach((minimizer) => {
         if (minimizer.constructor && minimizer.constructor.name === 'TerserPlugin') {
           // Disable parallel workers to avoid EPERM kill issues on Windows
@@ -29,7 +28,8 @@ const nextConfig = {
             ...minimizer.options.terserOptions,
             compress: {
               ...minimizer.options.terserOptions?.compress,
-              drop_console: ['log', 'info', 'warn'],
+              drop_console: true, // Remove ALL console statements
+              drop_debugger: true, // Also remove debugger statements
             },
           };
         }
