@@ -22,8 +22,8 @@ export const metadata: Metadata = {
     default: "DR. INFO - AI Assistant for Doctors",
     template: "%s | DR. INFO - Medical AI Assistant"
   },
-  description: "Dr.Info.ai - Fastest AI Assistant for Medical Decision Support. AI-powered clinical assistant for doctors with verified references. Evidence-based medical AI tool for hospitals, clinical practice, and medical professionals. Alternative to UpToDate with real-time drug interactions and clinical guidelines.",
-  abstract: "Dr.Info is the fastest AI assistant for medical decision support, providing evidence-based clinical guidance, drug interactions, and medical guidelines for healthcare professionals worldwide.",
+  description: "DR. INFO - AI Assistant for Doctors with verified references and evidence-based medical information",
+  abstract: "DR. INFO is the AI assistant for doctors with verified references and evidence-based medical information",
   category: "Healthcare Technology",
   classification: "Medical AI Software",
   keywords: [
@@ -169,7 +169,7 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: 'https://app.drinfo.ai',
     title: 'DR. INFO - AI Assistant for Doctors',
-    description: 'Dr.Info.ai - Fastest AI Assistant for Medical Decision Support. AI-powered clinical assistant for doctors with verified references and evidence-based medical information.',
+    description:  'AI Assistant for Doctors with verified references and evidence-based medical information',
     siteName: 'Dr.Info',
     images: [
       {
@@ -183,7 +183,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'DR.INFO - AI Assistant for Doctors',
-    description: 'Fastest AI Assistant for Medical Decision Support with verified references',
+    description: 'AI Assistant for Doctors with verified references and evidence-based medical information',
     images: ['/og-image.png'],
   },
   alternates: {
