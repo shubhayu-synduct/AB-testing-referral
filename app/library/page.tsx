@@ -532,23 +532,66 @@ export default function LibraryPage() {
     }
   }
 
-  const handleBulkDownload = () => {
+  // Helper function to convert SVG to PNG and download at 400 DPI
+  const downloadAsPNG = async (svgData: string, filename: string) => {
+    return new Promise<void>((resolve, reject) => {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      const img = new Image()
+      
+      img.onload = () => {
+        // Calculate dimensions for 400 DPI (assuming 96 DPI screen)
+        const dpiScale = 400 / 96
+        const scaledWidth = img.width * dpiScale
+        const scaledHeight = img.height * dpiScale
+        
+        // Set canvas dimensions for high DPI
+        canvas.width = scaledWidth
+        canvas.height = scaledHeight
+        
+        // Enable high quality rendering
+        ctx!.imageSmoothingEnabled = true
+        ctx!.imageSmoothingQuality = 'high'
+        
+        // Draw the image scaled for 400 DPI
+        ctx?.drawImage(img, 0, 0, scaledWidth, scaledHeight)
+        
+        // Convert to PNG and download
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = filename
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+            URL.revokeObjectURL(url)
+            resolve()
+          } else {
+            reject(new Error('Failed to create PNG blob'))
+          }
+        }, 'image/png')
+      }
+      
+      img.onerror = () => reject(new Error('Failed to load SVG image'))
+      
+      // Convert SVG to data URL
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
+      const url = URL.createObjectURL(svgBlob)
+      img.src = url
+    })
+  }
+
+  const handleBulkDownload = async () => {
     if (selectedAbstracts.size === 0) return
     
-    selectedAbstracts.forEach(abstractId => {
+    for (const abstractId of selectedAbstracts) {
       const abstract = visualAbstracts.find(a => a.id === abstractId)
       if (abstract) {
-        const blob = new Blob([abstract.svg.svg_data], { type: 'image/svg+xml' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `visual-abstract-${abstract.id}.svg`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
+        await downloadAsPNG(abstract.svg.svg_data, `visual-abstract-${abstract.id}.png`)
       }
-    })
+    }
   }
 
   // Guideline AI Summary Functions
@@ -879,16 +922,9 @@ export default function LibraryPage() {
                               variant="ghost"
                               size="sm"
                               className="h-6 w-6 p-0 bg-white/90 backdrop-blur-sm border border-[#B5C9FC] hover:bg-white hover:border-[#223258] transition-all"
-                              onClick={() => {
-                                const blob = new Blob([abstract.svg.svg_data], { type: 'image/svg+xml' })
-                                const url = URL.createObjectURL(blob)
-                                const a = document.createElement('a')
-                                a.href = url
-                                a.download = `visual-abstract-${abstract.id}.svg`
-                                document.body.appendChild(a)
-                                a.click()
-                                document.body.removeChild(a)
-                                URL.revokeObjectURL(url)
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                downloadAsPNG(abstract.svg.svg_data, `visual-abstract-${abstract.id}.png`)
                               }}
                             >
                               <Download className="h-3 w-3 text-[#223258]" />
@@ -1294,17 +1330,7 @@ export default function LibraryPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  const blob = new Blob([selectedAbstract.svg.svg_data], { type: 'image/svg+xml' })
-                  const url = URL.createObjectURL(blob)
-                  const a = document.createElement('a')
-                  a.href = url
-                  a.download = `visual-abstract-${selectedAbstract.id}.svg`
-                  document.body.appendChild(a)
-                  a.click()
-                  document.body.removeChild(a)
-                  URL.revokeObjectURL(url)
-                }}
+                onClick={() => downloadAsPNG(selectedAbstract.svg.svg_data, `visual-abstract-${selectedAbstract.id}.png`)}
                 className="bg-[#002A7C] hover:bg-[#1B3B8B] border-[#002A7C] text-white"
               >
                 <Download className="h-4 w-4 mr-2" />
