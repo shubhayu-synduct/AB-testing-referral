@@ -21,7 +21,7 @@ export const day5Template = {
         .card-subtitle { font-size: 18px; font-style: italic; text-align: center; margin-bottom: 24px; color: #223258; }
         .section-title { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #223258; }
         .section-text { font-size: 16px; color: #000000; margin-bottom: 16px; line-height: 1.6; }
-        .transparency { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid rgba(55, 113, 254, 0.2); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
+        .transparency { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border: none; }
         .transparency h3 { color: #223258; margin-bottom: 12px; font-weight: 600; }
         .transparency strong { color: #223258; }
         .transparency ul { list-style-type: disc; padding-left: 20px; margin-bottom: 16px; }

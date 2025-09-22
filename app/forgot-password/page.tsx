@@ -8,12 +8,13 @@ import { getFirebaseAuth } from "@/lib/firebase"
 import { sendPasswordResetEmail } from "firebase/auth"
 import { logger } from "@/lib/logger"
 import { track } from "@/lib/analytics"
+import { checkEmailExists } from "@/lib/email-validation"
 
 export default function ForgotPasswordPage() {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | React.ReactNode | null>(null)
   const [success, setSuccess] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -23,6 +24,23 @@ export default function ForgotPasswordPage() {
     setIsLoading(true)
 
     try {
+      // First, check if email exists in our database
+      const emailExists = await checkEmailExists(email)
+      
+      if (!emailExists) {
+        setError(
+          <>
+            No account found with this email address. Please check your email or{' '}
+            <Link href="/signup" className="underline text-red-600 hover:text-red-700">
+              sign up
+            </Link>
+            {' '}for a new account.
+          </>
+        )
+        setIsLoading(false)
+        return
+      }
+
       const auth = await getFirebaseAuth()
       if (!auth) throw new Error("Firebase auth not initialized")
 
@@ -63,9 +81,29 @@ export default function ForgotPasswordPage() {
     setError(null)
     setIsLoading(true)
     try {
+      // First, check if email exists in our database
+      const emailExists = await checkEmailExists(email)
+      
+      if (!emailExists) {
+        setError(
+          <>
+            No account found with this email address. Please check your email or{' '}
+            <Link href="/signup" className="underline text-red-600 hover:text-red-700">
+              sign up
+            </Link>
+            {' '}for a new account.
+          </>
+        )
+        setIsLoading(false)
+        return
+      }
+
       const auth = await getFirebaseAuth()
       if (!auth) throw new Error("Firebase auth not initialized")
-      await sendPasswordResetEmail(auth, email)
+      await sendPasswordResetEmail(auth, email, {
+        url: "https://app.drinfo.ai/reset-password",
+        handleCodeInApp: true
+      })
       setSuccess(true)
     } catch (err: any) {
       setError(err.message || "An error occurred while resending the email")
@@ -121,7 +159,7 @@ export default function ForgotPasswordPage() {
           </div>
         )}
         {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-lg w-full max-w-md">
+          <div className="bg-[#F4F7FF] text-red-600 p-3 rounded-lg w-full max-w-md border border-[#3771FE80]">
             {error}
           </div>
         )}

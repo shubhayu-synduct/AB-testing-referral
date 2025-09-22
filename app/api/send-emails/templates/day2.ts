@@ -21,7 +21,7 @@ export const day2Template = {
         .card-subtitle { font-size: 18px; font-style: italic; text-align: center; margin-bottom: 24px; color: #223258; }
         .section-title { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #223258; }
         .section-text { font-size: 16px; color: #000000; margin-bottom: 16px; line-height: 1.6; }
-        .example { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid rgba(55, 113, 254, 0.2); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); display: flex; align-items: flex-start; gap: 16px; }
+        .example { background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border: none; display: flex; align-items: flex-start; gap: 16px; }
         .example-icon { flex-shrink: 0; margin-top: 4px; }
         .example-content h3 { color: #223258; margin-bottom: 12px; font-weight: 600; }
         .example-content p { color: #000000; margin: 0; line-height: 1.6; }

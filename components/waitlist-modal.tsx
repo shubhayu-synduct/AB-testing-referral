@@ -17,7 +17,7 @@ export default function WaitlistModal({ isOpen }: WaitlistModalProps) {
   // Auto signout after 30 seconds with countdown
   useEffect(() => {
     if (isOpen) {
-      setCountdown(30)
+      setCountdown(10)
       
       const countdownTimer = setInterval(() => {
         setCountdown(prev => {
