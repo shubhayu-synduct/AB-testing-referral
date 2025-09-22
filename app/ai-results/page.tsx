@@ -1194,10 +1194,10 @@ function AIResultsContent() {
               </div>
               <div className="flex items-center border-[2.7px] rounded-lg h-[52px] w-full max-w-4xl mx-auto pr-3 md:pr-4 bg-white transition-all duration-300 relative z-10 border-[#3771FE]/[0.27] shadow-[0_0_12px_rgba(55,113,254,0.2)]">
                 <button 
-                  onClick={() => router.back()}
+                  onClick={() => router.push('/drug-information')}
                   className="pl-3 md:pl-4 flex items-center hover:opacity-70 transition-opacity"
                 >
-                  <ArrowLeft className="stroke-[1.5] w-[18px] h-[18px] md:w-[20px] md:h-[20px] transition-colors duration-300 text-[#3771FE]" fill="none" />
+                  <ArrowLeft className="stroke-[2.5] w-[18px] h-[18px] md:w-[20px] md:h-[20px] transition-colors duration-300 text-[#01257C]" fill="none" />
                 </button>
                 <input
                   ref={searchInputRef}
