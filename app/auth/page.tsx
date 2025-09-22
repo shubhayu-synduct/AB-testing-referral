@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { SignInForm } from "@/components/auth/signin-form"
 import { SignUpForm } from "@/components/auth/signup-form"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -27,7 +27,9 @@ export default function AuthPage() {
           </TabsList>
           
           <TabsContent value="signin" className="mt-6">
-            <SignInForm />
+            <Suspense fallback={<div className="flex justify-center p-4">Loading...</div>}>
+              <SignInForm />
+            </Suspense>
           </TabsContent>
           
           <TabsContent value="signup" className="mt-6">
@@ -61,4 +63,4 @@ export default function AuthPage() {
       </div>
     </main>
   )
-} 
+}

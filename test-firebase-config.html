@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Configuration Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; background-color: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        pre { background-color: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Firebase Configuration Test</h1>
+    
+    <div class="test-section info">
+        <h3>Current Firebase Configuration</h3>
+        <div id="config-display"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test Firebase Authentication</h3>
+        <button onclick="testFirebaseConfig()">Test Firebase Config</button>
+        <button onclick="testBackendConnection()">Test Backend Connection</button>
+        <div id="firebase-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test Results</h3>
+        <div id="test-results"></div>
+    </div>
+
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        
+        // Firebase configuration (should match backend)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDkqGSpF6YN7k1dJlXrWy6Qei7XtBjcmQQ",
+            authDomain: "webappdrinfostage.firebaseapp.com",
+            projectId: "webappdrinfostage",
+            storageBucket: "webappdrinfostage.firebasestorage.app",
+            messagingSenderId: "276866709512",
+            appId: "1:276866709512:web:51c160733e2d0641b1f9bd",
+            measurementId: "G-SYSKG3VCK4"
+        };
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        
+        // Display current configuration
+        document.getElementById('config-display').innerHTML = `
+            <pre>${JSON.stringify(firebaseConfig, null, 2)}</pre>
+        `;
+        
+        // Test Firebase configuration
+        window.testFirebaseConfig = async function() {
+            const resultDiv = document.getElementById('firebase-result');
+            resultDiv.innerHTML = '<p>Testing Firebase configuration...</p>';
+            
+            try {
+                // Test anonymous sign-in
+                const userCredential = await signInAnonymously(auth);
+                const user = userCredential.user;
+                
+                // Get ID token
+                const idToken = await user.getIdToken();
+                
+                resultDiv.innerHTML = `
+                    <div class="success">
+                        <h4>✅ Firebase Authentication Successful</h4>
+                        <p><strong>User ID:</strong> ${user.uid}</p>
+                        <p><strong>Project ID:</strong> ${firebaseConfig.projectId}</p>
+                        <p><strong>Token Preview:</strong> ${idToken.substring(0, 50)}...</p>
+                    </div>
+                `;
+                
+                // Store token for backend test
+                window.currentIdToken = idToken;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h4>❌ Firebase Authentication Failed</h4>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <pre>${JSON.stringify(error, null, 2)}</pre>
+                    </div>
+                `;
+            }
+        };
+        
+        // Test backend connection with Firebase token
+        window.testBackendConnection = async function() {
+            const resultDiv = document.getElementById('test-results');
+            
+            if (!window.currentIdToken) {
+                resultDiv.innerHTML = '<div class="error">❌ Please test Firebase config first to get an ID token</div>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<p>Testing backend connection with Firebase token...</p>';
+            
+            try {
+                // const drugApiUrl = 'http://localhost:8002/api/search';
+                const drugApiUrl = 'https://synduct-drugsummary.drinfo.ai/api/search';
+                // const response = await fetch('http://localhost:8002/api/drugs/ryzodeg', {
+                const response = await fetch('https://synduct-drugsummary.drinfo.ai/api/drugs/ryzodeg', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${window.currentIdToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const responseText = await response.text();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="success">
+                            <h4>✅ Backend Connection Successful</h4>
+                            <p><strong>Status:</strong> ${response.status}</p>
+                            <p><strong>Response:</strong></p>
+                            <pre>${responseText}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="error">
+                            <h4>❌ Backend Connection Failed</h4>
+                            <p><strong>Status:</strong> ${response.status}</p>
+                            <p><strong>Response:</strong></p>
+                            <pre>${responseText}</pre>
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h4>❌ Backend Connection Error</h4>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                    </div>
+                `;
+            }
+        };
+        
+        // Auto-test on page load
+        setTimeout(() => {
+            testFirebaseConfig();
+        }, 1000);
+    </script>
+</body>
+</html>

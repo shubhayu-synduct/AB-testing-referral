@@ -619,10 +619,12 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }
   }, [sessionId, isChatLoading, query, hasFetched, lastQuestion]);
 
-  // Single, working scroll effect for streaming content
+  const [shouldUseNextScroll, setShouldUseNextScroll] = useState(true);
+  
+  // Scroll to end during active session (when streaming)
   useEffect(() => {
-    // Only scroll during streaming or when messages change
-    if (status !== 'complete' && status !== 'complete_image' && messages.length > 0) {
+    if (lastQuestion && isStreaming) {
+      setShouldUseNextScroll(false);
       // Use requestAnimationFrame for smooth performance
       requestAnimationFrame(() => {
         // Scroll the content container to bottom
@@ -641,11 +643,14 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         }
       });
     }
-  }, [messages, status]); // Depend on messages and status
+  }, [lastQuestion, isStreaming]); // Depend on lastQuestion and isStreaming
 
-  // Always scroll to end after any new message (answer) is added
+  // Scroll to end when loading from history (not streaming)
   useEffect(() => {
-    if (messages.length > 0) {
+    // console.log('messages.length', messages.length);
+    // console.log('isStreaming', isStreaming);
+    // console.log('shouldUseNextScroll', shouldUseNextScroll);
+    if (messages.length > 0 && !isStreaming && shouldUseNextScroll) {
       // Use requestAnimationFrame for smooth performance
       requestAnimationFrame(() => {
         // Scroll the content container to bottom
@@ -664,7 +669,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         }
       });
     }
-  }, [messages]); // Only depend on messages
+  }, [messages.length, isStreaming, shouldUseNextScroll]); // Depend on messages, streaming, and shouldUseNextScroll
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -1093,6 +1098,36 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       @media (prefers-reduced-motion: reduce) {
         .shimmer-text { animation: none; }
       }
+
+      /* Hide scrollbars while maintaining scroll functionality */
+      .hide-scrollbar {
+        -ms-overflow-style: none;  /* Internet Explorer 10+ */
+        scrollbar-width: none;  /* Firefox */
+      }
+      
+      .hide-scrollbar::-webkit-scrollbar {
+        display: none;  /* Safari and Chrome */
+      }
+
+      /* Apply to main content areas */
+      .overflow-y-auto {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      
+      .overflow-y-auto::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* Apply to specific scrollable containers */
+      .flex-1.overflow-y-auto {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      
+      .flex-1.overflow-y-auto::-webkit-scrollbar {
+        display: none;
+      }
     `;
     document.head.appendChild(style);
     
@@ -1309,6 +1344,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }
     setIsLoading(true);
     setImageGenerationStatus('idle'); // Reset image generation status
+    setShowTourPrompt(false); // Hide tour prompt when new question is asked
     const userId = user?.uid || user?.id;
     if (!userId) {
       setError('User not authenticated.');
@@ -2008,6 +2044,33 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }, 100);
   };
 
+  // Custom scroll function to scroll to bottom of page (steps 2-6)
+  const scrollToVisualAbstractButton = () => {
+    setTimeout(() => {
+      // Scroll to the very bottom of the content container
+      const contentRef = document.querySelector('.flex-1.overflow-y-auto');
+      if (contentRef) {
+        contentRef.scrollTop = contentRef.scrollHeight;
+      }
+      
+      // Also scroll the window to the bottom
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior: 'smooth'
+      });
+      
+      // Scroll to the visual abstract button specifically
+      const visualAbstractButton = document.querySelector('.drinfo-visual-abstract-step');
+      if (visualAbstractButton) {
+        visualAbstractButton.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        });
+      }
+    }, 100);
+  };
+
   // Modified tour start function with 2-second delay
   const startTourWithDelay = () => {
     if (!tourContext) return;
@@ -2021,6 +2084,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }, 2000);
   };
 
+  // Show tour prompt when answer is complete and rendered
   useEffect(() => {
     // Check if tour should be shown based on saved preferences
     if (tourContext && tourContext.shouldShowTour) {
@@ -2031,18 +2095,38 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       }
     }
 
-    const timeout = setTimeout(() => {
-      setShowTourPrompt(true);
-    }, 25000);
-    return () => clearTimeout(timeout);
-  }, [tourContext]);
+    // Show tour prompt when answer is complete and there are messages
+    // Only show for the first answer (not follow-up questions)
+    if ((status === 'complete' || status === 'complete_image') && messages.length > 0 && !isLoading && messages.length <= 2) {
+      // Add a small delay to ensure the answer is fully rendered
+      const timeout = setTimeout(() => {
+        setShowTourPrompt(true);
+      }, 1000); // 1 second delay to ensure rendering is complete
+      return () => clearTimeout(timeout);
+    } else {
+      setShowTourPrompt(false);
+    }
+  }, [tourContext, status, messages.length, isLoading]);
+
+  // Listen for tour step changes and trigger custom scroll from step 2 onwards
+  useEffect(() => {
+    if (tourContext && tourContext.run) {
+      // Get current step index from tour context
+      const currentStepIndex = tourContext.stepIndex || 0;
+      
+      // If we're on step 2 or later (index 1+), scroll to bottom and stay there
+      if (currentStepIndex >= 1) {
+        scrollToVisualAbstractButton();
+      }
+    }
+  }, [tourContext?.run, tourContext?.stepIndex]);
 
   return (
     <div className="p-2 sm:p-4 md:p-6 h-[100dvh] flex flex-col relative overflow-hidden">
       {showTourPrompt && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black bg-opacity-40">
           <div 
-            className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center border"
+            className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center border mx-4"
             style={{
               borderRadius: "8px",
               border: "1px solid #E4ECFF",
@@ -2112,8 +2196,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
           </div>
         </div>
       )}
-      {/* Top Bar with Share Button */}
-      <div className="flex justify-between items-center mb-4 px-2 sm:px-4">
+      {/* Top Bar with Share Button - Hidden on mobile, shown on desktop */}
+      <div className="hidden md:flex justify-between items-center mb-4 px-2 sm:px-4">
         <div className="flex-1"></div>
         <button
           onClick={handleShare}
@@ -2335,6 +2419,12 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                             return !hasCitations;
                           })() && (
                             <div className="mt-4 sm:mt-6">
+                              {/* Disclaimer appears before shimmer animation (formatting phase) */}
+                              {/* <div className="mb-4 text-center">
+                                <p className="text-sm text-gray-500 font-['DM_Sans'] italic leading-relaxed">
+                                  DR.INFO is an informational and educational tool.
+                                </p>
+                              </div> */}
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                                 <div className="reference-skeleton h-[95px] sm:h-[105px] lg:h-[125px]" />
                                 <div className="reference-skeleton h-[95px] sm:h-[105px] lg:h-[125px]" />
@@ -2342,6 +2432,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                               </div>
                             </div>
                           )}
+
                           {(() => {
                             const shouldShowCitations = (msg.answer?.citations && Object.keys(msg.answer.citations).length > 0) || 
                               (activeCitations && Object.keys(activeCitations).length > 0);
@@ -2356,6 +2447,12 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                             return shouldShowCitations;
                           })() && (
                             <div className="mt-4 sm:mt-6">
+                              {/* Disclaimer appears above references when citations are shown (complete phase) */}
+                              {/* <div className="mb-4 text-center">
+                                <p className="text-sm text-gray-500 font-['DM_Sans'] italic leading-relaxed">
+                                  DR.INFO is an informational and educational tool.
+                                </p>
+                              </div> */}
                               <p className="text-slate-500 text-xs sm:text-sm">
                                 Used {getCitationCount(msg.answer?.citations || activeCitations || {})} references
                               </p>
@@ -2475,7 +2572,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
             {(searchPosition === "bottom" || chatHistory.length > 0 || streamedContent.mainSummary) && (
               <>
                 <div ref={inputAnchorRef} style={{ marginBottom: '120px sm:140px' }} />
-                <div className="sticky bottom-0 bg-gray-50 pt-2 pb-4 z-10">
+                <div className="sticky bottom-0 bg-gray-50 pt-2 pb-0 z-10 mt-0">
                   <div className="max-w-4xl mx-auto px-2 sm:px-4">
                     <div className="relative w-full bg-white rounded border-2 border-[#3771fe44] shadow-[0px_0px_11px_#0000000c] p-3 md:p-4 follow-up-question-search">
                       <div className="relative">
@@ -2488,31 +2585,61 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                             e.target.style.height = e.target.scrollHeight + 'px';
                           }}
                           placeholder="Ask a follow-up question..."
-                          className="w-full text-base md:text-[16px] text-[#223258] font-normal font-['DM_Sans'] outline-none resize-none min-h-[24px] max-h-[200px] overflow-y-auto"
-                          onKeyDown={(e) => e.key === 'Enter' && handleFollowUpQuestion(e as any)}
+                          className={`w-full text-base md:text-[16px] font-normal font-['DM_Sans'] outline-none resize-none min-h-[24px] max-h-[200px] overflow-y-auto ${
+                            isLoading || (status && status !== 'complete' && status !== 'complete_image') 
+                              ? 'text-gray-400 cursor-not-allowed bg-gray-50' 
+                              : 'text-[#223258]'
+                          }`}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !isLoading && (status === 'complete' || status === 'complete_image')) {
+                              handleFollowUpQuestion(e as any);
+                            }
+                          }}
                           rows={1}
                           style={{ height: '24px' }}
+                          disabled={isLoading || (status !== null && status !== 'complete' && status !== 'complete_image')}
                         />
                       </div>
-                      <div className="flex justify-between items-center mt-2">
-                        {/* Toggle switch for Acute/Research mode */}
-                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <div className="flex justify-end items-center mt-2">
+                        {/* Toggle switch for Acute/Research mode - COMMENTED OUT */}
+                        {/* <label className={`flex items-center gap-2 select-none ${
+                          isLoading || (status && status !== 'complete' && status !== 'complete_image') 
+                            ? 'cursor-not-allowed opacity-50' 
+                            : 'cursor-pointer'
+                        }`}>
                           <input
                             type="checkbox"
                             checked={activeMode === 'instant'}
                             onChange={() => setActiveMode(activeMode === 'instant' ? 'research' : 'instant')}
                             className="toggle-checkbox hidden"
+                            disabled={isLoading || (status !== null && status !== 'complete' && status !== 'complete_image')}
                           />
-                          <span className={`w-10 h-6 flex items-center rounded-full p-1 duration-300 ease-in-out ${activeMode === 'instant' ? 'bg-blue-500' : 'bg-gray-300'}`}
+                          <span className={`w-10 h-6 flex items-center rounded-full p-1 duration-300 ease-in-out ${
+                            isLoading || (status && status !== 'complete' && status !== 'complete_image')
+                              ? 'bg-gray-200'
+                              : activeMode === 'instant' ? 'bg-blue-500' : 'bg-gray-300'
+                          }`}
                                 style={{ transition: 'background 0.3s' }}>
-                            <span className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ease-in-out ${activeMode === 'instant' ? 'translate-x-4' : ''}`}></span>
+                            <span className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ease-in-out ${
+                              isLoading || (status && status !== 'complete' && status !== 'complete_image')
+                                ? ''
+                                : activeMode === 'instant' ? 'translate-x-4' : ''
+                            }`}></span>
                           </span>
-                          <span className={`text-sm font-medium ${activeMode === 'instant' ? 'text-[#3771FE]' : 'text-gray-500'}`}
+                          <span className={`text-sm font-medium ${
+                            isLoading || (status && status !== 'complete' && status !== 'complete_image')
+                              ? 'text-gray-400'
+                              : activeMode === 'instant' ? 'text-[#3771FE]' : 'text-gray-500'
+                          }`}
                                 style={{ fontSize: '16px', fontFamily: 'DM Sans, sans-serif' }}>
                             Acute
                           </span>
-                        </label>
-                        <button onClick={handleFollowUpQuestion} className="flex-shrink-0" disabled={isLoading}>
+                        </label> */}
+                        <button 
+                          onClick={handleFollowUpQuestion} 
+                          className="flex-shrink-0" 
+                          disabled={isLoading || (status !== null && status !== 'complete' && status !== 'complete_image')}
+                        >
                           {isLoading ? (
                             <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                           ) : (
@@ -2525,7 +2652,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                         </button>
                       </div>
                     </div>
-                    <div className="w-full py-3 md:py-4 text-center text-xs md:text-sm text-gray-400 px-4">
+                    <div className="w-full py-3 md:py-4 text-center text-xs text-gray-400 px-4">
+                      <p>DR. INFO is an informational and educational tool.</p>
                       <p>Do not insert protected health information or personal data.</p>
                         <Link href="https://synduct.com/terms-and-conditions/" className="text-black hover:text-[#3771FE] underline inline-block" target="_blank" rel="noopener noreferrer">
                           Terms and Conditions

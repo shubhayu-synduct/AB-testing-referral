@@ -11,27 +11,25 @@ const nextConfig = {
   },
   skipTrailingSlashRedirect: true,
   skipMiddlewareUrlNormalize: true,
-  // Remove console statements in production builds
-  compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
-  },
   // Ignore build errors for specific pages
   onDemandEntries: {
     maxInactiveAge: 25 * 1000,
     pagesBufferLength: 2,
   },
-  // Remove ALL console statements in production builds (both client and server)
+  // Remove console statements in production builds
   webpack: (config, { dev, isServer }) => {
-    if (!dev) {
-      // Remove ALL console statements in production builds (both client and server)
+    if (!dev && !isServer) {
+      // Remove console.log, console.info, console.warn in production client builds
+      // Keep console.error for critical error reporting
       config.optimization.minimizer.forEach((minimizer) => {
-        if (minimizer.constructor.name === 'TerserPlugin') {
+        if (minimizer.constructor && minimizer.constructor.name === 'TerserPlugin') {
+          // Disable parallel workers to avoid EPERM kill issues on Windows
+          minimizer.options.parallel = false;
           minimizer.options.terserOptions = {
             ...minimizer.options.terserOptions,
             compress: {
-              ...minimizer.options.terserOptions.compress,
-              drop_console: true, // Remove ALL console statements
-              drop_debugger: true, // Also remove debugger statements
+              ...minimizer.options.terserOptions?.compress,
+              drop_console: ['log', 'info', 'warn'],
             },
           };
         }

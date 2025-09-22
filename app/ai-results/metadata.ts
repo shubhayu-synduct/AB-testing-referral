@@ -1,0 +1,43 @@
+import type { Metadata } from "next"
+
+export const aiResultsMetadata: Metadata = {
+  title: "AI Medical Results - Dr.Info Clinical AI Analysis",
+  description: "Get instant AI-powered medical analysis and clinical decision support. Dr.Info provides evidence-based medical insights, drug interactions, and clinical recommendations for healthcare professionals.",
+  keywords: [
+    "AI medical results",
+    "clinical AI analysis",
+    "medical AI insights",
+    "AI medical diagnosis support",
+    "clinical decision AI",
+    "medical AI recommendations",
+    "AI medical analysis",
+    "clinical AI results",
+    "medical AI interpretation",
+    "AI clinical insights",
+    "medical AI assessment",
+    "clinical AI evaluation",
+    "AI medical consultation",
+    "medical AI diagnosis",
+    "clinical AI support",
+    "AI medical evaluation",
+    "medical AI consultation",
+    "clinical AI analysis",
+    "AI medical assessment",
+    "medical AI results",
+    "clinical AI insights",
+    "AI medical interpretation",
+    "medical AI analysis",
+    "clinical AI recommendations",
+    "AI medical support",
+    "medical AI guidance",
+    "clinical AI assistance",
+    "AI medical advice",
+    "medical AI consultation",
+    "clinical AI results"
+  ],
+  openGraph: {
+    title: "AI Medical Results - Dr.Info Clinical AI Analysis",
+    description: "Get instant AI-powered medical analysis and clinical decision support with evidence-based insights.",
+    type: "website",
+  },
+}

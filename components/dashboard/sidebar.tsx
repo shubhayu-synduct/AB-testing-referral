@@ -25,6 +25,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { doc, getDoc } from 'firebase/firestore'
 import { getFirebaseFirestore } from '@/lib/firebase'
 import { logger } from '@/lib/logger'
+import { track } from '@/lib/analytics'
 
 interface SidebarProps {
   isOpen: boolean;
@@ -118,6 +119,9 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
       // Sign out of Firebase
       await signOut(auth)
       
+      // Track logout event
+      track.userLogout('manual', user?.uid)
+      
       // Clear our custom session cookie
       clearSessionCookie()
       
@@ -147,10 +151,20 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             <div className={`flex ${isOpen ? 'items-center justify-between' : 'flex-col items-center'} mb-8`}>
               <div className="flex items-center">
                 {isOpen ? (
-                  <img src="/login-logo.svg" alt="DR. INFO Logo" className="h-8" />
+                  <img 
+                    src="/full-icon.svg" 
+                    alt="DR. INFO Logo" 
+                    className="h-8 w-auto cursor-pointer hover:opacity-80 transition-opacity" 
+                    onClick={() => router.push('/dashboard')}
+                  />
                 ) : (
-                  <div className="relative w-8 h-8">
-                    <img src="/favicon.png" alt="DR. INFO Logo" className="w-8 h-8" />
+                  <div className="relative w-8 h-8 flex items-center justify-center">
+                    <img 
+                      src="/favicon.svg" 
+                      alt="DR. INFO Icon" 
+                      className="w-8 h-8 cursor-pointer hover:opacity-80 transition-opacity" 
+                      onClick={() => router.push('/dashboard')}
+                    />
                   </div>
                 )}
               </div>
@@ -237,6 +251,9 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               <Link 
                 href="/guidelines"
                 onClick={() => {
+                  if (user) {
+                    track.guidelinesClicked(user.uid, pathname)
+                  }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);
                   }
@@ -266,6 +283,9 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               <Link 
                 href="/drug-information"
                 onClick={() => {
+                  if (user) {
+                    track.drugInformationViewed('drug_search', 'search', user.uid, pathname)
+                  }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);
                   }
@@ -287,6 +307,9 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               <Link 
                 href="/image-generator"
                 onClick={() => {
+                  if (user) {
+                    track.visualAbstractClicked(user.uid, pathname)
+                  }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);
                   }
@@ -300,17 +323,15 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                {isOpen && (
-                  <div className="ml-3 flex items-center">
-                    <span>Visual Abstract</span>
-                    <span className="ml-2 px-1.5 py-0.5 text-xs font-bold text-white bg-gradient-to-r from-[#3771FE] to-[#5B8AFF] rounded-full shadow-sm">NEW</span>
-                  </div>
-                )}
+                {isOpen && <span className="ml-3">Visual Abstract</span>}
               </Link>
 
               <Link 
                 href="/library"
                 onClick={() => {
+                  if (user) {
+                    track.libraryClicked(user.uid, pathname)
+                  }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);
                   }
@@ -363,7 +384,12 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           <div className="mt-auto w-full p-2 border-t border-gray-200">
             <div className="relative">
               <button
-                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                onClick={() => {
+                  if (!isOpen) {
+                    setIsOpen(true);
+                  }
+                  setIsProfileOpen(!isProfileOpen);
+                }}
                 className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-gray-50 sidebar-profile"
               >
                 <div className="flex items-center">

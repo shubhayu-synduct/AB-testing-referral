@@ -38,39 +38,12 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { uid, subscriptionTier, idToken } = body;
-
-    if (!uid || !subscriptionTier || !idToken) {
-      return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 });
-    }
-
-    // Verify Firebase ID token
-    const decoded = await auth.verifyIdToken(idToken);
-    if (decoded.uid !== uid) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Update user's subscription tier (for testing purposes)
-    await db.collection('users').doc(uid).set(
-      {
-        subscriptionTier,
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true }
-    );
-
-    return NextResponse.json({
-      success: true,
-      message: `Updated user ${uid} to tier: ${subscriptionTier}`,
-      updatedAt: new Date().toISOString()
-    });
-  } catch (error: any) {
-    console.error('Test subscription update error:', error);
-    return NextResponse.json(
-      { error: 'Failed to update user data' },
-      { status: 500 }
-    );
-  }
+  // SECURITY FIX: Disabled direct subscription tier updates
+  // Subscription tiers should ONLY be updated by Stripe webhooks after successful payment
+  return NextResponse.json(
+    { 
+      error: 'Direct subscription updates are disabled for security. Only Stripe webhooks can update subscription tiers after successful payment.' 
+    },
+    { status: 403 }
+  );
 } 

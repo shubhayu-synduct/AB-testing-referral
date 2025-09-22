@@ -267,10 +267,29 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
     return run;
   }, [run]);
 
+  // Filter out steps with missing targets
+  const getValidSteps = useCallback(() => {
+    if (typeof window === 'undefined') return steps;
+    
+    return steps.filter((step: any) => {
+      if (!step.target) return true; // Keep steps without targets
+      
+      // Check if any of the target selectors exist
+      const selectors = step.target.split(',').map((s: string) => s.trim());
+      return selectors.some((selector: string) => {
+        try {
+          return document.querySelector(selector) !== null;
+        } catch (error) {
+          return false;
+        }
+      });
+    });
+  }, []);
+
   return (
     <TourContext.Provider value={{ startTour, stopTour, run, forceStartTour, checkTourPreference, resetTourPreference, shouldShowTour, saveTourPreference, isTourActive }}>
       <Joyride
-        steps={steps as any}
+        steps={getValidSteps() as any}
         run={run}
         stepIndex={stepIndex}
         continuous
@@ -537,6 +556,7 @@ const DrinfoSummaryTourContext = createContext<{
   startTour: () => void;
   stopTour: () => void;
   run: boolean;
+  stepIndex: number;
   setStepIndex: (index: number) => void;
   nextStep: () => void;
   prevStep: () => void;
@@ -650,16 +670,24 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
     }
   }, [stepIndex, run]);
 
-  // Hard prevention of Joyride scrolling
+  // Hard prevention of Joyride scrolling (with exception for step 5)
   useEffect(() => {
     if (run) {
       try {
+        // Check if current step allows scrolling
+        const currentStep = drinfoSummaryTourSteps[stepIndex];
+        const allowScrolling = currentStep && !currentStep.disableScrolling;
+        
         // Prevent Joyride from scrolling by overriding scroll methods
         const originalScrollIntoView = Element.prototype.scrollIntoView;
         const originalScrollTo = window.scrollTo;
         
-        // Override scrollIntoView to prevent Joyride from using it
+        // Override scrollIntoView to prevent Joyride from using it (unless step allows scrolling)
         Element.prototype.scrollIntoView = function(options) {
+          // Allow scrolling if current step allows it
+          if (allowScrolling) {
+            return originalScrollIntoView.call(this, options);
+          }
           // Only allow scrolling if it's not Joyride trying to scroll
           if (!options || typeof options === 'object') {
             return; // Block Joyride's scrollIntoView calls
@@ -667,8 +695,12 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
           return originalScrollIntoView.call(this, options);
         };
         
-        // Override window.scrollTo to prevent Joyride from using it
+        // Override window.scrollTo to prevent Joyride from using it (unless step allows scrolling)
         window.scrollTo = function(options) {
+          // Allow scrolling if current step allows it
+          if (allowScrolling) {
+            return originalScrollTo.call(this, options);
+          }
           // Block Joyride's window.scrollTo calls
           return;
         };
@@ -684,6 +716,10 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
                 return originalScrollTop.get.call(this);
               },
               set: function(value) {
+                // Allow scrolling if current step allows it
+                if (allowScrolling) {
+                  return originalScrollTop.set.call(this, value);
+                }
                 // Only allow setting if it's not Joyride trying to scroll
                 if (run) {
                   return; // Block Joyride's scrollTop changes
@@ -708,7 +744,7 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
         return () => {};
       }
     }
-  }, [run]);
+  }, [run, stepIndex]);
 
   // Check if current step should disable scrolling
   const currentStep = drinfoSummaryTourSteps[stepIndex];
@@ -765,11 +801,31 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
     return run;
   }, [run]);
 
+  // Filter out steps with missing targets for DrinfoSummary tour
+  const getValidDrinfoSummarySteps = useCallback(() => {
+    if (typeof window === 'undefined') return drinfoSummaryTourSteps;
+    
+    return drinfoSummaryTourSteps.filter((step: any) => {
+      if (!step.target) return true; // Keep steps without targets
+      
+      // Check if any of the target selectors exist
+      const selectors = step.target.split(',').map((s: string) => s.trim());
+      return selectors.some((selector: string) => {
+        try {
+          return document.querySelector(selector) !== null;
+        } catch (error) {
+          return false;
+        }
+      });
+    });
+  }, []);
+
   return (
     <DrinfoSummaryTourContext.Provider value={{ 
       startTour, 
       stopTour, 
       run, 
+      stepIndex,
       setStepIndex, 
       nextStep, 
       prevStep, 
@@ -782,7 +838,7 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
       isTourActive
     }}>
       <Joyride
-        steps={drinfoSummaryTourSteps as any}
+        steps={getValidDrinfoSummarySteps() as any}
         run={run}
         stepIndex={stepIndex}
         continuous

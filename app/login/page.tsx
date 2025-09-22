@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { Suspense } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { SignInForm } from "@/components/auth/signin-form"
@@ -35,7 +36,9 @@ export default function SignIn() {
         {/* Sign In Form */}
         <div className="w-full max-w-[95%] sm:max-w-[85%] md:max-w-md flex flex-col items-center">
           <div className="bg-[#F4F7FF] rounded-[10px] shadow-sm border-[#3771FE]/50 border-2 p-3 sm:p-5 md:p-6 lg:p-8 w-full">
-            <SignInForm />
+            <Suspense fallback={<div className="text-center py-4">Loading...</div>}>
+              <SignInForm />
+            </Suspense>
           </div>
 
           {/* Terms and Privacy */}
@@ -53,4 +56,4 @@ export default function SignIn() {
       </div>
     </div>
   )
-} 
+}

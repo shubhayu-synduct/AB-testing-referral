@@ -1,0 +1,43 @@
+import type { Metadata } from "next"
+
+export const guidelinesMetadata: Metadata = {
+  title: "Clinical Guidelines - Dr.Info AI Guidelines Assistant",
+  description: "Access comprehensive clinical guidelines with AI-powered search and analysis. Find evidence-based treatment protocols, clinical recommendations, and medical guidelines for all specialties.",
+  keywords: [
+    "clinical guidelines AI",
+    "medical guidelines AI assistant",
+    "treatment guidelines AI",
+    "clinical protocols AI",
+    "evidence-based guidelines AI",
+    "medical recommendations AI",
+    "clinical decision guidelines",
+    "treatment protocols AI",
+    "medical standards AI",
+    "clinical practice guidelines",
+    "healthcare guidelines AI",
+    "medical best practices AI",
+    "clinical recommendations AI",
+    "treatment algorithms AI",
+    "medical protocols AI",
+    "clinical standards AI",
+    "healthcare protocols AI",
+    "medical guidelines database",
+    "clinical guidelines search",
+    "treatment guidelines database",
+    "medical recommendations database",
+    "clinical protocols database",
+    "evidence-based protocols AI",
+    "medical standards database",
+    "healthcare guidelines database",
+    "clinical practice standards",
+    "treatment guidelines search",
+    "medical guidelines search AI",
+    "clinical recommendations search",
+    "healthcare protocols search"
+  ],
+  openGraph: {
+    title: "Clinical Guidelines - Dr.Info AI Guidelines Assistant",
+    description: "Access comprehensive clinical guidelines with AI-powered search and analysis for evidence-based treatment protocols.",
+    type: "website",
+  },
+}

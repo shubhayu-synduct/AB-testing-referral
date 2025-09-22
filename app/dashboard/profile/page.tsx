@@ -1,15 +1,16 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { unstable_noStore as noStore } from 'next/cache';
 import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirebaseFirestore } from "@/lib/firebase";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useSearchParams, useRouter } from "next/navigation";
+import { CleanupService } from "@/lib/cleanup-service";
 
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   noStore(); // Disable static generation/prerendering
   
   const { user, loading: authLoading } = useAuth();
@@ -17,7 +18,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'subscription' | 'feedback'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'subscription' | 'feedback'>('profile');
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('yearly');
   const [currentSubscription, setCurrentSubscription] = useState<any>(null);
   const [showSpecialtiesDropdown, setShowSpecialtiesDropdown] = useState(false);
@@ -36,6 +37,18 @@ export default function ProfilePage() {
   const [countrySearchTerm, setCountrySearchTerm] = useState('');
   const [occupationSearchTerm, setOccupationSearchTerm] = useState('');
   const [placeOfWorkSearchTerm, setPlaceOfWorkSearchTerm] = useState('');
+  const [cookiePreferences, setCookiePreferences] = useState({
+    analytics: false,
+    marketing: false,
+    functional: false
+  });
+  const [originalCookiePreferences, setOriginalCookiePreferences] = useState({
+    analytics: false,
+    marketing: false,
+    functional: false
+  });
+  const [preferencesSaving, setPreferencesSaving] = useState(false);
+  const [preferencesSuccess, setPreferencesSuccess] = useState(false);
 
   // Occupation and Specialties options
   const occupationOptions = [
@@ -94,6 +107,10 @@ export default function ProfilePage() {
     // Check if tab parameter is set in URL
     const tabParam = searchParams.get('tab');
     if (tabParam === 'subscription') {
+      setActiveTab('subscription');
+    } else if (tabParam === 'preferences') {
+      setActiveTab('preferences');
+    } else if (tabParam === 'profile') {
       setActiveTab('profile');
     }
     
@@ -114,27 +131,64 @@ export default function ProfilePage() {
     if (!user) return; // Optionally redirect to login here
 
     const fetchProfile = async () => {
-      const db = getFirebaseFirestore();
-      const docRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        // Convert country value to match dropdown format if needed
-        const country = docSnap.data().country || docSnap.data().profile || docSnap.data().profile?.country || 'united-states';
-        const formattedCountry = country.toLowerCase().replace(/\s+/g, '-');
-        
-        setProfile({
-          ...docSnap.data().profile || {},
-          email: docSnap.data().email || user.email,
-          country: formattedCountry
-        });
+      try {
+        const db = getFirebaseFirestore();
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          // Convert country value to match dropdown format if needed
+          const country = docSnap.data().country || docSnap.data().profile || docSnap.data().profile?.country || 'united-states';
+          const formattedCountry = country.toLowerCase().replace(/\s+/g, '-');
+          
+          setProfile({
+            ...docSnap.data().profile || {},
+            email: docSnap.data().email || user.email,
+            country: formattedCountry
+          });
 
-        // Set current subscription data
-        setCurrentSubscription({
-          tier: docSnap.data().subscriptionTier || 'free',
-          subscription: docSnap.data().subscription || null
+          // Set current subscription data
+          const subscriptionData = {
+            tier: docSnap.data().subscriptionTier || 'free',
+            subscription: docSnap.data().subscription || null
+          };
+          setCurrentSubscription(subscriptionData);
+
+          // Set cookie preferences from Firebase
+          const cookieConsent = docSnap.data().cookieConsent;
+          if (cookieConsent) {
+            const preferences = {
+              analytics: cookieConsent.analytics || false,
+              marketing: cookieConsent.marketing || false,
+              functional: cookieConsent.functional || false
+            };
+            setCookiePreferences(preferences);
+            setOriginalCookiePreferences(preferences);
+          }
+        } else {
+          // User document doesn't exist, set default values
+          setProfile({
+            email: user.email,
+            country: 'united-states'
+          });
+          setCurrentSubscription({
+            tier: 'free',
+            subscription: null
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+        // Set default values on error
+        setProfile({
+          email: user.email,
+          country: 'united-states'
         });
+        setCurrentSubscription({
+          tier: 'free',
+          subscription: null
+        });
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchProfile();
   }, [user, authLoading]);
@@ -145,6 +199,13 @@ export default function ProfilePage() {
       return () => clearTimeout(timer);
     }
   }, [success]);
+
+  useEffect(() => {
+    if (preferencesSuccess) {
+      const timer = setTimeout(() => setPreferencesSuccess(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [preferencesSuccess]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -183,6 +244,62 @@ export default function ProfilePage() {
     setProfile((prev: any) => ({ ...prev, specialties: e.target.value.split(",").map((s) => s.trim()) }));
   };
 
+  const toggleCookie = (type: 'analytics' | 'marketing' | 'functional') => {
+    setCookiePreferences(prev => ({
+      ...prev,
+      [type]: !prev[type]
+    }));
+  };
+
+  const handlePreferencesSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPreferencesSaving(true);
+    setPreferencesSuccess(false);
+    
+    const auth = await getFirebaseAuth();
+    const user = auth.currentUser;
+    if (user) {
+      const db = getFirebaseFirestore();
+      const docRef = doc(db, "users", user.uid);
+      
+      const consent: any = {
+        necessary: true, // Always true
+        analytics: cookiePreferences.analytics,
+        marketing: cookiePreferences.marketing,
+        functional: cookiePreferences.functional,
+        consentedAt: new Date().toISOString(),
+        consentType: 'custom'
+      };
+      
+      // Update Firebase with new cookie preferences
+      await updateDoc(docRef, {
+        "cookieConsent": consent
+      });
+      
+      // Also update localStorage
+      localStorage.setItem('drinfo-cookie-consent', JSON.stringify(consent));
+      
+      // Dispatch event to notify other components about consent update
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('cookie-consent-updated'));
+      }
+      
+      // Update original preferences to match current
+      setOriginalCookiePreferences(cookiePreferences);
+      setPreferencesSuccess(true);
+    }
+    setPreferencesSaving(false);
+  };
+
+  // Check if preferences have changed
+  const hasPreferencesChanged = () => {
+    return (
+      cookiePreferences.analytics !== originalCookiePreferences.analytics ||
+      cookiePreferences.marketing !== originalCookiePreferences.marketing ||
+      cookiePreferences.functional !== originalCookiePreferences.functional
+    );
+  };
+
   const getCurrentPlanDisplay = () => {
     if (!currentSubscription) return 'Free';
     
@@ -195,18 +312,22 @@ export default function ProfilePage() {
     return 'Free';
   };
 
-  // Debug logging for subscription data
+
+  // Sync billing interval with current subscription
   useEffect(() => {
-    if (currentSubscription) {
-      console.log('🔍 Current Subscription Data:', {
-        tier: currentSubscription.tier,
-        status: currentSubscription.subscription?.status,
-        cancelAtPeriodEnd: currentSubscription.subscription?.cancelAtPeriodEnd,
-        currentPeriodEnd: currentSubscription.subscription?.currentPeriodEnd,
-        interval: currentSubscription.subscription?.interval
-      });
+    if (currentSubscription?.subscription?.interval) {
+      const subscriptionInterval = currentSubscription.subscription.interval;
+      
+      // Map subscription interval to billing interval state
+      if (subscriptionInterval === 'monthly' || subscriptionInterval === 'yearly' || subscriptionInterval === 'biyearly') {
+        const newInterval = subscriptionInterval === 'monthly' ? 'monthly' : 'yearly';
+        // Only update if different to prevent unnecessary re-renders
+        if (newInterval !== billingInterval) {
+          setBillingInterval(newInterval);
+        }
+      }
     }
-  }, [currentSubscription]);
+  }, [currentSubscription, billingInterval]);
 
   const isCurrentPlan = (plan: string) => {
     if (!currentSubscription) return plan === 'free';
@@ -218,7 +339,19 @@ export default function ProfilePage() {
     return currentSubscription.subscription.interval === interval;
   };
 
-  const handleTabChange = (tab: 'profile' | 'subscription' | 'feedback') => {
+  // Helper function to check if a plan should be highlighted
+  const shouldHighlightPlan = (plan: string) => {
+    if (!currentSubscription) return plan === 'free';
+    
+    if (plan === 'free') {
+      return currentSubscription.tier === 'free' || !currentSubscription.subscription;
+    }
+    
+    // For paid plans, check both tier and billing interval
+    return currentSubscription.tier === plan && isCurrentBillingInterval(billingInterval);
+  };
+
+  const handleTabChange = (tab: 'profile' | 'preferences' | 'subscription' | 'feedback') => {
     setActiveTab(tab);
     router.push(`/dashboard/profile?tab=${tab}`);
   };
@@ -364,6 +497,9 @@ export default function ProfilePage() {
       const auth = await getFirebaseAuth();
       const user = auth.currentUser;
       if (user) {
+        const userUid = user.uid;
+        const userEmail = user.email || 'unknown@example.com';
+        
         // Send delete confirmation email first
         try {
           await fetch('/api/send-delete-email', {
@@ -382,30 +518,67 @@ export default function ProfilePage() {
           // Don't fail the deletion if email fails
         }
 
-        const db = getFirebaseFirestore();
-        const docRef = doc(db, "users", user.uid);
+        // Use server-side API for deletion (handles Firebase Admin SDK)
+        console.log('Calling server-side delete API...');
+        const deleteResponse = await fetch('/api/delete-profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userUid: userUid,
+            userEmail: userEmail
+          }),
+        });
+
+        const deleteResult = await deleteResponse.json();
         
-        // Delete the user document from Firestore
-        await deleteDoc(docRef);
+        if (!deleteResponse.ok) {
+          throw new Error(deleteResult.error || 'Failed to delete profile');
+        }
+
+        console.log('Server-side deletion successful:', deleteResult);
+        console.log(`Deleted ${deleteResult.deletedUserCount} user document(s) with email ${userEmail}`);
+        console.log(`Deleted ${deleteResult.deletedAuthUserCount} Firebase Auth user(s) with email ${userEmail}`);
+        console.log(`Total accounts deleted: ${deleteResult.totalAccountsDeleted}`);
         
-        // Delete the user's authentication account
-        await user.delete();
-        
-        // Sign out to clear authentication cookies
-        await auth.signOut();
-        
-        // Reset local state
+        // Reset local state immediately
         setProfile(null);
         setShowDeleteModal(false);
         setDeleteConfirmation('');
         
-        // Redirect to signup page
-        window.location.href = '/signup';
+        // Perform comprehensive cleanup (without redirect)
+        await CleanupService.performCompleteCleanup(userUid, userEmail);
+        
+        // Verify cleanup was successful
+        const cleanupSuccessful = CleanupService.verifyCleanup();
+        console.log('Cleanup verification:', cleanupSuccessful);
+        
+        // Redirect to signup page (sign out will be handled there)
+        console.log('Redirecting to signup page...');
+        window.location.replace('/signup?deleted=true');
+        
       }
     } catch (error) {
       console.error('Error deleting profile:', error);
-      // If there's an error, it might be because the user needs to re-authenticate
-      // You might want to show a message asking them to sign in again
+      
+      // Show error message to user
+      alert('There was an error deleting your account. Please try again or contact support if the problem persists.');
+      
+      // Redirect to signup page even on error (before cleanup)
+      console.log('Redirecting to signup page after error...');
+      window.location.replace('/signup?deleted=true');
+      
+      // Even if there's an error, try to perform cleanup after redirect
+      try {
+        const auth = await getFirebaseAuth();
+        const user = auth.currentUser;
+        if (user) {
+          await CleanupService.performCompleteCleanup(user.uid, user.email || 'unknown@example.com');
+        }
+      } catch (cleanupError) {
+        console.error('Error during cleanup after deletion failure:', cleanupError);
+      }
     } finally {
       setDeleting(false);
     }
@@ -433,14 +606,20 @@ export default function ProfilePage() {
           >
             Profile
           </button>
-          {/* Tempory comment out subscription tab */}
-          {/* <button
+          <button
+            className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
+              ${activeTab === 'preferences' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
+            onClick={() => handleTabChange('preferences')}
+          >
+            Preferences
+          </button>
+          <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'subscription' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
             onClick={() => handleTabChange('subscription')}
           >
             Subscription
-          </button> */}
+          </button>
           {/* <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'feedback' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
@@ -967,6 +1146,198 @@ export default function ProfilePage() {
           </div>
         )}
 
+        {/* Preferences Tab Content */}
+        {activeTab === 'preferences' && (
+          <div>
+            <h2 className="text-xl font-regular text-[#000000] mb-1">Cookie Preferences</h2>
+            <p className="text-[#747474] text-sm mb-6">Manage your cookie preferences and privacy settings</p>
+            <div className="border border-[#B5C9FC] rounded-[10px] p-4 md:p-8 bg-[#F4F7FF] w-full">
+              <form onSubmit={handlePreferencesSubmit}>
+                <div className="space-y-4">
+                  {/* Necessary Cookies - Locked */}
+                  <div className="bg-[#E4ECFF] rounded-lg p-4 border border-[#B5C9FC]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center border border-[#223258]">
+                          <svg className="w-4 h-4 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-[#223258] font-['DM_Sans']">Necessary</h4>
+                          <p className="text-xs text-[#747474] font-['DM_Sans']">Authentication & security</p>
+                        </div>
+                      </div>
+                      <div className="relative w-12 h-6 rounded-full bg-[#223258]">
+                        <div className="absolute top-0.5 right-0.5 w-5 h-5 bg-white rounded-full flex items-center justify-center">
+                          <svg className="w-3 h-3 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Analytics Cookies */}
+                  <div className="bg-white rounded-lg p-4 border border-[#B5C9FC]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-[#E4ECFF] rounded-full flex items-center justify-center">
+                          <svg className="w-4 h-4 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-[#223258] font-['DM_Sans']">Analytics</h4>
+                          <p className="text-xs text-[#747474] font-['DM_Sans']">Website performance & usage</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleCookie('analytics')}
+                        className={`relative w-12 h-6 rounded-full transition-all duration-300 ease-in-out ${
+                          cookiePreferences.analytics ? 'bg-[#214498]' : 'bg-gray-300'
+                        }`}
+                      >
+                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all duration-300 ease-in-out flex items-center justify-center ${
+                          cookiePreferences.analytics ? 'left-6' : 'left-0.5'
+                        }`}>
+                          {cookiePreferences.analytics ? (
+                            <svg className="w-3 h-3 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Marketing Cookies */}
+                  <div className="bg-white rounded-lg p-4 border border-[#B5C9FC]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-[#E4ECFF] rounded-full flex items-center justify-center">
+                          <svg className="w-4 h-4 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-[#223258] font-['DM_Sans']">Marketing</h4>
+                          <p className="text-xs text-[#747474] font-['DM_Sans']">Personalized ads & content</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleCookie('marketing')}
+                        className={`relative w-12 h-6 rounded-full transition-all duration-300 ease-in-out ${
+                          cookiePreferences.marketing ? 'bg-[#214498]' : 'bg-gray-300'
+                        }`}
+                      >
+                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all duration-300 ease-in-out flex items-center justify-center ${
+                          cookiePreferences.marketing ? 'left-6' : 'left-0.5'
+                        }`}>
+                          {cookiePreferences.marketing ? (
+                            <svg className="w-3 h-3 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Functional Cookies */}
+                  <div className="bg-white rounded-lg p-4 border border-[#B5C9FC]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-[#E4ECFF] rounded-full flex items-center justify-center">
+                          <svg className="w-4 h-4 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-[#223258] font-['DM_Sans']">Functional</h4>
+                          <p className="text-xs text-[#747474] font-['DM_Sans']">User preferences & customization</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleCookie('functional')}
+                        className={`relative w-12 h-6 rounded-full transition-all duration-300 ease-in-out ${
+                          cookiePreferences.functional ? 'bg-[#214498]' : 'bg-gray-300'
+                        }`}
+                      >
+                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all duration-300 ease-in-out flex items-center justify-center ${
+                          cookiePreferences.functional ? 'left-6' : 'left-0.5'
+                        }`}>
+                          {cookiePreferences.functional ? (
+                            <svg className="w-3 h-3 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <div className="flex items-top justify-between">
+                    <p className="text-xs text-[#747474] font-['DM_Sans']">
+                      Read our{' '}
+                      <a 
+                        href="https://drinfo.ai/privacy-policy/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-black underline hover:text-[#3771FE] transition-colors"
+                      >
+                        privacy policy
+                      </a>
+                      {' '}and{' '}
+                      <a 
+                        href="https://drinfo.ai/cookie-policy/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-black underline hover:text-[#3771FE] transition-colors"
+                      >
+                        cookie policy
+                      </a>
+                    </p>
+                    
+                    <button
+                      type="submit"
+                      disabled={preferencesSaving}
+                      className="bg-[#F4F7FF] border border-[#B5C9FC] text-[#747474] font-regular px-8 py-2 rounded-[8px] transition-colors text-lg w-56 hover:bg-[#E8F0FF] hover:text-[#223258]"
+                    >
+                      {preferencesSaving ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                  
+                  {preferencesSuccess && (
+                    <div className="mt-2 font-medium text-right" style={{ color: '#8991AA' }}>
+                      Preferences saved successfully!
+                    </div>
+                  )}
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Subscription Tab Content */}
         {activeTab === 'subscription' && (
           <div>
@@ -1035,8 +1406,8 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Free Plan */}
               <div className={`border rounded-[10px] p-6 ${
-                isCurrentPlan('free') 
-                  ? 'border-[#3771FE] bg-[#F4F7FF]' 
+                shouldHighlightPlan('free') 
+                  ? 'border-[#3771FE] bg-blue-50 ring-2 ring-blue-200' 
                   : 'border-[#B5C9FC] bg-white'
               }`}>
                 <h4 className="text-xl font-semibold text-[#000000] mb-2">Free</h4>
@@ -1045,7 +1416,7 @@ export default function ProfilePage() {
                 
                 {/* Button positioned above features */}
                 <div className="w-full py-3 px-4 rounded-[8px] font-medium border border-[#3771FE] text-[#3771FE] bg-white text-center mb-6">
-                  {isCurrentPlan('free') ? 'Current Plan' : 'Free Plan'}
+                  {shouldHighlightPlan('free') ? 'Current Plan' : 'Free Plan'}
                 </div>
                 
                 <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
@@ -1062,8 +1433,8 @@ export default function ProfilePage() {
 
               {/* Premium Student Plan */}
               <div className={`border rounded-[10px] p-6 relative ${
-                isCurrentPlan('student') && isCurrentBillingInterval(billingInterval)
-                  ? 'border-[#3771FE] bg-[#F4F7FF]' 
+                shouldHighlightPlan('student')
+                  ? 'border-[#3771FE] bg-blue-50 ring-2 ring-blue-200' 
                   : 'border-[#B5C9FC] bg-white'
               }`}>
                 {/* Save Badge for Yearly */}
@@ -1086,15 +1457,15 @@ export default function ProfilePage() {
                 
                 {/* Button positioned above description */}
                 <button
-                  onClick={isCurrentPlan('student') && isCurrentBillingInterval(billingInterval) ? undefined : () => handlePlanSelect('student', billingInterval)}
+                  onClick={shouldHighlightPlan('student') ? undefined : () => handlePlanSelect('student', billingInterval)}
                   className={`w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-4 ${
-                    isCurrentPlan('student') && isCurrentBillingInterval(billingInterval)
+                    shouldHighlightPlan('student')
                       ? 'border border-[#3771FE] text-[#3771FE] bg-white cursor-not-allowed'
                       : 'bg-[#3771FE] text-white hover:bg-[#2A5CDB]'
                   }`}
-                  disabled={isCurrentPlan('student') && isCurrentBillingInterval(billingInterval)}
+                  disabled={shouldHighlightPlan('student')}
                 >
-                  {isCurrentPlan('student') && isCurrentBillingInterval(billingInterval) ? 'Current Plan' : 'Get Pro Student'}
+                  {shouldHighlightPlan('student') ? 'Current Plan' : 'Get Pro Student'}
                 </button>
                 
                 <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
@@ -1107,8 +1478,8 @@ export default function ProfilePage() {
 
               {/* Premium Physician Plan */}
               <div className={`border rounded-[10px] p-6 relative ${
-                isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval)
-                  ? 'border-[#3771FE] bg-[#F4F7FF]' 
+                shouldHighlightPlan('clinician')
+                  ? 'border-[#3771FE] bg-blue-50 ring-2 ring-blue-200' 
                   : 'border-[#B5C9FC] bg-white'
               }`}>
                 {/* Save Badge for Yearly */}
@@ -1131,15 +1502,15 @@ export default function ProfilePage() {
                 
                 {/* Button positioned above description */}
                 <button
-                  onClick={isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval) ? undefined : () => handlePlanSelect('clinician', billingInterval)}
+                  onClick={shouldHighlightPlan('clinician') ? undefined : () => handlePlanSelect('clinician', billingInterval)}
                   className={`w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-4 ${
-                    isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval)
+                    shouldHighlightPlan('clinician')
                       ? 'border border-[#3771FE] text-[#3771FE] bg-white cursor-not-allowed'
                       : 'bg-[#3771FE] text-white hover:bg-[#2A5CDB]'
                   }`}
-                  disabled={isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval)}
+                  disabled={shouldHighlightPlan('clinician')}
                 >
-                  {isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval) ? 'Current Plan' : 'Get Pro Physician'}
+                  {shouldHighlightPlan('clinician') ? 'Current Plan' : 'Get Pro Physician'}
                 </button>
                 
                 <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
@@ -1176,15 +1547,7 @@ export default function ProfilePage() {
             {/* Cancel Subscription Button */}
             {(() => {
               const shouldShowCancel = currentSubscription?.subscription?.status === 'active' && 
-                                     !currentSubscription?.subscription?.cancelAtPeriodEnd && 
-                                     currentSubscription?.subscription?.status !== 'canceled';
-              
-              console.log('🔍 Cancel Button Debug:', {
-                status: currentSubscription?.subscription?.status,
-                cancelAtPeriodEnd: currentSubscription?.subscription?.cancelAtPeriodEnd,
-                shouldShowCancel,
-                subscription: currentSubscription?.subscription
-              });
+                                     !currentSubscription?.subscription?.cancelAtPeriodEnd;
               
               return shouldShowCancel ? (
                 <div className="flex justify-end mt-8 mb-4">
@@ -1226,6 +1589,24 @@ export default function ProfilePage() {
             )}
           </div>
         )}
+
+        {/* Feedback Tab Content */}
+        {/* {activeTab === 'feedback' && (
+          <div>
+            <h2 className="text-xl font-regular text-[#000000] mb-1">Feedback</h2>
+            <p className="text-[#747474] text-sm mb-6">Share your thoughts and suggestions with us</p>
+            
+            <div className="border border-[#B5C9FC] rounded-[10px] p-4 md:p-8 bg-[#F4F7FF] w-full">
+              <div className="text-center py-8">
+                <h3 className="text-lg font-medium text-[#223258] mb-2">Coming Soon</h3>
+                <p className="text-[#747474] text-sm">
+                  We're working on a feedback system to better serve you. 
+                  For now, you can reach us at <a href="mailto:info@synduct.com" className="text-[#3771FE] hover:underline">info@synduct.com</a>
+                </p>
+              </div>
+            </div>
+          </div>
+        )} */}
       </div>
 
       {/* Delete Profile Modal */}
@@ -1277,4 +1658,16 @@ export default function ProfilePage() {
       )}
     </DashboardLayout>
   );
-} 
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    }>
+      <ProfilePageContent />
+    </Suspense>
+  );
+}
