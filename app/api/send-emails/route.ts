@@ -192,7 +192,7 @@ export async function GET() {
             subject: template.subject,
             html: template.html
               .replace(/\{\{name\}\}/g, userName)
-              .replace('{{unsubscribe_url}}', `${process.env.NEXT_PUBLIC_BASE_URL}/unsubscribe?email=${encodeURIComponent(user.email)}`)
+              .replace('{{unsubscribe_url}}', `https://app.drinfo.ai/unsubscribe?email=${encodeURIComponent(user.email)}`)
           };
 
           // Send email with retry logic

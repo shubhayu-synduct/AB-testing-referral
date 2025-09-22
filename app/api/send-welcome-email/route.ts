@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       subject: day1Template.subject,
       html: day1Template.html
         .replace(/\{\{name\}\}/g, userName)
-        .replace('{{unsubscribe_url}}', `${process.env.NEXT_PUBLIC_BASE_URL}/unsubscribe?email=${encodeURIComponent(userEmail)}`)
+        .replace('{{unsubscribe_url}}', `https://app.drinfo.ai/unsubscribe?email=${encodeURIComponent(userEmail)}`)
     }
 
     // Send welcome email
