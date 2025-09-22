@@ -1344,6 +1344,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }
     setIsLoading(true);
     setImageGenerationStatus('idle'); // Reset image generation status
+    setShowTourPrompt(false); // Hide tour prompt when new question is asked
     const userId = user?.uid || user?.id;
     if (!userId) {
       setError('User not authenticated.');
@@ -2083,6 +2084,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }, 2000);
   };
 
+  // Show tour prompt when answer is complete and rendered
   useEffect(() => {
     // Check if tour should be shown based on saved preferences
     if (tourContext && tourContext.shouldShowTour) {
@@ -2093,11 +2095,18 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       }
     }
 
-    const timeout = setTimeout(() => {
-      setShowTourPrompt(true);
-    }, 25000);
-    return () => clearTimeout(timeout);
-  }, [tourContext]);
+    // Show tour prompt when answer is complete and there are messages
+    // Only show for the first answer (not follow-up questions)
+    if ((status === 'complete' || status === 'complete_image') && messages.length > 0 && !isLoading && messages.length <= 2) {
+      // Add a small delay to ensure the answer is fully rendered
+      const timeout = setTimeout(() => {
+        setShowTourPrompt(true);
+      }, 1000); // 1 second delay to ensure rendering is complete
+      return () => clearTimeout(timeout);
+    } else {
+      setShowTourPrompt(false);
+    }
+  }, [tourContext, status, messages.length, isLoading]);
 
   // Listen for tour step changes and trigger custom scroll from step 2 onwards
   useEffect(() => {
