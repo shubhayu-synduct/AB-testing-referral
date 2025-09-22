@@ -281,7 +281,7 @@ function AIResultsContent() {
         createCitationTooltip(element as HTMLElement);
       }
     });
-  }, [messages, streamedContent, showCitationsSidebar]);
+  }, [messages, streamedContent, showCitationsSidebar, isStreaming]);
 
   // Handle clicks outside citations sidebar
   useEffect(() => {
