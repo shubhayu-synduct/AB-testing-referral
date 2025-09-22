@@ -19,8 +19,8 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   metadataBase: new URL('https://app.drinfo.ai'),
   title: {
-    default: "DR.INFO - AI Assistant for Doctors | Medical AI Clinical Decision Support",
-    template: "%s | Dr.Info - Medical AI Assistant"
+    default: "DR. INFO - AI Assistant for Doctors",
+    template: "%s | DR. INFO - Medical AI Assistant"
   },
   description: "Dr.Info.ai - Fastest AI Assistant for Medical Decision Support. AI-powered clinical assistant for doctors with verified references. Evidence-based medical AI tool for hospitals, clinical practice, and medical professionals. Alternative to UpToDate with real-time drug interactions and clinical guidelines.",
   abstract: "Dr.Info is the fastest AI assistant for medical decision support, providing evidence-based clinical guidance, drug interactions, and medical guidelines for healthcare professionals worldwide.",
@@ -168,7 +168,7 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_US',
     url: 'https://app.drinfo.ai',
-    title: 'DR.INFO - AI Assistant for Doctors | Medical AI Clinical Decision Support',
+    title: 'DR. INFO - AI Assistant for Doctors',
     description: 'Dr.Info.ai - Fastest AI Assistant for Medical Decision Support. AI-powered clinical assistant for doctors with verified references and evidence-based medical information.',
     siteName: 'Dr.Info',
     images: [

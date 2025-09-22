@@ -3,11 +3,11 @@ export const seoConfig = {
   // Site Information
   siteName: 'Dr.Info',
   siteUrl: 'https://app.drinfo.ai',
-  siteDescription: 'Fastest AI Assistant for Medical Decision Support with verified references and evidence-based medical information',
+  siteDescription: 'DR. INFO - AI Assistant for Doctors.',
   
   // Default Meta Tags
-  defaultTitle: 'DR.INFO - AI Assistant for Doctors | Medical AI Clinical Decision Support',
-  defaultDescription: 'Dr.Info.ai - Fastest AI Assistant for Medical Decision Support. AI-powered clinical assistant for doctors with verified references.',
+  defaultTitle: 'DR. INFO - AI Assistant for Doctors',
+  defaultDescription: 'DR. INFO - AI Assistant for Doctors.',
   
   // Social Media
   social: {
