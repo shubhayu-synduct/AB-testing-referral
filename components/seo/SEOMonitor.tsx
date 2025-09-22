@@ -10,7 +10,7 @@ export default function SEOMonitor() {
       const images = document.querySelectorAll('img')
       const imagesWithoutAlt = Array.from(images).filter(img => !img.alt)
       if (imagesWithoutAlt.length > 0) {
-        console.warn(`Found ${imagesWithoutAlt.length} images without alt text`)
+        // console.warn(`Found ${imagesWithoutAlt.length} images without alt text`)
       }
 
       // Check for missing heading hierarchy
@@ -24,7 +24,7 @@ export default function SEOMonitor() {
 
       // Check for internal links
       const internalLinks = document.querySelectorAll('a[href^="/"], a[href^="https://app.drinfo.ai"]')
-      console.log(`Found ${internalLinks.length} internal links`)
+      // console.log(`Found ${internalLinks.length} internal links`)
 
       // Check for external links
       const externalLinks = document.querySelectorAll('a[href^="http"]:not([href*="app.drinfo.ai"])')
@@ -39,10 +39,10 @@ export default function SEOMonitor() {
         window.addEventListener('load', () => {
           const perfData = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming
           if (perfData) {
-            console.log('Page Load Time:', perfData.loadEventEnd - perfData.loadEventStart)
-            console.log('DOM Content Loaded:', perfData.domContentLoadedEventEnd - perfData.domContentLoadedEventStart)
-            console.log('First Paint:', performance.getEntriesByName('first-paint')[0]?.startTime)
-            console.log('First Contentful Paint:', performance.getEntriesByName('first-contentful-paint')[0]?.startTime)
+            // console.log('Page Load Time:', perfData.loadEventEnd - perfData.loadEventStart)
+            // console.log('DOM Content Loaded:', perfData.domContentLoadedEventEnd - perfData.domContentLoadedEventStart)
+            // console.log('First Paint:', performance.getEntriesByName('first-paint')[0]?.startTime)
+            // console.log('First Contentful Paint:', performance.getEntriesByName('first-contentful-paint')[0]?.startTime)
           }
         })
       }
@@ -54,14 +54,14 @@ export default function SEOMonitor() {
       new PerformanceObserver((entryList) => {
         const entries = entryList.getEntries()
         const lastEntry = entries[entries.length - 1]
-        console.log('LCP:', lastEntry.startTime)
+        // console.log('LCP:', lastEntry.startTime)
       }).observe({ entryTypes: ['largest-contentful-paint'] })
 
       // First Input Delay (FID)
       new PerformanceObserver((entryList) => {
         for (const entry of entryList.getEntries()) {
           const fidEntry = entry as PerformanceEventTiming
-          console.log('FID:', fidEntry.processingStart - fidEntry.startTime)
+          // console.log('FID:', fidEntry.processingStart - fidEntry.startTime)
         }
       }).observe({ entryTypes: ['first-input'] })
 
@@ -71,7 +71,7 @@ export default function SEOMonitor() {
         for (const entry of entryList.getEntries()) {
           if (!(entry as any).hadRecentInput) {
             clsValue += (entry as any).value
-            console.log('CLS:', clsValue)
+            // console.log('CLS:', clsValue)
           }
         }
       }).observe({ entryTypes: ['layout-shift'] })
@@ -87,7 +87,7 @@ export default function SEOMonitor() {
       const scrollDepth = Math.round((window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100)
       if (scrollDepth > maxScrollDepth) {
         maxScrollDepth = scrollDepth
-        console.log('Max Scroll Depth:', maxScrollDepth + '%')
+        // console.log('Max Scroll Depth:', maxScrollDepth + '%')
       }
     }
 

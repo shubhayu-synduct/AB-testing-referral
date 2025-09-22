@@ -204,10 +204,10 @@ export function DashboardLayout({ children, sessionId, user: propUser }: Dashboa
           
           // Check if user has given necessary or all consent
           if (cookieConsent && (cookieConsent.consentType === 'necessary' || cookieConsent.consentType === 'all' || cookieConsent.consentType === 'custom')) {
-            console.log("User has valid consent, hiding banner");
+            // console.log("User has valid consent, hiding banner");
             setShowCookieBanner(false);
           } else {
-            console.log("User has no valid consent, showing banner");
+            // console.log("User has no valid consent, showing banner");
             setShowCookieBanner(true);
           }
           

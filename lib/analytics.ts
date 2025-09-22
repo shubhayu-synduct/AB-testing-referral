@@ -19,7 +19,7 @@ export const checkUserCookieConsent = async (userId: string) => {
             
       if (cookieConsent) {
          const analytics = cookieConsent.analytics;
-         console.log('Analytics consent:', analytics);
+        //  console.log('Analytics consent:', analytics);
          return {
           analytics
         }
@@ -59,11 +59,11 @@ export const checkCurrentUserCookieConsent = async () => {
     // Get current user
     const currentUser = auth.currentUser;
     if (!currentUser) {
-      console.log('No authenticated user found');
+      // console.log('No authenticated user found');
       return { analytics: false };
     }
 
-    console.log(`Checking cookie consent for current user: ${currentUser.uid}`);
+    // console.log(`Checking cookie consent for current user: ${currentUser.uid}`);
     
     // Use the existing function with the current user's ID
     return await checkUserCookieConsent(currentUser.uid);
@@ -88,13 +88,13 @@ export let globalAnalyticsConsent: boolean = false;
 export const updateGlobalConsent = async () => {
   const result = await checkCurrentUserCookieConsent();
   globalAnalyticsConsent = result.analytics;
-  console.log('Global analytics consent updated:', globalAnalyticsConsent);
+  // console.log('Global analytics consent updated:', globalAnalyticsConsent);
   return result;
 };
 
 // Initialize on module load
 updateGlobalConsent().then(() => {
-  console.log("Global analytics consent:", globalAnalyticsConsent);
+  // console.log("Global analytics consent:", globalAnalyticsConsent);
 });
 
 // Helper function to check if analytics should be tracked

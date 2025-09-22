@@ -103,7 +103,7 @@ export default function Dashboard() {
   useEffect(() => {
     // Don't show tour if no valid cookie consent
     if (!hasValidCookieConsent) {
-      console.log('cookie consent not valid, not showing tour',hasValidCookieConsent);
+      // console.log('cookie consent not valid, not showing tour',hasValidCookieConsent);
       setShowTourPrompt(false);
       return;
     }
