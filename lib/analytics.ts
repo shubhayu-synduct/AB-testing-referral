@@ -24,13 +24,13 @@ export const checkUserCookieConsent = async (userId: string) => {
           analytics
         }
       } else {
-        console.log('No cookie consent data found, analytics: false');
+        // console.log('No cookie consent data found, analytics: false');
         return {
           analytics: false
         };
       }
     } else {
-      console.log('User document does not exist, analytics: false');
+      // console.log('User document does not exist, analytics: false');
       return {
         analytics: false
       };
@@ -52,7 +52,7 @@ export const checkCurrentUserCookieConsent = async () => {
     
     const auth = await getFirebaseAuth();
     if (!auth) {
-      console.log('Auth not available');
+      // console.log('Auth not available');
       return { analytics: false };
     }
 

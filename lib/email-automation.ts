@@ -49,7 +49,7 @@ if (typeof window !== 'undefined') {
       // Check if user already exists and is enrolled in email automation
       const existingUser = await getUserEmailStatus(userData.email);
       if (existingUser && existingUser.status === 'active') {
-        console.log(`User ${userData.email} already enrolled in email automation system`);
+        // console.log(`User ${userData.email} already enrolled in email automation system`);
         return {
           success: true,
           message: "User already enrolled in email automation",
@@ -71,7 +71,7 @@ if (typeof window !== 'undefined') {
       // Check if user already has email automation fields
       const existingData = userDoc.data();
       if (existingData.emailDay !== undefined && existingData.emailAutomationStatus === 'active') {
-        console.log(`User ${userData.email} already has active email automation fields`);
+        // console.log(`User ${userData.email} already has active email automation fields`);
         return {
           success: true,
           message: "User already has active email automation fields",
@@ -93,7 +93,7 @@ if (typeof window !== 'undefined') {
         updatedAt: admin.firestore.Timestamp.fromDate(new Date())
       });
   
-      console.log(`User ${userData.email} added to email automation system with ID: ${userId}`);
+      // console.log(`User ${userData.email} added to email automation system with ID: ${userId}`);
       
       // Log analytics event
       await logAnalyticsEvent('user_added_to_email_automation', {
@@ -143,7 +143,7 @@ if (typeof window !== 'undefined') {
         lastEmailSent: emailDay > 0 ? admin.firestore.Timestamp.fromDate(new Date()) : null
       });
   
-      console.log(`Updated email day to ${emailDay} for user ${email}`);
+      // console.log(`Updated email day to ${emailDay} for user ${email}`);
       
       return { success: true, message: "Email day updated" };
     } catch (error) {
@@ -245,7 +245,7 @@ if (typeof window !== 'undefined') {
         unsubscribedAt: admin.firestore.Timestamp.fromDate(new Date())
       });
   
-      console.log(`User ${email} removed from email automation`);
+      // console.log(`User ${email} removed from email automation`);
       
       // Log analytics event
       await logAnalyticsEvent('user_unsubscribed', {
@@ -308,7 +308,7 @@ if (typeof window !== 'undefined') {
       });
   
       await batch.commit();
-      console.log(`Cleaned up ${inactiveUsers.docs.length} inactive users`);
+      // console.log(`Cleaned up ${inactiveUsers.docs.length} inactive users`);
       
       return { success: true, message: `Cleaned up ${inactiveUsers.docs.length} inactive users` };
     } catch (error) {

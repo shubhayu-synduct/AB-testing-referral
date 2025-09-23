@@ -519,7 +519,7 @@ function ProfilePageContent() {
         }
 
         // Use server-side API for deletion (handles Firebase Admin SDK)
-        console.log('Calling server-side delete API...');
+        // console.log('Calling server-side delete API...');
         const deleteResponse = await fetch('/api/delete-profile', {
           method: 'POST',
           headers: {
@@ -537,10 +537,10 @@ function ProfilePageContent() {
           throw new Error(deleteResult.error || 'Failed to delete profile');
         }
 
-        console.log('Server-side deletion successful:', deleteResult);
-        console.log(`Deleted ${deleteResult.deletedUserCount} user document(s) with email ${userEmail}`);
-        console.log(`Deleted ${deleteResult.deletedAuthUserCount} Firebase Auth user(s) with email ${userEmail}`);
-        console.log(`Total accounts deleted: ${deleteResult.totalAccountsDeleted}`);
+        // console.log('Server-side deletion successful:', deleteResult);
+        // console.log(`Deleted ${deleteResult.deletedUserCount} user document(s) with email ${userEmail}`);
+        // console.log(`Deleted ${deleteResult.deletedAuthUserCount} Firebase Auth user(s) with email ${userEmail}`);
+        // console.log(`Total accounts deleted: ${deleteResult.totalAccountsDeleted}`);
         
         // Reset local state immediately
         setProfile(null);
@@ -552,10 +552,10 @@ function ProfilePageContent() {
         
         // Verify cleanup was successful
         const cleanupSuccessful = CleanupService.verifyCleanup();
-        console.log('Cleanup verification:', cleanupSuccessful);
+        // console.log('Cleanup verification:', cleanupSuccessful);
         
         // Redirect to signup page (sign out will be handled there)
-        console.log('Redirecting to signup page...');
+        // console.log('Redirecting to signup page...');
         window.location.replace('/signup?deleted=true');
         
       }
@@ -566,7 +566,7 @@ function ProfilePageContent() {
       alert('There was an error deleting your account. Please try again or contact support if the problem persists.');
       
       // Redirect to signup page even on error (before cleanup)
-      console.log('Redirecting to signup page after error...');
+      // console.log('Redirecting to signup page after error...');
       window.location.replace('/signup?deleted=true');
       
       // Even if there's an error, try to perform cleanup after redirect

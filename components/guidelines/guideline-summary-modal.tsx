@@ -120,7 +120,7 @@ export default function GuidelineSummaryModal({
         }
         
         const data = await response.json()
-        console.log('Summary API response:', data)
+        // console.log('Summary API response:', data)
         // Decode unicode in summary before using it
         const decodedSummary = decodeUnicode(data.summary)
         // logger.debug('Summary API response:', decodedSummary)
@@ -155,7 +155,7 @@ export default function GuidelineSummaryModal({
 
   const extractReferenceText = useCallback((refNumber: string, refIndex: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
     // Use messageData if provided (for followup questions), otherwise use summary data
-    console.log('messageData:', messageData);
+    // console.log('messageData:', messageData);
     const dataSource = messageData
     if (!dataSource) return null
     // console.log('dataSource:', dataSource);
@@ -230,7 +230,7 @@ export default function GuidelineSummaryModal({
 
   const handleReferenceClick = useCallback((refNumber: string, occurrenceIndex?: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
     // Console log for verification
-    console.log(`Citation clicked: [${refNumber}] at occurrence index: ${occurrenceIndex}`);
+    // console.log(`Citation clicked: [${refNumber}] at occurrence index: ${occurrenceIndex}`);
     
     // Always ensure the citation panel is open - both immediately and after any other state updates
     setIsCitationPanelOpen(true);
@@ -313,7 +313,7 @@ export default function GuidelineSummaryModal({
       }
       
       const data = await response.json()
-      console.log('Followup API response:', data);
+      // console.log('Followup API response:', data);
       
       setChatHistory(prev => {
         const updated = [...prev]

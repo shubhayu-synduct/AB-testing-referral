@@ -107,7 +107,7 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
         const data = await response.json()
         // Decode unicode in summary before using it
         const decodedSummary = decodeUnicode(data.summary)
-        logger.debug('Summary API response:', decodedSummary)
+        // logger.debug('Summary API response:', decodedSummary)
         setSummary({ ...data, summary: decodedSummary })
         
         // Add the initial summary to the chat history
@@ -213,7 +213,7 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
 
   const handleReferenceClick = useCallback((refNumber: string, occurrenceIndex?: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
     // Console log for verification
-    console.log(`Citation clicked: [${refNumber}] at occurrence index: ${occurrenceIndex}`);
+    // console.log(`Citation clicked: [${refNumber}] at occurrence index: ${occurrenceIndex}`);
     console.log(`Available page_references for [${refNumber}]:`, messageData?.page_references?.[refNumber] || summary?.page_references?.[refNumber]);
     
     // Always ensure the citation panel is open - both immediately and after any other state updates
@@ -297,7 +297,7 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
       }
       
       const data = await response.json()
-      console.log('Followup API response:', data);
+      // console.log('Followup API response:', data);
       
       setChatHistory(prev => {
         const updated = [...prev]

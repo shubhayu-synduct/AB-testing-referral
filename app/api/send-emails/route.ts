@@ -132,7 +132,7 @@ export async function GET() {
       .where("emailAutomationStatus", "==", "active")
       .get();
 
-    console.log(`Processing ${snapshot.docs.length} active users`);
+    // console.log(`Processing ${snapshot.docs.length} active users`);
 
     for (const doc of snapshot.docs) {
       const user = doc.data();
@@ -208,7 +208,7 @@ export async function GET() {
               updatedAt: admin.firestore.Timestamp.fromDate(new Date())
             });
 
-            console.log(`Sent Day ${nextEmailDay} email to ${user.email}`);
+            // console.log(`Sent Day ${nextEmailDay} email to ${user.email}`);
             emailsSent++;
             emailCounts.hourly++;
             emailCounts.daily++;
@@ -230,7 +230,7 @@ export async function GET() {
         } else if (user.emailDay >= 7) {
           // User has completed the 6-day sequence (Day 2-7)
           skippedUsers++;
-          console.log(`User ${user.email} has completed email sequence (day ${user.emailDay})`);
+          // console.log(`User ${user.email} has completed email sequence (day ${user.emailDay})`);
         } else {
           skippedUsers++;
         }
@@ -246,7 +246,7 @@ export async function GET() {
     const processingTime = Date.now() - startTime;
 
     // Log summary
-    console.log(`Email automation completed: ${emailsSent} sent, ${errors.length} errors, ${skippedUsers} skipped, ${processingTime}ms`);
+    // console.log(`Email automation completed: ${emailsSent} sent, ${errors.length} errors, ${skippedUsers} skipped, ${processingTime}ms`);
 
     // Log analytics for the run
     await logAnalyticsEvent('email_automation_run', {

@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       cancel_at_period_end: true,
     });
 
-    console.log(`[Cancel Subscription] Subscription ${subscriptionId} cancelled for user ${uid}`);
+    // console.log(`[Cancel Subscription] Subscription ${subscriptionId} cancelled for user ${uid}`);
 
     return NextResponse.json({ 
       success: true, 

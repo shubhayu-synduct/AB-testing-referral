@@ -176,7 +176,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
         }
       }, { merge: true })
       
-      console.log('Feedback saved to Firebase successfully')
+      // console.log('Feedback saved to Firebase successfully')
       setShowFeedback(false)
       setFeedbackData({
         useCase: [] as string[],
@@ -212,7 +212,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
         }
       })
       
-      console.log('SVG saved to Firebase successfully')
+      // console.log('SVG saved to Firebase successfully')
       return threadId
     } catch (error) {
       console.error('Error saving SVG to Firebase:', error)

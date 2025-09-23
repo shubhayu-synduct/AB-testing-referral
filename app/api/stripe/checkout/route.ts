@@ -55,14 +55,14 @@ export async function POST(req: NextRequest) {
             firebaseUID: uid 
           },
         });
-        console.log(`Updated existing customer ${customer.id} with Firebase UID: ${uid}`);
+        // console.log(`Updated existing customer ${customer.id} with Firebase UID: ${uid}`);
       }
     } else {
       customer = await stripe.customers.create({
         email,
         metadata: { firebaseUID: uid },
       });
-      console.log(`Created new customer ${customer.id} with Firebase UID: ${uid}`);
+      // console.log(`Created new customer ${customer.id} with Firebase UID: ${uid}`);
     }
 
     // Create checkout session with tax configuration
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
     // The subscription tier should ONLY be updated by the webhook after successful payment.
     // Updating it here allows users to get premium access without paying.
     
-    console.log(`[Checkout] Created checkout session ${session.id} for user ${uid}. Database will only be updated after successful payment via webhook.`);
+    // console.log(`[Checkout] Created checkout session ${session.id} for user ${uid}. Database will only be updated after successful payment via webhook.`);
 
     return NextResponse.json({ url: session.url });
   } catch (error: any) {

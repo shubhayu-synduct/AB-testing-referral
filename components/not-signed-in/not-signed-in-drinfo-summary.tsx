@@ -418,7 +418,7 @@ export function NotSignedInDrInfoSummary() {
   useEffect(() => {
     if (!activeCitations || Object.keys(activeCitations).length === 0) return;
     
-    console.log('Setting up citation tooltips for:', activeCitations);
+    // console.log('Setting up citation tooltips for:', activeCitations);
 
     // Find all citation references and drug names
     const citationRefs = document.querySelectorAll('.citation-reference');

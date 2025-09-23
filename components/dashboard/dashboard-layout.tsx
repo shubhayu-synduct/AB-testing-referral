@@ -214,7 +214,7 @@ export function DashboardLayout({ children, sessionId, user: propUser }: Dashboa
           // Debug: Log the state change
           // console.log("Setting showCookieBanner to:", true);
         } else {
-          console.log("User document doesn't exist, showing banner");
+          // console.log("User document doesn't exist, showing banner");
           // User document doesn't exist, show cookie banner
           setShowCookieBanner(true);
         }
@@ -249,7 +249,7 @@ export function DashboardLayout({ children, sessionId, user: propUser }: Dashboa
             
             // If user is waitlisted, redirect to waitlist
             if (isWaitlisted) {
-              console.log('Waitlisted user detected, redirecting to waitlist');
+              // console.log('Waitlisted user detected, redirecting to waitlist');
               router.push('/waitlist');
             }
           }

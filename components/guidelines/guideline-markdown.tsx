@@ -112,7 +112,7 @@ export const GuidelineMarkdown = ({
           const correctMessageData = clickedMessageId && window.messageDataStore 
             ? window.messageDataStore.get(clickedMessageId) 
             : messageData;
-          console.log('Citation clicked:', { refNumber, index, clickedMessageId, correctMessageData });
+          // console.log('Citation clicked:', { refNumber, index, clickedMessageId, correctMessageData });
           onCitationClick?.(refNumber, index, correctMessageData);
         }
       }

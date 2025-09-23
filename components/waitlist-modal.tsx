@@ -31,7 +31,7 @@ export default function WaitlistModal({ isOpen }: WaitlistModalProps) {
 
       const signoutTimer = setTimeout(async () => {
         try {
-          console.log('Auto signing out non-medical user after 30 seconds')
+          // console.log('Auto signing out non-medical user after 30 seconds')
           
           // Sign out from Firebase
           const { getFirebaseAuth } = await import("@/lib/firebase")
