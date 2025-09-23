@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 
 export const dashboardMetadata: Metadata = {
-  title: "Dashboard - Dr.Info AI Assistant for Doctors",
+  title: "Dashboard - DR. INFO AI Assistant for Doctors",
   description: "Access your Dr.Info AI medical assistant dashboard. Get instant clinical decision support, drug interactions, and evidence-based medical information for healthcare professionals.",
   keywords: [
     "medical AI dashboard",
@@ -14,7 +14,7 @@ export const dashboardMetadata: Metadata = {
     "healthcare AI tools dashboard"
   ],
   openGraph: {
-    title: "Dashboard - Dr.Info AI Assistant for Doctors",
+    title: "Dashboard - DR. INFO AI Assistant for Doctors",
     description: "Access your Dr.Info AI medical assistant dashboard for instant clinical decision support.",
     type: "website",
   },

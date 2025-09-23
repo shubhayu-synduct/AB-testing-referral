@@ -2,9 +2,9 @@ import { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Dr.Info - AI Assistant for Doctors',
-    short_name: 'Dr.Info',
-    description: 'Fastest AI Assistant for Medical Decision Support with verified references and evidence-based medical information',
+    name: 'DR. INFO - AI Assistant for Doctors',
+    short_name: 'DR. INFO',
+    description: 'Redefining How Medicine Finds Answers',
     start_url: '/',
     display: 'standalone',
     background_color: '#ffffff',
