@@ -21,10 +21,14 @@ function ProfilePageContent() {
   const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'subscription' | 'feedback'>('profile');
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('yearly');
   const [currentSubscription, setCurrentSubscription] = useState<any>(null);
+  const [planLoading, setPlanLoading] = useState(false);
   const [showSpecialtiesDropdown, setShowSpecialtiesDropdown] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [showCancelSubscriptionModal, setShowCancelSubscriptionModal] = useState(false);
+  const [cancelConfirmation, setCancelConfirmation] = useState('');
+  const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState('');
   const specialtiesRef = useRef<HTMLDivElement>(null);
   const placeOfWorkRef = useRef<HTMLDivElement>(null);
@@ -347,8 +351,47 @@ function ProfilePageContent() {
       return currentSubscription.tier === 'free' || !currentSubscription.subscription;
     }
     
-    // For paid plans, check both tier and billing interval
-    return currentSubscription.tier === plan && isCurrentBillingInterval(billingInterval);
+    // For paid plans, highlight if it's the current tier regardless of billing interval
+    // This allows users to see their current plan highlighted in both monthly and yearly views
+    return currentSubscription.tier === plan;
+  };
+
+  // Helper function to get button text and state for plan selection
+  const getPlanButtonState = (plan: string) => {
+    // Handle edge cases
+    if (!plan || (plan !== 'student' && plan !== 'clinician' && plan !== 'free')) {
+      return {
+        text: 'Invalid Plan',
+        disabled: true,
+        className: 'bg-gray-400 text-white cursor-not-allowed'
+      };
+    }
+
+    const isCurrentPlan = shouldHighlightPlan(plan);
+    const isCurrentInterval = isCurrentBillingInterval(billingInterval);
+    const isExactCurrentPlan = isCurrentPlan && isCurrentInterval;
+    
+    if (isExactCurrentPlan) {
+      return {
+        text: 'Current Plan',
+        disabled: true,
+        className: 'border border-[#3771FE] text-[#3771FE] bg-white cursor-not-allowed'
+      };
+    }
+    
+    if (planLoading) {
+      return {
+        text: 'Processing...',
+        disabled: true,
+        className: 'bg-[#3771FE] text-white hover:bg-[#2A5CDB]'
+      };
+    }
+    
+    return {
+      text: plan === 'student' ? 'Get Pro Student' : 'Get Pro Physician',
+      disabled: false,
+      className: 'bg-[#3771FE] text-white hover:bg-[#2A5CDB]'
+    };
   };
 
   const handleTabChange = (tab: 'profile' | 'preferences' | 'subscription' | 'feedback') => {
@@ -367,7 +410,7 @@ function ProfilePageContent() {
       return;
     }
 
-    setLoading(true);
+    setPlanLoading(true);
     setError('');
 
     try {
@@ -398,11 +441,17 @@ function ProfilePageContent() {
       // console.error('Payment error:', err);
       setError(err.message || 'Failed to process payment');
     } finally {
-      setLoading(false);
+      setPlanLoading(false);
     }
   };
 
-  const handleCancelSubscription = async () => {
+  const handleCancelSubscription = () => {
+    setShowCancelSubscriptionModal(true);
+  };
+
+  const confirmCancelSubscription = async () => {
+    if (cancelConfirmation !== 'CANCEL') return;
+    
     if (!user) {
       setError('Please sign in to continue');
       return;
@@ -413,7 +462,7 @@ function ProfilePageContent() {
       return;
     }
 
-    setLoading(true);
+    setCancelling(true);
     setError('');
 
     try {
@@ -448,11 +497,13 @@ function ProfilePageContent() {
       }));
 
       setSuccess(true);
+      setShowCancelSubscriptionModal(false);
+      setCancelConfirmation('');
     } catch (err: any) {
       // console.error('Cancellation error:', err);
       setError(err.message || 'Failed to cancel subscription');
     } finally {
-      setLoading(false);
+      setCancelling(false);
     }
   };
 
@@ -1456,17 +1507,18 @@ function ProfilePageContent() {
                 </div>
                 
                 {/* Button positioned above description */}
-                <button
-                  onClick={shouldHighlightPlan('student') ? undefined : () => handlePlanSelect('student', billingInterval)}
-                  className={`w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-4 ${
-                    shouldHighlightPlan('student')
-                      ? 'border border-[#3771FE] text-[#3771FE] bg-white cursor-not-allowed'
-                      : 'bg-[#3771FE] text-white hover:bg-[#2A5CDB]'
-                  }`}
-                  disabled={shouldHighlightPlan('student')}
-                >
-                  {shouldHighlightPlan('student') ? 'Current Plan' : 'Get Pro Student'}
-                </button>
+                {(() => {
+                  const buttonState = getPlanButtonState('student');
+                  return (
+                    <button
+                      onClick={buttonState.disabled ? undefined : () => handlePlanSelect('student', billingInterval)}
+                      className={`w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-4 ${buttonState.className}`}
+                      disabled={buttonState.disabled}
+                    >
+                      {buttonState.text}
+                    </button>
+                  );
+                })()}
                 
                 <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
                   <li>Unlimited Clinical Questions</li>
@@ -1501,17 +1553,18 @@ function ProfilePageContent() {
                 </div>
                 
                 {/* Button positioned above description */}
-                <button
-                  onClick={shouldHighlightPlan('clinician') ? undefined : () => handlePlanSelect('clinician', billingInterval)}
-                  className={`w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-4 ${
-                    shouldHighlightPlan('clinician')
-                      ? 'border border-[#3771FE] text-[#3771FE] bg-white cursor-not-allowed'
-                      : 'bg-[#3771FE] text-white hover:bg-[#2A5CDB]'
-                  }`}
-                  disabled={shouldHighlightPlan('clinician')}
-                >
-                  {shouldHighlightPlan('clinician') ? 'Current Plan' : 'Get Pro Physician'}
-                </button>
+                {(() => {
+                  const buttonState = getPlanButtonState('clinician');
+                  return (
+                    <button
+                      onClick={buttonState.disabled ? undefined : () => handlePlanSelect('clinician', billingInterval)}
+                      className={`w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-4 ${buttonState.className}`}
+                      disabled={buttonState.disabled}
+                    >
+                      {buttonState.text}
+                    </button>
+                  );
+                })()}
                 
                 <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
                   <li>Unlimited Clinical Questions</li>
@@ -1651,6 +1704,54 @@ function ProfilePageContent() {
                 className="flex-1 bg-[#F4F7FF] border border-[#B5C9FC] text-[#223258] font-medium px-4 py-2 rounded-[8px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#E8F0FF] disabled:hover:bg-[#F4F7FF]"
               >
                 {deleting ? 'Deleting...' : 'Delete Profile'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Subscription Modal */}
+      {showCancelSubscriptionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[10px] p-6 max-w-md w-full border border-[#B5C9FC]">
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-medium text-[#000000] mb-2">Cancel Subscription</h3>
+              <p className="text-[#747474] text-sm leading-relaxed">
+                Are you sure you want to cancel your subscription? You will lose access to premium features at the end of your current billing period.
+              </p>
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-[#000000] mb-2 font-medium text-sm">
+                Type <span className="font-bold text-[#223258]">CANCEL</span> to confirm
+              </label>
+              <input
+                type="text"
+                value={cancelConfirmation}
+                onChange={(e) => setCancelConfirmation(e.target.value)}
+                placeholder="Type CANCEL to confirm"
+                className="w-full border border-[#B5C9FC] rounded-[8px] px-4 py-2 bg-white text-[#223258] font-medium outline-none focus:ring-2 focus:ring-[#B5C9FC] text-center"
+              />
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCancelSubscriptionModal(false);
+                  setCancelConfirmation('');
+                }}
+                className="flex-1 bg-gray-200 text-gray-700 font-medium px-4 py-2 rounded-[8px] transition-colors hover:bg-gray-300"
+              >
+                Keep Subscription
+              </button>
+              <button
+                type="button"
+                onClick={confirmCancelSubscription}
+                disabled={cancelConfirmation !== 'CANCEL' || cancelling}
+                className="flex-1 bg-red-50 border border-red-200 text-red-700 font-medium px-4 py-2 rounded-[8px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-red-100 disabled:hover:bg-red-50"
+              >
+                {cancelling ? 'Cancelling...' : 'Cancel Subscription'}
               </button>
             </div>
           </div>

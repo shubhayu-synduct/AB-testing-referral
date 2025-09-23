@@ -128,5 +128,5 @@ export async function GET(request: NextRequest) {
   }
 
   // Redirect to the unsubscribe page with the email parameter
-  return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/unsubscribe?email=${encodeURIComponent(email)}`);
+  return NextResponse.redirect(`https://app.drinfo.ai/unsubscribe?email=${encodeURIComponent(email)}`);
 }
