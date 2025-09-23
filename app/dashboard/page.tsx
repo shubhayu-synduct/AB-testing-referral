@@ -80,7 +80,7 @@ export default function Dashboard() {
           setHasValidCookieConsent(false);
         }
       } catch (err) {
-        console.error("Error checking cookie consent:", err);
+        // console.error("Error checking cookie consent:", err);
         setHasValidCookieConsent(false);
       }
     };

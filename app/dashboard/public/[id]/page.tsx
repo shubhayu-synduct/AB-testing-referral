@@ -200,7 +200,7 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
       const svgElement = container.querySelector('svg');
       
       if (!svgElement) {
-        console.error('No SVG element found in content');
+        // console.error('No SVG element found in content');
         return;
       }
 
@@ -251,13 +251,13 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
       };
 
       img.onerror = () => {
-        console.error('Failed to load SVG image');
+        // console.error('Failed to load SVG image');
         URL.revokeObjectURL(svgUrl);
       };
 
       img.src = svgUrl;
     } catch (error) {
-      console.error('Error downloading SVG as PNG:', error);
+      // console.error('Error downloading SVG as PNG:', error);
     }
   };
 

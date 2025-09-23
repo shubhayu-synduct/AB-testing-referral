@@ -100,7 +100,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.error(`Image generation failed with status ${response.status}:`, errorText)
+        // console.error(`Image generation failed with status ${response.status}:`, errorText)
         throw new Error(`Image generation failed with status ${response.status}`)
       }
 
@@ -141,7 +141,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
         throw new Error(data.message || data.error || 'Failed to generate visual abstract')
       }
     } catch (err) {
-      console.error('Error generating visual abstract:', err)
+      // console.error('Error generating visual abstract:', err)
       setError('Failed to generate visual abstract. Please try again.')
       setImageGenerationStatus('idle')
     } finally {
@@ -192,7 +192,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
       toast.success('Thank you for your feedback!')
       setFeedbackSubmitted(true)
     } catch (error) {
-      console.error('Error saving feedback to Firebase:', error)
+      // console.error('Error saving feedback to Firebase:', error)
       toast.error('Failed to save feedback. Please try again.')
     }
   }
@@ -215,7 +215,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
       // console.log('SVG saved to Firebase successfully')
       return threadId
     } catch (error) {
-      console.error('Error saving SVG to Firebase:', error)
+      // console.error('Error saving SVG to Firebase:', error)
       return null
     }
   }
@@ -229,7 +229,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
       const svgElement = container.querySelector('svg')
       
       if (!svgElement) {
-        console.error('No SVG element found in content')
+        // console.error('No SVG element found in content')
         return
       }
 
@@ -289,13 +289,13 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
       }
 
       img.onerror = () => {
-        console.error('Failed to load SVG image')
+        // console.error('Failed to load SVG image')
         URL.revokeObjectURL(svgUrl)
       }
 
       img.src = svgUrl
     } catch (error) {
-      console.error('Error downloading SVG as PNG:', error)
+      // console.error('Error downloading SVG as PNG:', error)
     }
   }
 

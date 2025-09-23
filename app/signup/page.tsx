@@ -28,7 +28,7 @@ function SignUpContent() {
             // console.log('User signed out successfully')
           }
         } catch (error) {
-          console.error('Error signing out user:', error)
+          // console.error('Error signing out user:', error)
         }
       }
       

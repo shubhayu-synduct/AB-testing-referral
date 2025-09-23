@@ -98,7 +98,7 @@ const SubscriptionPage = () => {
       // Redirect to Stripe Checkout
       window.location.href = data.url;
     } catch (err: any) {
-      console.error('Payment error:', err);
+      // console.error('Payment error:', err);
       setError(err.message || 'Failed to process payment');
     } finally {
       setLoading(false);

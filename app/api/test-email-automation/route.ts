@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
         return Response.json({ error: "Invalid action" }, { status: 400 });
     }
   } catch (error) {
-    console.error("Error in test email automation:", error);
+    // console.error("Error in test email automation:", error);
     return Response.json({ error: error instanceof Error ? error.message : "Unknown error" }, { status: 500 });
   }
 }

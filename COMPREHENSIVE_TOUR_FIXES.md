@@ -39,7 +39,7 @@
 // 1. Override scrollIntoView - only block Joyride's smooth scrolling
 Element.prototype.scrollIntoView = function(options) {
   if (options && typeof options === 'object' && options.behavior === 'smooth') {
-    console.log('🚫 Blocked Joyride smooth scrollIntoView call');
+    // console.log('🚫 Blocked Joyride smooth scrollIntoView call');
     return;
   }
   return originalMethodsRef.current!.scrollIntoView.call(this, options);
@@ -72,7 +72,7 @@ const positionMaintenance = setInterval(() => {
     contentRef.scrollTop = contentRef.scrollHeight;
   }
   window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'auto' });
-  console.log('🔒 Position maintained at bottom');
+  // console.log('🔒 Position maintained at bottom');
 }, 50); // More frequent updates for better prevention
 ```
 

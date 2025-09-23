@@ -258,7 +258,7 @@ export default function LibraryPage() {
       setHasMore(querySnapshot.docs.length === 12)
       setError(null)
     } catch (err) {
-      console.error('Error fetching visual abstracts:', err)
+      // console.error('Error fetching visual abstracts:', err)
       setError('Failed to load visual abstracts. Please try again.')
     } finally {
       setLoading(false)
@@ -362,7 +362,7 @@ export default function LibraryPage() {
 
         setChatSessions(sessions)
       } catch (err) {
-        console.error("Error fetching chat sessions:", err)
+        // console.error("Error fetching chat sessions:", err)
         setChatHistoryError("Failed to load chat history")
       } finally {
         setChatHistoryLoading(false)
@@ -392,7 +392,7 @@ export default function LibraryPage() {
           setSavedGuidelines(bookmarks)
         }
       } catch (err) {
-        console.error("Error fetching saved guidelines:", err)
+        // console.error("Error fetching saved guidelines:", err)
         setSavedGuidelinesError("Failed to load saved guidelines")
       } finally {
         setSavedGuidelinesLoading(false)
@@ -434,7 +434,7 @@ export default function LibraryPage() {
         // Show success message (you can add a toast notification here)
         // console.log('Visual abstract deleted successfully')
       } catch (error) {
-        console.error('Error deleting visual abstract:', error)
+        // console.error('Error deleting visual abstract:', error)
         alert('Failed to delete visual abstract. Please try again.')
       }
     }
@@ -481,7 +481,7 @@ export default function LibraryPage() {
       
       setChatSessions(prev => prev.filter(session => session.id !== sessionId))
     } catch (err) {
-      console.error("Error deleting chat session:", err)
+      // console.error("Error deleting chat session:", err)
       setChatHistoryError("Failed to delete chat. Please try again.")
     }
   }
@@ -526,7 +526,7 @@ export default function LibraryPage() {
         
         // console.log('Bulk delete successful')
       } catch (error) {
-        console.error('Error during bulk delete:', error)
+        // console.error('Error during bulk delete:', error)
         alert('Failed to delete some visual abstracts. Please try again.')
       }
     }
@@ -643,7 +643,7 @@ export default function LibraryPage() {
       
       // console.log('Bookmark removed successfully')
     } catch (error) {
-      console.error('Error removing bookmark:', error)
+      // console.error('Error removing bookmark:', error)
       alert('Failed to remove bookmark. Please try again.')
     }
   }

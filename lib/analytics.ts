@@ -36,7 +36,7 @@ export const checkUserCookieConsent = async (userId: string) => {
       };
     }
   } catch (error) {
-    console.error("Error checking cookie consent:", error);
+    // console.error("Error checking cookie consent:", error);
     return {
       analytics: false,
     };
@@ -69,7 +69,7 @@ export const checkCurrentUserCookieConsent = async () => {
     return await checkUserCookieConsent(currentUser.uid);
     
   } catch (error) {
-    console.error("Error checking current user cookie consent:", error);
+    // console.error("Error checking current user cookie consent:", error);
     return { analytics: false };
   }
 }
@@ -77,7 +77,7 @@ export const checkCurrentUserCookieConsent = async () => {
 // Example usage - call this function when you need to check consent
 export const getCurrentUserConsent = async () => {
   const result = await checkCurrentUserCookieConsent();
-  console.log('Current user analytics consent:', result.analytics);
+  // console.log('Current user analytics consent:', result.analytics);
   return result;
 };
 

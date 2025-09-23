@@ -82,7 +82,7 @@ async function sendEmailWithRetry(emailData: any, retries = 0): Promise<boolean>
     await resend.emails.send(emailData);
     return true;
   } catch (error) {
-    console.error(`Email send attempt ${retries + 1} failed:`, error);
+    // console.error(`Email send attempt ${retries + 1} failed:`, error);
     
     if (retries < RATE_LIMIT.maxRetries) {
       await new Promise(resolve => setTimeout(resolve, RATE_LIMIT.retryDelay * (retries + 1)));
@@ -105,7 +105,7 @@ async function logAnalyticsEvent(eventName: string, data: any) {
       environment: process.env.NODE_ENV || 'development'
     });
   } catch (error) {
-    console.error("Error logging analytics event:", error);
+    // console.error("Error logging analytics event:", error);
     // Don't throw - analytics logging shouldn't break main functionality
   }
 }
@@ -119,7 +119,7 @@ export async function GET() {
   try {
     // Check rate limits
     if (!checkRateLimit()) {
-      console.warn("Rate limit exceeded");
+      // console.warn("Rate limit exceeded");
       return Response.json({ 
         error: "Rate limit exceeded",
         hourlyCount: emailCounts.hourly,
@@ -154,7 +154,7 @@ export async function GET() {
         } else {
           // Fallback to current date if signupDate is missing
           signupDate = new Date();
-          console.warn(`Missing emailAutomationSignupDate for user ${user.email}, using current date as fallback`);
+          // console.warn(`Missing emailAutomationSignupDate for user ${user.email}, using current date as fallback`);
         }
 
         // Calculate days since signup
@@ -172,13 +172,13 @@ export async function GET() {
           const template = emailTemplates[nextEmailDay as keyof typeof emailTemplates];
 
           if (!template) {
-            console.warn(`No template found for day ${nextEmailDay}`);
+            // console.warn(`No template found for day ${nextEmailDay}`);
             continue;
           }
 
           // Check rate limits again before sending
           if (!checkRateLimit()) {
-            console.warn("Rate limit reached during processing");
+            // console.warn("Rate limit reached during processing");
             break;
           }
 
@@ -235,7 +235,7 @@ export async function GET() {
           skippedUsers++;
         }
       } catch (error) {
-        console.error(`Error processing user ${user.email}:`, error);
+        // console.error(`Error processing user ${user.email}:`, error);
         errors.push({ 
           email: user.email, 
           error: error instanceof Error ? error.message : "Unknown error" 
@@ -270,7 +270,7 @@ export async function GET() {
       }
     });
   } catch (error) {
-    console.error("Email automation error:", error);
+    // console.error("Email automation error:", error);
     
     // Log error
     await logAnalyticsEvent('email_automation_error', {

@@ -134,7 +134,7 @@ export function DashboardLayout({ children, sessionId, user: propUser }: Dashboa
           toast.success('Link copied to clipboard!');
         }
       } catch (error) {
-        console.error('Error sharing:', error);
+        // console.error('Error sharing:', error);
         // Fallback: copy to clipboard
         try {
           await navigator.clipboard.writeText(window.location.href);
@@ -219,7 +219,7 @@ export function DashboardLayout({ children, sessionId, user: propUser }: Dashboa
           setShowCookieBanner(true);
         }
       } catch (err) {
-        console.error("Error checking cookie consent:", err);
+        // console.error("Error checking cookie consent:", err);
         logger.error("Error checking cookie consent:", err);
         // On error, show cookie banner as fallback
         setShowCookieBanner(true);
@@ -255,7 +255,7 @@ export function DashboardLayout({ children, sessionId, user: propUser }: Dashboa
           }
         }
       } catch (err) {
-        console.error("Error checking user waitlist status:", err);
+        // console.error("Error checking user waitlist status:", err);
         logger.error("Error checking user waitlist status:", err);
         // On error, allow access (fail-safe)
       }

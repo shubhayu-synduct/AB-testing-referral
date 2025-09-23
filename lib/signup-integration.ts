@@ -26,7 +26,7 @@ export async function handleUserSignup(userData: {
     // console.log("Email automation result:", result);
     return result;
   } catch (error) {
-    console.error("Error in signup flow:", error);
+    // console.error("Error in signup flow:", error);
     // Don't fail the signup if email automation fails
     return { success: false, error };
   }
@@ -51,7 +51,7 @@ export async function handleFirebaseAuthSignup(user: any) {
     // console.log("Email automation result:", result);
     return result;
   } catch (error) {
-    console.error("Error in Firebase Auth signup:", error);
+    // console.error("Error in Firebase Auth signup:", error);
     // Don't fail the signup if email automation fails
     return { success: false, error };
   }
@@ -79,7 +79,7 @@ export async function handleCustomFormSignup(formData: {
     // console.log("Email automation result:", result);
     return result;
   } catch (error) {
-    console.error("Error in custom form signup:", error);
+    // console.error("Error in custom form signup:", error);
     // Don't fail the signup if email automation fails
     return { success: false, error };
   }
@@ -112,7 +112,7 @@ export async function handleApiRouteSignup(req: any, res: any) {
       emailAutomation: result,
     });
   } catch (error) {
-    console.error("Error in API route signup:", error);
+    // console.error("Error in API route signup:", error);
     
     // Return error response
     res.status(500).json({

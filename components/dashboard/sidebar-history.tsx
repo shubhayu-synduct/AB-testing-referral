@@ -107,7 +107,7 @@ export function SidebarHistory() {
       await deleteDoc(doc(db, "conversations", sessionId))
       setChatSessions(prev => prev.filter(session => session.id !== sessionId))
     } catch (err) {
-      console.error("Error deleting chat session:", err)
+      // console.error("Error deleting chat session:", err)
     }
   }
 
@@ -134,7 +134,7 @@ export function SidebarHistory() {
       
       // console.log('Local state updated')
     } catch (err) {
-      console.error("Error toggling pin:", err)
+      // console.error("Error toggling pin:", err)
     }
   }
 

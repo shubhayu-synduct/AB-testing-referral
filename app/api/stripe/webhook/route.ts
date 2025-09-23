@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!);
   } catch (err: any) {
-    console.error('[Webhook] Signature error:', err.message);
+    // console.error('[Webhook] Signature error:', err.message);
     return NextResponse.json({ error: err.message }, { status: 400 });
   }
 
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       await db.collection('webhook_logs').add(webhookLog);
       // console.log(`✅ Webhook log saved to Firebase`);
     } catch (logError) {
-      console.error(`❌ Failed to save webhook log:`, logError);
+      // console.error(`❌ Failed to save webhook log:`, logError);
     }
     
     // Handle invoice events
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
 
           // console.log(`[Webhook] Invoice ${invoice.id} sent successfully to ${customerEmail}`);
         } catch (invoiceError: any) {
-          console.error('[Webhook] Error sending invoice:', invoiceError);
+          // console.error('[Webhook] Error sending invoice:', invoiceError);
           // Don't fail the webhook for invoice sending errors
         }
       } else {
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
             // console.log(`[Webhook] Payment failure logged for user ${uid}`);
           }
         } catch (logError) {
-          console.error(`[Webhook] Failed to log payment failure:`, logError);
+          // console.error(`[Webhook] Failed to log payment failure:`, logError);
         }
       }
       
@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
       
       // CRITICAL: Check if payment was actually successful
       if (session.payment_status !== 'paid') {
-        console.error(`[Webhook] Payment not successful for session ${session.id}. Payment status: ${session.payment_status}`);
+        // console.error(`[Webhook] Payment not successful for session ${session.id}. Payment status: ${session.payment_status}`);
         
         // Log the failed payment attempt
         try {
@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
             // console.log(`[Webhook] Failed payment logged for user ${uid}`);
           }
         } catch (logError) {
-          console.error(`[Webhook] Failed to log failed payment:`, logError);
+          // console.error(`[Webhook] Failed to log failed payment:`, logError);
         }
         
         return NextResponse.json({ 
@@ -191,14 +191,14 @@ export async function POST(req: NextRequest) {
         try {
           const paymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent as string);
           if (paymentIntent.status !== 'succeeded') {
-            console.error(`[Webhook] Payment intent not succeeded for session ${session.id}. Status: ${paymentIntent.status}`);
+            // console.error(`[Webhook] Payment intent not succeeded for session ${session.id}. Status: ${paymentIntent.status}`);
             return NextResponse.json({ 
               error: `Payment intent not succeeded. Status: ${paymentIntent.status}` 
             }, { status: 400 });
           }
           // console.log(`[Webhook] Payment intent verified as succeeded for session ${session.id}`);
         } catch (piError) {
-          console.error(`[Webhook] Error retrieving payment intent for session ${session.id}:`, piError);
+          // console.error(`[Webhook] Error retrieving payment intent for session ${session.id}:`, piError);
           return NextResponse.json({ 
             error: 'Error verifying payment intent' 
           }, { status: 400 });
@@ -230,14 +230,14 @@ export async function POST(req: NextRequest) {
           if (charges.data.length > 0) {
             const charge = charges.data[0];
             if (charge.payment_method_details?.card?.last4 === '4242') {
-              console.error(`[Webhook] Test card detected in live mode for session ${session.id}. Rejecting subscription.`);
+              // console.error(`[Webhook] Test card detected in live mode for session ${session.id}. Rejecting subscription.`);
               return NextResponse.json({ 
                 error: 'Test cards are not allowed in live mode' 
               }, { status: 400 });
             }
           }
         } catch (testCardError) {
-          console.error(`[Webhook] Error checking for test card usage:`, testCardError);
+          // console.error(`[Webhook] Error checking for test card usage:`, testCardError);
           // Don't fail the webhook for this check, just log it
         }
       }
@@ -247,7 +247,7 @@ export async function POST(req: NextRequest) {
       const uid = (customer as any).metadata.firebaseUID;
       
       if (!uid) {
-        console.error('[Webhook] Missing Firebase UID for customer:', session.customer);
+        // console.error('[Webhook] Missing Firebase UID for customer:', session.customer);
         return NextResponse.json({ error: 'Missing Firebase UID' }, { status: 400 });
       }
       
@@ -256,7 +256,7 @@ export async function POST(req: NextRequest) {
       const priceId = lineItems.data[0]?.price?.id;
       
       if (!priceId) {
-        console.error('[Webhook] Missing price ID from checkout session');
+        // console.error('[Webhook] Missing price ID from checkout session');
         return NextResponse.json({ error: 'Missing price ID' }, { status: 400 });
       }
       
@@ -294,7 +294,7 @@ export async function POST(req: NextRequest) {
       
       // CRITICAL SAFETY CHECK: Double-verify payment status before database update
       if (session.payment_status !== 'paid') {
-        console.error(`[Webhook] CRITICAL: Payment status changed to ${session.payment_status} before database update. Aborting subscription creation.`);
+        // console.error(`[Webhook] CRITICAL: Payment status changed to ${session.payment_status} before database update. Aborting subscription creation.`);
         return NextResponse.json({ 
           error: `Payment status changed to ${session.payment_status}. Subscription not created.` 
         }, { status: 400 });
@@ -305,7 +305,7 @@ export async function POST(req: NextRequest) {
         try {
           const finalPaymentIntent = await stripe.paymentIntents.retrieve(session.payment_intent as string);
           if (finalPaymentIntent.status !== 'succeeded') {
-            console.error(`[Webhook] CRITICAL: Payment intent status changed to ${finalPaymentIntent.status} before database update. Aborting subscription creation.`);
+            // console.error(`[Webhook] CRITICAL: Payment intent status changed to ${finalPaymentIntent.status} before database update. Aborting subscription creation.`);
             return NextResponse.json({ 
               error: `Payment intent status changed to ${finalPaymentIntent.status}. Subscription not created.` 
             }, { status: 400 });
@@ -341,7 +341,7 @@ export async function POST(req: NextRequest) {
         
         // console.log(`[Webhook] Successfully updated user ${uid} with complete subscription data: ${subscriptionTier} ${interval}, expires: ${expiryDate ? new Date(expiryDate).toISOString() : 'null'}`);
       } catch (dbError) {
-        console.error(`[Webhook] CRITICAL: Database update failed for user ${uid}:`, dbError);
+        // console.error(`[Webhook] CRITICAL: Database update failed for user ${uid}:`, dbError);
         return NextResponse.json({ 
           error: 'Database update failed. Subscription not created.' 
         }, { status: 500 });
@@ -363,7 +363,7 @@ export async function POST(req: NextRequest) {
         });
         // console.log(`[Webhook] Subscription creation logged for user ${uid}`);
       } catch (logError) {
-        console.error(`[Webhook] Failed to log subscription creation:`, logError);
+        // console.error(`[Webhook] Failed to log subscription creation:`, logError);
       }
       
       return NextResponse.json({ received: true });
@@ -383,7 +383,7 @@ export async function POST(req: NextRequest) {
       // console.log(`[Webhook] Customer ID: ${subscription.customer}, Firebase UID: ${uid}`);
 
       if (!uid) {
-        console.error('[Webhook] Missing Firebase UID for customer:', subscription.customer);
+        // console.error('[Webhook] Missing Firebase UID for customer:', subscription.customer);
         return NextResponse.json({ error: 'Missing Firebase UID' }, { status: 400 });
       }
 
@@ -391,7 +391,7 @@ export async function POST(req: NextRequest) {
       
       // Check if subscription has items data
       if (!subscription.items || !subscription.items.data || subscription.items.data.length === 0) {
-        console.error('[Webhook] Subscription missing items data:', subscription.id);
+        // console.error('[Webhook] Subscription missing items data:', subscription.id);
         return NextResponse.json({ error: 'Subscription missing items data' }, { status: 400 });
       }
       
@@ -514,7 +514,7 @@ export async function POST(req: NextRequest) {
       await db.collection('webhook_logs').add(completionLog);
       // console.log(`✅ Webhook completion log saved to Firebase`);
     } catch (logError) {
-      console.error(`❌ Failed to save completion log:`, logError);
+      // console.error(`❌ Failed to save completion log:`, logError);
     }
     
     // console.log(`🎉🎉🎉 WEBHOOK COMPLETED SUCCESSFULLY for ${event.type} 🎉🎉🎉`);
@@ -533,10 +533,10 @@ export async function POST(req: NextRequest) {
       await db.collection('webhook_logs').add(errorLog);
       // console.log(`✅ Webhook error log saved to Firebase`);
     } catch (logError) {
-      console.error(`❌ Failed to save error log:`, logError);
+      // console.error(`❌ Failed to save error log:`, logError);
     }
     
-    console.error('[Webhook] Error processing event:', error);
+    // console.error('[Webhook] Error processing event:', error);
     return NextResponse.json(
       { error: 'Failed to process webhook' },
       { status: 500 }

@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('[Cancel Subscription] Error:', error);
+    // console.error('[Cancel Subscription] Error:', error);
     
     if (error.type === 'StripeInvalidRequestError') {
       return NextResponse.json(

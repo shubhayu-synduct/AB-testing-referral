@@ -45,7 +45,7 @@ export default function WaitlistModal({ isOpen }: WaitlistModalProps) {
           // Redirect to login
           router.push('/login')
         } catch (error) {
-          console.error('Error during auto signout:', error)
+          // console.error('Error during auto signout:', error)
           // Fallback: just redirect to login
           router.push('/login')
         }

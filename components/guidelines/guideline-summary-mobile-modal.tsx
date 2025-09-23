@@ -239,7 +239,7 @@ export default function GuidelineSummaryMobileModal({
   const handleReferenceClick = useCallback((refNumber: string, occurrenceIndex?: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
     // Console log for verification
     // console.log(`Citation clicked: [${refNumber}] at occurrence index: ${occurrenceIndex}`);
-    console.log(`Available page_references for [${refNumber}]:`, messageData?.page_references?.[refNumber] || summary?.page_references?.[refNumber]);
+    // console.log(`Available page_references for [${refNumber}]:`, messageData?.page_references?.[refNumber] || summary?.page_references?.[refNumber]);
     
     // Save current scroll position before switching tabs
     saveScrollPosition();

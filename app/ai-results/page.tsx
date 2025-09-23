@@ -151,7 +151,7 @@ function AIResultsContent() {
       };
       localStorage.setItem(PERSISTENT_SESSION_KEY, JSON.stringify(sessionData));
     } catch (error) {
-      console.error('Failed to save session to localStorage:', error);
+      // console.error('Failed to save session to localStorage:', error);
     }
   };
 
@@ -169,7 +169,7 @@ function AIResultsContent() {
         };
       }
     } catch (error) {
-      console.error('Failed to load session from localStorage:', error);
+      // console.error('Failed to load session from localStorage:', error);
     }
     return null;
   };
@@ -178,7 +178,7 @@ function AIResultsContent() {
     try {
       localStorage.removeItem(PERSISTENT_SESSION_KEY);
     } catch (error) {
-      console.error('Failed to clear session from localStorage:', error);
+      // console.error('Failed to clear session from localStorage:', error);
     }
   };
 
@@ -306,7 +306,7 @@ function AIResultsContent() {
           setUserCountry(data.country || 'US');
         }
       } catch (error) {
-        console.error('Failed to fetch user country:', error);
+        // console.error('Failed to fetch user country:', error);
       }
     };
 
@@ -355,7 +355,7 @@ function AIResultsContent() {
         await handleSearch(query, true);
       }
     } catch (error) {
-      console.error('Error loading chat session:', error);
+      // console.error('Error loading chat session:', error);
       setError('Failed to load chat session');
     } finally {
       setIsLoading(false);
@@ -383,7 +383,7 @@ function AIResultsContent() {
       // Also save to localStorage for persistence
       saveSessionToStorage(sessionId, query, updatedMessages);
     } catch (error) {
-      console.error('Error saving chat session:', error);
+      // console.error('Error saving chat session:', error);
     }
   };
 
@@ -411,7 +411,7 @@ function AIResultsContent() {
     try {
       await handleSearchWithContent(searchQuery, assistantMessage.id, newMessages);
     } catch (error) {
-      console.error('Search failed:', error);
+      // console.error('Search failed:', error);
       setError('Failed to get AI response. Please try again.');
       setIsStreaming(false);
     } finally {
@@ -835,7 +835,7 @@ function AIResultsContent() {
       
       toast.success('Thank you for your feedback!');
     } catch (error) {
-      console.error('Error updating feedback:', error);
+      // console.error('Error updating feedback:', error);
       toast.error('Failed to save feedback');
     }
   };
@@ -935,7 +935,7 @@ function AIResultsContent() {
       
       toast.success('Share link created!');
     } catch (error) {
-      console.error('Error creating share link:', error);
+      // console.error('Error creating share link:', error);
       toast.error('Failed to create share link');
     } finally {
       setIsSharing(false);
@@ -948,7 +948,7 @@ function AIResultsContent() {
       await navigator.clipboard.writeText(shareLink);
       toast.success('Link copied to clipboard!');
     } catch (error) {
-      console.error('Failed to copy link:', error);
+      // console.error('Failed to copy link:', error);
       toast.error('Failed to copy link');
     }
   };
@@ -1052,7 +1052,7 @@ function AIResultsContent() {
       setTimeout(() => setCopied(false), 2000);
       toast.success('Content copied to clipboard!');
     } catch (error) {
-      console.error('Failed to copy to clipboard:', error);
+      // console.error('Failed to copy to clipboard:', error);
       toast.error('Failed to copy content');
     }
   };

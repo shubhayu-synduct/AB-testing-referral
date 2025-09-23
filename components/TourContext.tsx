@@ -210,7 +210,7 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
           }
         };
       } catch (error) {
-        console.warn('Error setting up scroll prevention:', error);
+        // console.warn('Error setting up scroll prevention:', error);
         // If scroll prevention fails, just return a no-op cleanup function
         return () => {};
       }
@@ -739,7 +739,7 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
           }
         };
       } catch (error) {
-        console.warn('Error setting up scroll prevention:', error);
+        // console.warn('Error setting up scroll prevention:', error);
         // If scroll prevention fails, just return a no-op cleanup function
         return () => {};
       }

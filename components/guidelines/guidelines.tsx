@@ -501,7 +501,7 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
         await saveBookmark(guideline);
       }
     } catch (error) {
-      console.error('Error toggling bookmark:', error);
+      // console.error('Error toggling bookmark:', error);
       logger.error('Error toggling bookmark:', error);
       // You could add a toast notification here for user feedback
     } finally {
