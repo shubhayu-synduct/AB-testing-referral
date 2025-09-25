@@ -4,9 +4,17 @@ import React from 'react'
 import { ImageGenerator } from '@/components/image-generator/ImageGenerator'
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import { useAuth } from "@/hooks/use-auth"
+import { track } from '@/lib/analytics'
 
 export default function ImageGeneratorPage() {
   const { user } = useAuth()
+
+  // Track page view when user is available
+  React.useEffect(() => {
+    if (user) {
+      track.visualAbstractPageViewed(user.uid, 'visual-abstract')
+    }
+  }, [user])
 
   const ImageGeneratorContent = () => {
     return (

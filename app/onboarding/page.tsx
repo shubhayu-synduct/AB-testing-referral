@@ -136,6 +136,30 @@ export default function Onboarding() {
       ...prev,
       [name]: value
     }))
+
+    // Track specific field entries
+    if (user) {
+      switch (name) {
+        case 'firstName':
+          track.onboardingFirstNameEntered(user.uid, 'onboarding')
+          break
+        case 'lastName':
+          track.onboardingLastNameEntered(user.uid, 'onboarding')
+          break
+        case 'institution':
+          track.onboardingInstitutionEntered(user.uid, 'onboarding')
+          break
+        case 'otherOccupation':
+          track.onboardingOtherProfessionEntered(value, user.uid, 'onboarding')
+          break
+        case 'otherPlaceOfWork':
+          track.onboardingOtherPlaceOfWorkEntered(value, user.uid, 'onboarding')
+          break
+        case 'otherSpecialty':
+          track.onboardingOtherSpecialtyEntered(value, user.uid, 'onboarding')
+          break
+      }
+    }
   }
 
   // Auto-check healthcare professional checkbox based on occupation
@@ -160,10 +184,20 @@ export default function Onboarding() {
       occupation: occupation,
       ...(occupation === "other" ? { otherOccupation: "" } : {})
     }))
+
+    // Track profession selection
+    if (user) {
+      track.onboardingProfessionSelected(occupation, user.uid, 'onboarding')
+    }
   }
 
   const handleTermsAgreement = (checked: boolean) => {
     setTermsAgreed(checked)
+    
+    // Track terms agreement
+    if (user && checked) {
+      track.onboardingTermsAccepted(user.uid, 'onboarding')
+    }
   }
 
   const handleHealthcareProfessionalAgreement = (checked: boolean) => {
@@ -195,6 +229,11 @@ export default function Onboarding() {
         setIsHealthcareProfessional(false)
       }
       // Don't allow checking manually for non-medical professions
+    }
+
+    // Track healthcare professional checkbox interaction
+    if (user) {
+      track.onboardingHealthcareProfessionalChecked(checked, formData.occupation, user.uid, 'onboarding')
     }
   }
 
@@ -240,6 +279,14 @@ export default function Onboarding() {
     }
 
     setFieldErrors(errors)
+    
+    // Track validation errors
+    if (hasErrors && user) {
+      Object.entries(errors).forEach(([field, message]) => {
+        track.onboardingValidationError(field, message, user.uid, 'onboarding')
+      })
+    }
+    
     return !hasErrors
   }
 
@@ -347,7 +394,7 @@ export default function Onboarding() {
       }
 
       // Track onboarding completion
-      track.onboardingCompleted(user.uid, undefined, formData.specialties)
+      track.onboardingCompleted(user.uid, formData.specialties)
       
       // Send Day 1 welcome email only to medical professionals
       if (isMedicalProfessional) {
@@ -848,7 +895,12 @@ export default function Onboarding() {
                     <div
                       className={`w-full min-h-[40px] px-2 py-1 border ${fieldErrors.occupation ? 'border-red-500' : 'border-[#3771FE]/50'} rounded-[5px] bg-white flex items-center justify-between gap-1 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent placeholder-text`}
                       tabIndex={0}
-                      onClick={() => setShowProfessionDropdown(true)}
+                      onClick={() => {
+                        setShowProfessionDropdown(true)
+                        if (user) {
+                          track.onboardingProfessionDropdownOpened(user.uid, 'onboarding')
+                        }
+                      }}
                       style={{ cursor: 'text', position: 'relative' }}
                     >
                                              {formData.occupation === "" && (
@@ -906,7 +958,12 @@ export default function Onboarding() {
                     <div
                       className={`w-full min-h-[40px] px-2 py-1 border ${fieldErrors.experience ? 'border-red-500' : 'border-[#3771FE]/50'} rounded-[5px] bg-white flex items-center justify-between gap-1 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent placeholder-text`}
                       tabIndex={0}
-                      onClick={() => setShowExperienceDropdown(true)}
+                      onClick={() => {
+                        setShowExperienceDropdown(true)
+                        if (user) {
+                          track.onboardingExperienceDropdownOpened(user.uid, 'onboarding')
+                        }
+                      }}
                       style={{ cursor: 'text', position: 'relative' }}
                     >
                                              {formData.experience === "" && (
@@ -933,6 +990,9 @@ export default function Onboarding() {
                                  experience: opt.value
                                }));
                                setShowExperienceDropdown(false);
+                               if (user) {
+                                 track.onboardingExperienceSelected(opt.value, user.uid, 'onboarding')
+                               }
                              }}
                            >
                              {opt.label}
@@ -955,7 +1015,12 @@ export default function Onboarding() {
                     <div
                       className={`w-full min-h-[40px] px-2 py-1 border ${fieldErrors.placeOfWork ? 'border-red-500' : 'border-[#3771FE]/50'} rounded-[5px] bg-white flex items-center justify-between gap-1 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent placeholder-text`}
                       tabIndex={0}
-                      onClick={() => setShowPlaceOfWorkDropdown(true)}
+                      onClick={() => {
+                        setShowPlaceOfWorkDropdown(true)
+                        if (user) {
+                          track.onboardingPlaceOfWorkDropdownOpened(user.uid, 'onboarding')
+                        }
+                      }}
                       style={{ cursor: 'text', position: 'relative' }}
                     >
                                              {formData.placeOfWork === "" && (
@@ -983,6 +1048,9 @@ export default function Onboarding() {
                                  ...(opt.value === "other" ? { otherPlaceOfWork: "" } : {})
                                }));
                                setShowPlaceOfWorkDropdown(false);
+                               if (user) {
+                                 track.onboardingPlaceOfWorkSelected(opt.value, user.uid, 'onboarding')
+                               }
                              }}
                            >
                              {opt.label}
@@ -1034,7 +1102,12 @@ export default function Onboarding() {
                   <div
                     className={`w-full min-h-[40px] px-2 py-1 border ${fieldErrors.specialties ? 'border-red-500' : 'border-[#3771FE]/50'} rounded-[5px] bg-white flex flex-wrap items-center gap-1 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent placeholder-text`}
                     tabIndex={0}
-                    onClick={() => setShowSpecialtiesDropdown(true)}
+                    onClick={() => {
+                      setShowSpecialtiesDropdown(true)
+                      if (user) {
+                        track.onboardingSpecialtiesDropdownOpened(user.uid, 'onboarding')
+                      }
+                    }}
                     style={{ cursor: 'text', position: 'relative' }}
                   >
                     {formData.specialties.length === 0 && (
@@ -1080,6 +1153,9 @@ export default function Onboarding() {
                           className="w-full px-3 py-2 border border-[#3771FE]/50 rounded-[6px] text-sm text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#3771FE] focus:border-transparent"
                           onChange={(e) => {
                             setSpecialtiesSearchTerm(e.target.value);
+                            if (user && e.target.value) {
+                              track.onboardingSpecialtySearched(e.target.value, user.uid, 'onboarding')
+                            }
                           }}
                           onKeyDown={(e) => {
                             if (e.key === 'Escape') {
@@ -1099,6 +1175,7 @@ export default function Onboarding() {
                           }`}
                           style={{ fontSize: '12px', color: '#223258' }}
                           onClick={() => {
+                            const isAdding = !formData.specialties.includes(opt.value)
                             setFormData(prev => ({
                               ...prev,
                               specialties: prev.specialties.includes(opt.value)
@@ -1107,6 +1184,15 @@ export default function Onboarding() {
                             }));
                             // Don't close dropdown for specialties since multiple selections are allowed
                             setSpecialtiesSearchTerm('');
+                            
+                            // Track specialty addition/removal
+                            if (user) {
+                              if (isAdding) {
+                                track.onboardingSpecialtyAdded(opt.value, user.uid, 'onboarding')
+                              } else {
+                                track.onboardingSpecialtyRemoved(opt.value, user.uid, 'onboarding')
+                              }
+                            }
                           }}
                         >
                           {opt.label}
@@ -1144,7 +1230,12 @@ export default function Onboarding() {
                   <div
                     className={`w-full min-h-[40px] px-2 py-1 border ${fieldErrors.country ? 'border-red-500' : 'border-[#3771FE]/50'} rounded-[5px] bg-white flex items-center justify-between gap-1 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent placeholder-text`}
                     tabIndex={0}
-                    onClick={() => setShowCountryDropdown(true)}
+                    onClick={() => {
+                      setShowCountryDropdown(true)
+                      if (user) {
+                        track.onboardingCountryDropdownOpened(user.uid, 'onboarding')
+                      }
+                    }}
                     style={{ cursor: 'text', position: 'relative' }}
                   >
                     {formData.country === "" && (
@@ -1167,6 +1258,9 @@ export default function Onboarding() {
                           className="w-full px-3 py-2 border border-[#3771FE]/50 rounded-[6px] text-sm text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#3771FE] focus:border-transparent"
                           onChange={(e) => {
                             setCountrySearchTerm(e.target.value);
+                            if (user && e.target.value) {
+                              track.onboardingCountrySearched(e.target.value, user.uid, 'onboarding')
+                            }
                           }}
                           onKeyDown={(e) => {
                             if (e.key === 'Escape') {
@@ -1190,6 +1284,9 @@ export default function Onboarding() {
                             }));
                             setShowCountryDropdown(false);
                             setCountrySearchTerm('');
+                            if (user) {
+                              track.onboardingCountrySelected(value, user.uid, 'onboarding')
+                            }
                           }}
                         >
                           {label}

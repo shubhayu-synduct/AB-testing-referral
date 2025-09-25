@@ -47,7 +47,6 @@ export default function Dashboard() {
   // Track dashboard landing
   useEffect(() => {
     if (user) {
-      track.dashboardVisited(user.uid)
     }
   }, [user]);
   
@@ -119,6 +118,10 @@ export default function Dashboard() {
 
     const timeout = setTimeout(() => {
       setShowTourPrompt(true);
+      // Track tour prompt shown
+      if (user) {
+        track.dashboardTourPromptShown(user.uid, 'dashboard')
+      }
     }, 5000);
     return () => clearTimeout(timeout);
   }, [tourContext, hasValidCookieConsent]);
@@ -352,8 +355,9 @@ export default function Dashboard() {
     }
     
     if (!query.trim() || !user) return
-        // Track search query (both Vercel and GA4)
-    track.searchQuery(query, activeMode, !!user)
+    
+    // Track dashboard search performed
+    track.dashboardSearchPerformed(query, activeMode, user.uid, 'dashboard')
     
     // Immediately lock everything - no more interactions possible
     isRequestInProgressRef.current = true;
@@ -374,7 +378,6 @@ export default function Dashboard() {
     
       // Track medical query submission
       if (user) {
-        track.medicalQuerySubmitted(query, activeMode, user.uid, query.length)
       }
       
       try {
@@ -384,7 +387,6 @@ export default function Dashboard() {
         
         // Track chat session started
         if (user) {
-          track.chatSessionStarted(sessionId, user.uid, activeMode)
         }
       
       // Create chat session in Firebase first
@@ -437,6 +439,11 @@ export default function Dashboard() {
     setQuery(suggestion);
     setShowSuggestions(false);
     
+    // Track suggestion clicked
+    if (user) {
+      track.dashboardSuggestionClicked(suggestion, user.uid, 'dashboard')
+    }
+    
     // Force textarea to expand after state update
     const textarea = document.querySelector('textarea');
     if (textarea) {
@@ -453,6 +460,16 @@ export default function Dashboard() {
   const clearSearch = () => {
     setQuery('');
     setShowSuggestions(false);
+  };
+
+  const handleModeChange = (newMode: 'instant' | 'research') => {
+    const previousMode = activeMode;
+    setActiveMode(newMode);
+    
+    // Track mode change
+    if (user) {
+      track.dashboardModeChanged(previousMode, newMode, user.uid, 'dashboard')
+    }
   };
 
 
@@ -514,7 +531,7 @@ export default function Dashboard() {
                         <input
                           type="checkbox"
                           checked={activeMode === 'instant'}
-                          onChange={() => setActiveMode(activeMode === 'instant' ? 'research' : 'instant')}
+                          onChange={() => handleModeChange(activeMode === 'instant' ? 'research' : 'instant')}
                           className="toggle-checkbox hidden"
                         />
                         <span className={`w-10 h-6 flex items-center rounded-full p-1 duration-300 ease-in-out ${activeMode === 'instant' ? 'bg-[#3771FE]' : 'bg-gray-300'}`}
@@ -614,6 +631,10 @@ export default function Dashboard() {
                 className="px-4 py-2 rounded transition-colors"
                 onClick={() => { 
                   setShowTourPrompt(false); 
+                  // Track tour accepted
+                  if (user) {
+                    track.dashboardTourAccepted(user.uid, 'dashboard')
+                  }
                   if (tourContext && tourContext.startTour) {
                     tourContext.startTour();
                   }
@@ -635,6 +656,10 @@ export default function Dashboard() {
                 className="px-4 py-2 rounded transition-colors"
                 onClick={() => { 
                   setShowTourPrompt(false); 
+                  // Track tour declined
+                  if (user) {
+                    track.dashboardTourDeclined(user.uid, 'dashboard')
+                  }
                   // Save preference as skipped when user clicks "No, thanks"
                   if (tourContext && tourContext.saveTourPreference) {
                     tourContext.saveTourPreference('skipped');

@@ -5,6 +5,7 @@ import { doc, setDoc } from 'firebase/firestore'
 import { getFirebaseFirestore } from '@/lib/firebase'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { track } from '@/lib/analytics'
 
 interface ImageGeneratorProps {
   user?: any;
@@ -57,6 +58,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
     // Auto-resize the textarea
     e.target.style.height = 'auto'
     e.target.style.height = e.target.scrollHeight + 'px'
+    
   }
 
   const handleGenerate = async (e?: React.FormEvent) => {
@@ -67,7 +69,13 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
     const wordCount = prompt.trim().split(/\s+/).length
     if (wordCount < 20) {
       setError(`Please enter at least 20 words. Current word count: ${wordCount}`)
+      
       return
+    }
+
+    // Track generate button click
+    if (user) {
+      track.visualAbstractGenerateClicked(prompt.length, wordCount, user.uid, 'visual-abstract')
     }
 
     setIsLoading(true)
@@ -75,6 +83,9 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
     setImageGenerationStatus('generating')
     setGeneratedImage(null)
     setFeedbackSubmitted(false)
+
+
+    const generationStartTime = Date.now()
 
     try {
       // Clean the prompt text to avoid Pydantic validation errors
@@ -109,10 +120,13 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
       if (data.status === "success" && data.svg_content) {
         setGeneratedImage(data.svg_content)
         setImageGenerationStatus('complete')
+        
+        
         // Save to Firebase
         if (user?.uid) {
           const threadId = await saveSvgToFirebase(data.svg_content, prompt, user.uid)
           setCurrentThreadId(threadId)
+          
         }
         // Show feedback section after 5 seconds and auto-scroll
         setTimeout(() => {
@@ -125,10 +139,13 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
         // Handle case where API returns SVG content directly without success flag
         setGeneratedImage(data.svg_content)
         setImageGenerationStatus('complete')
+        
+        
         // Save to Firebase
         if (user?.uid) {
           const threadId = await saveSvgToFirebase(data.svg_content, prompt, user.uid)
           setCurrentThreadId(threadId)
+          
         }
         // Show feedback section after 5 seconds and auto-scroll
         setTimeout(() => {
@@ -144,6 +161,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
       console.error('Error generating visual abstract:', err)
       setError('Failed to generate visual abstract. Please try again.')
       setImageGenerationStatus('idle')
+      
     } finally {
       setIsLoading(false)
     }
@@ -152,6 +170,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
   // Function to handle feedback submission
   const handleFeedbackSubmit = async () => {
     if (!currentThreadId) return
+
 
     try {
       const db = getFirebaseFirestore()
@@ -222,6 +241,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
 
   // Function to download SVG as PNG
   const downloadSvgAsPng = (svgContent: string, filename: string = 'generated-image') => {
+    
     try {
       // Create a temporary container for the SVG
       const container = document.createElement('div')
@@ -322,6 +342,8 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
               id="prompt"
               value={prompt}
               onChange={handlePromptChange}
+              onFocus={() => {}}
+              onBlur={() => {}}
               placeholder="Paste your research abstract, study summary, or text content here (minimum 20 words)... (e.g., 'This study investigated the efficacy of a new treatment protocol in 150 patients with chronic conditions. Results showed a 35% improvement in outcomes compared to standard care.')"
               className="w-full text-base text-[#223258] font-normal font-['DM_Sans'] outline-none resize-none min-h-[120px] max-h-[300px] overflow-y-auto border border-gray-300 rounded-lg p-4 focus:border-[#3771FE] focus:ring-2 focus:ring-[#3771FE] focus:ring-opacity-20"
               rows={5}
@@ -419,7 +441,11 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
       {generatedImage && (
         <div className="flex justify-center mt-6">
           <button
-            onClick={() => setShowFeedback(!showFeedback)}
+            onClick={() => {
+              const newShowFeedback = !showFeedback
+              setShowFeedback(newShowFeedback)
+              
+            }}
             disabled={feedbackSubmitted}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200 font-['DM_Sans'] font-medium ${
               feedbackSubmitted 
@@ -455,7 +481,10 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
               </div>
             </div>
             <button
-              onClick={() => setShowFeedback(false)}
+              onClick={() => {
+                setShowFeedback(false)
+                
+              }}
               className="text-gray-400 hover:text-gray-600 transition-colors"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -487,10 +516,12 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
                     key={option.value}
                     type="button"
                     onClick={() => {
-                      const newUseCase = feedbackData.useCase.includes(option.value)
+                      const isCurrentlySelected = feedbackData.useCase.includes(option.value)
+                      const newUseCase = isCurrentlySelected
                         ? feedbackData.useCase.filter(item => item !== option.value)
                         : [...feedbackData.useCase, option.value];
                       setFeedbackData({...feedbackData, useCase: newUseCase})
+                      
                     }}
                     className={`p-1.5 text-xs font-['DM_Sans'] rounded border transition-colors duration-200 ${
                       feedbackData.useCase.includes(option.value)
@@ -505,7 +536,10 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
               {feedbackData.useCase.includes('other') && (
                 <textarea
                   value={feedbackData.useCaseOther}
-                  onChange={(e) => setFeedbackData({...feedbackData, useCaseOther: e.target.value})}
+                  onChange={(e) => {
+                    setFeedbackData({...feedbackData, useCaseOther: e.target.value})
+                    
+                  }}
                   placeholder="Please specify..."
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3771FE] focus:border-[#3771FE] font-['DM_Sans'] mt-2"
                   rows={2}
@@ -529,10 +563,12 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
                     key={option.value}
                     type="button"
                     onClick={() => {
-                      const newFrequency = feedbackData.frequency.includes(option.value)
+                      const isCurrentlySelected = feedbackData.frequency.includes(option.value)
+                      const newFrequency = isCurrentlySelected
                         ? feedbackData.frequency.filter(item => item !== option.value)
                         : [...feedbackData.frequency, option.value];
                       setFeedbackData({...feedbackData, frequency: newFrequency})
+                      
                     }}
                     className={`p-1.5 text-xs font-['DM_Sans'] rounded border transition-colors duration-200 ${
                       feedbackData.frequency.includes(option.value)
@@ -571,10 +607,12 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
                     key={option.value}
                     type="button"
                     onClick={() => {
-                      const newInfographicTypes = feedbackData.infographicTypes.includes(option.value)
+                      const isCurrentlySelected = feedbackData.infographicTypes.includes(option.value)
+                      const newInfographicTypes = isCurrentlySelected
                         ? feedbackData.infographicTypes.filter(item => item !== option.value)
                         : [...feedbackData.infographicTypes, option.value];
                       setFeedbackData({...feedbackData, infographicTypes: newInfographicTypes})
+                      
                     }}
                     className={`p-1.5 text-xs font-['DM_Sans'] rounded border transition-colors duration-200 ${
                       feedbackData.infographicTypes.includes(option.value)
@@ -589,7 +627,10 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
               {feedbackData.infographicTypes.includes('other') && (
                 <textarea
                   value={feedbackData.infographicOther}
-                  onChange={(e) => setFeedbackData({...feedbackData, infographicOther: e.target.value})}
+                  onChange={(e) => {
+                    setFeedbackData({...feedbackData, infographicOther: e.target.value})
+                    
+                  }}
                   placeholder="Please specify..."
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3771FE] focus:border-[#3771FE] font-['DM_Sans'] mt-2"
                   rows={2}
@@ -607,7 +648,10 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
                   <button
                     key={star}
                     type="button"
-                    onClick={() => setFeedbackData({...feedbackData, valueRating: star})}
+                    onClick={() => {
+                      setFeedbackData({...feedbackData, valueRating: star})
+                      
+                    }}
                     className={`text-2xl transition-colors duration-200 ${
                       star <= feedbackData.valueRating 
                         ? 'text-yellow-400' 
@@ -635,7 +679,10 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
               </label>
               <textarea
                 value={feedbackData.suggestions}
-                onChange={(e) => setFeedbackData({...feedbackData, suggestions: e.target.value})}
+                onChange={(e) => {
+                  setFeedbackData({...feedbackData, suggestions: e.target.value})
+                  
+                }}
                 placeholder="Share your ideas..."
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3771FE] focus:border-[#3771FE] font-['DM_Sans']"
                 rows={2}

@@ -252,7 +252,6 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 href="/guidelines"
                 onClick={() => {
                   if (user) {
-                    track.guidelinesClicked(user.uid, pathname)
                   }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);
@@ -284,7 +283,6 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 href="/drug-information"
                 onClick={() => {
                   if (user) {
-                    track.drugInformationViewed('drug_search', 'search', user.uid, pathname)
                   }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);
@@ -308,7 +306,6 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 href="/image-generator"
                 onClick={() => {
                   if (user) {
-                    track.visualAbstractClicked(user.uid, pathname)
                   }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);
@@ -330,7 +327,6 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 href="/library"
                 onClick={() => {
                   if (user) {
-                    track.libraryClicked(user.uid, pathname)
                   }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);

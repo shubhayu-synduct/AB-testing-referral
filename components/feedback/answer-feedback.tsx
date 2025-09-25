@@ -7,6 +7,7 @@ import { doc, setDoc } from 'firebase/firestore'
 import { MovingBorder } from "@/components/ui/moving-border";
 import { cn } from "@/lib/utils";
 import { logger } from '@/lib/logger';
+import { track } from '@/lib/analytics';
 
 interface AnswerFeedbackProps {
   conversationId: string;
@@ -68,6 +69,13 @@ export default function AnswerFeedback({
   };
 
   const handleFeedbackClick = (type: 'helpful' | 'not_helpful') => {
+    // Track like/dislike click
+    if (type === 'helpful') {
+      track.drinfoSummaryLikedAnswer('drinfo-summary');
+    } else {
+      track.drinfoSummaryDislikedAnswer('drinfo-summary');
+    }
+    
     // If clicking the same type that's already open, close it
     if (showForm === type) {
       setShowForm(null);
@@ -128,6 +136,9 @@ export default function AnswerFeedback({
 
       await setDoc(feedbackRef, feedbackData);
       logger.debug('Feedback saved successfully to Firebase');
+
+      // Track feedback submitted
+      track.drinfoSummaryFeedbackSubmitted(feedbackType === 'helpful' ? 'positive' : 'negative', 'drinfo-summary');
 
       setThankYou(true);
       setShowForm(null);
@@ -308,7 +319,10 @@ export default function AnswerFeedback({
         {/* Reload Button */}
         {onReload && (
           <button
-            onClick={onReload}
+            onClick={() => {
+              track.drinfoSummaryClickedRetry('drinfo-summary');
+              onReload();
+            }}
             disabled={isReloading}
             className="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg border border-[#223258] text-[#223258] bg-white transition-all flex items-center gap-1 sm:gap-2 hover:border-[#3771FE] hover:text-[#3771FE] disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label="Retry answer"

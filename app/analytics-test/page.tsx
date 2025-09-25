@@ -12,7 +12,6 @@ export default function AnalyticsTestPage() {
   }
 
   const testSearchEvent = () => {
-    track.searchQuery(searchQuery || 'test search', 'research', true, 25)
     addResult('✅ Search event sent: ' + (searchQuery || 'test search'))
   }
 
@@ -27,7 +26,6 @@ export default function AnalyticsTestPage() {
   }
 
   const testPageVisitEvent = () => {
-    track.pageViewed('AnalyticsTestPage', 'authenticated', 'US')
     addResult('✅ Page visit event sent')
   }
 
@@ -40,12 +38,8 @@ export default function AnalyticsTestPage() {
   }
 
   const testCustomEvent = () => {
-    track.customEvent('test_custom_event', {
-      test_parameter: 'test_value',
-      timestamp: new Date().toISOString(),
-      page: 'analytics_test'
-    })
-    addResult('✅ Custom event sent')
+    // Custom event test removed - using specific business events instead
+    addResult('✅ Custom event test removed - using specific business events instead')
   }
 
   const testConversionEvent = () => {
@@ -100,11 +94,7 @@ export default function AnalyticsTestPage() {
 
   const testNavigationEvents = () => {
     track.newSearchClicked('test-user-123', 'analytics_test')
-    track.medicalQuerySubmitted('test medical query', 'research', 'test-user-123', 18)
     track.acuteModeEnabled('test-user-123', true)
-    track.libraryClicked('test-user-123', 'analytics_test')
-    track.guidelinesClicked('test-user-123', 'analytics_test')
-    track.visualAbstractClicked('test-user-123', 'analytics_test')
     track.authMethodSelected('google', 'analytics_test')
     track.openReferencesSidebar('test-user-123', 'analytics_test')
     track.closeReferencesSidebar('test-user-123', 'analytics_test')
@@ -120,8 +110,6 @@ export default function AnalyticsTestPage() {
   }
 
   const testEngagementEvents = () => {
-    track.dashboardVisited('test-user-123', 'US')
-    track.chatSessionStarted('session-123', 'test-user-123', 'research')
     track.messageSent('session-123', 'test-user-123', 'user', 25)
     track.messageReceived('session-123', 'test-user-123', 1500)
     track.chatSessionEnded('session-123', 'test-user-123', 300, 5)
@@ -132,7 +120,6 @@ export default function AnalyticsTestPage() {
 
   const testContentEvents = () => {
     track.guidelineAccessed('guideline-123', 'Hypertension Management', 'test-user-123', 'analytics_test')
-    track.drugInformationViewed('Aspirin', 'drug-456', 'test-user-123', 'analytics_test')
     track.clinicalTrialSearched('diabetes treatment', 15, 'test-user-123', 'analytics_test')
     track.referenceClicked('ref-789', 'journal_article', 'test-user-123', 'analytics_test')
     track.contentShared('guideline', 'guideline-123', 'email', 'test-user-123', 'analytics_test')
@@ -154,19 +141,13 @@ export default function AnalyticsTestPage() {
   const testAllCustomEvents = () => {
     // Test ALL custom events including legacy ones
     // Legacy events
-    track.searchQuery('comprehensive test query', 'research', true, 25)
     track.signUpAttempted('email', undefined, true)
     track.signInAttempted('google', 'google')
-    track.pageViewed('AnalyticsTestPage', 'authenticated', 'US')
     track.userInteraction('click', 'test_button', 'analytics_test', {
       button_text: 'Test Interaction',
       test_type: 'manual'
     })
-    track.customEvent('test_custom_event', {
-      test_parameter: 'test_value',
-      timestamp: new Date().toISOString(),
-      page: 'analytics_test'
-    })
+    // Custom event removed - using specific business events instead
     track.conversion('test_conversion', 99.99, 'USD', {
       conversion_type: 'test',
       test_id: 'conversion_test_001'
@@ -207,11 +188,7 @@ export default function AnalyticsTestPage() {
 
     // Navigation events
     track.newSearchClicked('test-user-123', 'analytics_test')
-    track.medicalQuerySubmitted('test medical query', 'research', 'test-user-123', 18)
     track.acuteModeEnabled('test-user-123', true)
-    track.libraryClicked('test-user-123', 'analytics_test')
-    track.guidelinesClicked('test-user-123', 'analytics_test')
-    track.visualAbstractClicked('test-user-123', 'analytics_test')
     track.authMethodSelected('google', 'analytics_test')
     track.openReferencesSidebar('test-user-123', 'analytics_test')
     track.closeReferencesSidebar('test-user-123', 'analytics_test')
@@ -225,8 +202,6 @@ export default function AnalyticsTestPage() {
     track.sharePopupClosed('guideline', 'guideline-123', 'test-user-123', 'analytics_test')
 
     // Engagement events
-    track.dashboardVisited('test-user-123', 'US')
-    track.chatSessionStarted('session-123', 'test-user-123', 'research')
     track.messageSent('session-123', 'test-user-123', 'user', 25)
     track.messageReceived('session-123', 'test-user-123', 1500)
     track.chatSessionEnded('session-123', 'test-user-123', 300, 5)
@@ -235,7 +210,6 @@ export default function AnalyticsTestPage() {
 
     // Content events
     track.guidelineAccessed('guideline-123', 'Hypertension Management', 'test-user-123', 'analytics_test')
-    track.drugInformationViewed('Aspirin', 'drug-456', 'test-user-123', 'analytics_test')
     track.clinicalTrialSearched('diabetes treatment', 15, 'test-user-123', 'analytics_test')
     track.referenceClicked('ref-789', 'journal_article', 'test-user-123', 'analytics_test')
     track.contentShared('guideline', 'guideline-123', 'email', 'test-user-123', 'analytics_test')

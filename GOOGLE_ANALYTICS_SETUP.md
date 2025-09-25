@@ -51,11 +51,7 @@ track.signInAttempted('google', 'google')
 // Page visit tracking
 track.pageVisited('Dashboard', 'authenticated', 'US')
 
-// Custom events
-track.customEvent('button_clicked', {
-  button_name: 'subscribe',
-  page: 'pricing'
-})
+// Custom events - use specific business events instead of generic ones
 
 // User interactions
 track.userInteraction('click', 'cta_button', 'homepage', {
@@ -77,10 +73,8 @@ function MyComponent() {
   const { trackCustomEvent, trackUserAction } = useGA()
 
   const handleClick = () => {
-    trackCustomEvent('custom_event', {
-      action: 'click',
-      element: 'button'
-    })
+    // Use specific business events instead of generic custom events
+    trackUserAction('click', 'button', 'subscribe_button')
   }
 
   return <button onClick={handleClick}>Click me</button>

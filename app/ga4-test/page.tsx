@@ -55,24 +55,8 @@ export default function GA4TestPage() {
   }
 
   const testCustomEvents = () => {
-    // Test custom events
-    trackGA4Event('custom_event_1', {
-      custom_parameter: 'test_value',
-      test_id: 'custom_001'
-    })
-    addResult('✅ custom_event_1 sent')
-
-    trackGA4Event('button_click', {
-      button_name: 'test_button',
-      page: 'ga4_test'
-    })
-    addResult('✅ button_click event sent')
-
-    trackGA4Event('form_submit', {
-      form_name: 'test_form',
-      form_id: 'form_001'
-    })
-    addResult('✅ form_submit event sent')
+    // Test custom events - removed generic custom events
+    addResult('✅ Custom events test removed - using specific business events instead')
   }
 
   const clearResults = () => {
