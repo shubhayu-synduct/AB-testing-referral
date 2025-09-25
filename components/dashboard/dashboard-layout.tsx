@@ -134,7 +134,7 @@ export function DashboardLayout({ children, sessionId, user: propUser }: Dashboa
           toast.success('Link copied to clipboard!');
         }
       } catch (error) {
-        console.error('Error sharing:', error);
+        // console.error('Error sharing:', error);
         // Fallback: copy to clipboard
         try {
           await navigator.clipboard.writeText(window.location.href);
@@ -214,12 +214,12 @@ export function DashboardLayout({ children, sessionId, user: propUser }: Dashboa
           // Debug: Log the state change
           // console.log("Setting showCookieBanner to:", true);
         } else {
-          console.log("User document doesn't exist, showing banner");
+          // console.log("User document doesn't exist, showing banner");
           // User document doesn't exist, show cookie banner
           setShowCookieBanner(true);
         }
       } catch (err) {
-        console.error("Error checking cookie consent:", err);
+        // console.error("Error checking cookie consent:", err);
         logger.error("Error checking cookie consent:", err);
         // On error, show cookie banner as fallback
         setShowCookieBanner(true);
@@ -249,13 +249,13 @@ export function DashboardLayout({ children, sessionId, user: propUser }: Dashboa
             
             // If user is waitlisted, redirect to waitlist
             if (isWaitlisted) {
-              console.log('Waitlisted user detected, redirecting to waitlist');
+              // console.log('Waitlisted user detected, redirecting to waitlist');
               router.push('/waitlist');
             }
           }
         }
       } catch (err) {
-        console.error("Error checking user waitlist status:", err);
+        // console.error("Error checking user waitlist status:", err);
         logger.error("Error checking user waitlist status:", err);
         // On error, allow access (fail-safe)
       }

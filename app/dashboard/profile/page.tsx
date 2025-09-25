@@ -184,7 +184,7 @@ function ProfilePageContent() {
           });
         }
       } catch (error) {
-        console.error('Error fetching profile:', error);
+        // console.error('Error fetching profile:', error);
         // Set default values on error
         setProfile({
           email: user.email,
@@ -470,7 +470,7 @@ function ProfilePageContent() {
       // Redirect to Stripe Checkout
       window.location.href = data.url;
     } catch (err: any) {
-      console.error('Payment error:', err);
+      // console.error('Payment error:', err);
       setError(err.message || 'Failed to process payment');
     } finally {
       setPlanLoading(false);
@@ -540,7 +540,7 @@ function ProfilePageContent() {
       setShowCancelSubscriptionModal(false);
       setCancelConfirmation('');
     } catch (err: any) {
-      console.error('Cancellation error:', err);
+      // console.error('Cancellation error:', err);
       setError(err.message || 'Failed to cancel subscription');
     } finally {
       setCancelling(false);
@@ -619,12 +619,12 @@ function ProfilePageContent() {
             }),
           });
         } catch (emailError) {
-          console.warn('Failed to send delete email:', emailError);
+          // console.warn('Failed to send delete email:', emailError);
           // Don't fail the deletion if email fails
         }
 
         // Use server-side API for deletion (handles Firebase Admin SDK)
-        console.log('Calling server-side delete API...');
+        // console.log('Calling server-side delete API...');
         const deleteResponse = await fetch('/api/delete-profile', {
           method: 'POST',
           headers: {
@@ -642,10 +642,10 @@ function ProfilePageContent() {
           throw new Error(deleteResult.error || 'Failed to delete profile');
         }
 
-        console.log('Server-side deletion successful:', deleteResult);
-        console.log(`Deleted ${deleteResult.deletedUserCount} user document(s) with email ${userEmail}`);
-        console.log(`Deleted ${deleteResult.deletedAuthUserCount} Firebase Auth user(s) with email ${userEmail}`);
-        console.log(`Total accounts deleted: ${deleteResult.totalAccountsDeleted}`);
+        // console.log('Server-side deletion successful:', deleteResult);
+        // console.log(`Deleted ${deleteResult.deletedUserCount} user document(s) with email ${userEmail}`);
+        // console.log(`Deleted ${deleteResult.deletedAuthUserCount} Firebase Auth user(s) with email ${userEmail}`);
+        // console.log(`Total accounts deleted: ${deleteResult.totalAccountsDeleted}`);
         
         // Reset local state immediately
         setProfile(null);
@@ -657,21 +657,21 @@ function ProfilePageContent() {
         
         // Verify cleanup was successful
         const cleanupSuccessful = CleanupService.verifyCleanup();
-        console.log('Cleanup verification:', cleanupSuccessful);
+        // console.log('Cleanup verification:', cleanupSuccessful);
         
         // Redirect to signup page (sign out will be handled there)
-        console.log('Redirecting to signup page...');
+        // console.log('Redirecting to signup page...');
         window.location.replace('/signup?deleted=true');
         
       }
     } catch (error) {
-      console.error('Error deleting profile:', error);
+      // console.error('Error deleting profile:', error);
       
       // Show error message to user
       alert('There was an error deleting your account. Please try again or contact support if the problem persists.');
       
       // Redirect to signup page even on error (before cleanup)
-      console.log('Redirecting to signup page after error...');
+      // console.log('Redirecting to signup page after error...');
       window.location.replace('/signup?deleted=true');
       
       // Even if there's an error, try to perform cleanup after redirect
@@ -682,7 +682,7 @@ function ProfilePageContent() {
           await CleanupService.performCompleteCleanup(user.uid, user.email || 'unknown@example.com');
         }
       } catch (cleanupError) {
-        console.error('Error during cleanup after deletion failure:', cleanupError);
+        // console.error('Error during cleanup after deletion failure:', cleanupError);
       }
     } finally {
       setDeleting(false);

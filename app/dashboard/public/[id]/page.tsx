@@ -92,13 +92,13 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
         }
 
         const data = chatDoc.data() as PublicChatData;
-        console.log("Public chat data:", data);
+        // console.log("Public chat data:", data);
         setChatData(data);
 
         // Convert threads to messages format
         const convertedMessages: ChatMessage[] = [];
         data.threads.forEach((thread, index) => {
-          console.log(`Thread ${index}:`, thread);
+          // console.log(`Thread ${index}:`, thread);
           
           // Add user message
           convertedMessages.push({
@@ -112,8 +112,8 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
 
           // Add assistant message if it exists
           if (thread.bot_response.content) {
-            console.log(`Thread ${index} bot response:`, thread.bot_response);
-            console.log(`Thread ${index} SVG content:`, thread.bot_response.svg_content);
+            // console.log(`Thread ${index} bot response:`, thread.bot_response);
+            // console.log(`Thread ${index} SVG content:`, thread.bot_response.svg_content);
             
             convertedMessages.push({
               id: `assistant-${index}`,
@@ -131,7 +131,7 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
           }
         });
 
-        console.log("Converted messages:", convertedMessages);
+        // console.log("Converted messages:", convertedMessages);
         setMessages(convertedMessages);
 
         // Set active citations from the last assistant message
@@ -186,7 +186,7 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
     const trimmedContent = content.trim();
     const isSvg = trimmedContent.startsWith('<svg') || trimmedContent.startsWith('<?xml');
     if (isSvg) {
-      console.log('[SVG_DETECTION] Detected SVG content:', trimmedContent.substring(0, 100) + '...');
+      // console.log('[SVG_DETECTION] Detected SVG content:', trimmedContent.substring(0, 100) + '...');
     }
     return isSvg;
   };
@@ -200,7 +200,7 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
       const svgElement = container.querySelector('svg');
       
       if (!svgElement) {
-        console.error('No SVG element found in content');
+        // console.error('No SVG element found in content');
         return;
       }
 
@@ -251,13 +251,13 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
       };
 
       img.onerror = () => {
-        console.error('Failed to load SVG image');
+        // console.error('Failed to load SVG image');
         URL.revokeObjectURL(svgUrl);
       };
 
       img.src = svgUrl;
     } catch (error) {
-      console.error('Error downloading SVG as PNG:', error);
+      // console.error('Error downloading SVG as PNG:', error);
     }
   };
 
@@ -556,11 +556,11 @@ function PublicChatContent({ params }: { params: Promise<{ id: string }> }) {
 
   // Debug effect to log messages and their SVG content
   useEffect(() => {
-    console.log("Messages updated:", messages);
+    // console.log("Messages updated:", messages);
     messages.forEach((msg, index) => {
       if (msg.type === 'assistant' && msg.answer) {
-        console.log(`Message ${index} SVG content:`, msg.answer.svg_content);
-        console.log(`Message ${index} has SVG content:`, !!(msg.answer.svg_content && msg.answer.svg_content.length > 0));
+        // console.log(`Message ${index} SVG content:`, msg.answer.svg_content);
+        // console.log(`Message ${index} has SVG content:`, !!(msg.answer.svg_content && msg.answer.svg_content.length > 0));
       }
     });
   }, [messages]);

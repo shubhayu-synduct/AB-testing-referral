@@ -17,9 +17,9 @@ export default function SEOMonitor() {
       const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6')
       const h1Count = document.querySelectorAll('h1').length
       if (h1Count === 0) {
-        console.warn('No H1 tag found on page')
+        // console.warn('No H1 tag found on page')
       } else if (h1Count > 1) {
-        console.warn(`Found ${h1Count} H1 tags, should only have one`)
+        // console.warn(`Found ${h1Count} H1 tags, should only have one`)
       }
 
       // Check for internal links

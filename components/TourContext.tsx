@@ -75,7 +75,7 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
   const startTour = useCallback(() => {
     // Check if user has already completed or skipped the tour
     if (checkTourPreference()) {
-      console.log('Tour already completed or skipped, not starting');
+      // console.log('Tour already completed or skipped, not starting');
       return;
     }
     
@@ -210,7 +210,7 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
           }
         };
       } catch (error) {
-        console.warn('Error setting up scroll prevention:', error);
+        // console.warn('Error setting up scroll prevention:', error);
         // If scroll prevention fails, just return a no-op cleanup function
         return () => {};
       }
@@ -596,7 +596,7 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
   const startTour = useCallback(() => {
     // Check if user has already completed or skipped the tour
     if (checkTourPreference()) {
-      console.log('DrinfoSummary tour already completed or skipped, not starting');
+      // console.log('DrinfoSummary tour already completed or skipped, not starting');
       return;
     }
     
@@ -626,7 +626,7 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
 
   const handleJoyrideCallback = (data: any) => {
     const { status, index, type, action } = data;
-    console.log('DrinfoSummaryTour callback:', { status, index, type, action });
+    // console.log('DrinfoSummaryTour callback:', { status, index, type, action });
     
     if (status === "finished") {
       saveTourPreference('completed');
@@ -636,10 +636,10 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
       setRun(false);
     } else if (type === "step:after") {
       if (action === "prev") {
-        console.log('Back button clicked, going from step', index, 'to step', Math.max(0, index - 1));
+        // console.log('Back button clicked, going from step', index, 'to step', Math.max(0, index - 1));
         setStepIndex(Math.max(0, index - 1));
       } else if (action === "next") {
-        console.log('Next button clicked, going from step', index, 'to step', index + 1);
+        // console.log('Next button clicked, going from step', index, 'to step', index + 1);
         setStepIndex(index + 1);
       }
     }
@@ -647,7 +647,7 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
 
   // Custom back button handler
   const handleBackButton = useCallback(() => {
-    console.log('Custom back button handler, current step:', stepIndex, 'going to:', Math.max(0, stepIndex - 1));
+    // console.log('Custom back button handler, current step:', stepIndex, 'going to:', Math.max(0, stepIndex - 1));
     setStepIndex(Math.max(0, stepIndex - 1));
   }, [stepIndex]);
 
@@ -739,7 +739,7 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
           }
         };
       } catch (error) {
-        console.warn('Error setting up scroll prevention:', error);
+        // console.warn('Error setting up scroll prevention:', error);
         // If scroll prevention fails, just return a no-op cleanup function
         return () => {};
       }

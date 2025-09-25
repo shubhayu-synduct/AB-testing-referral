@@ -82,7 +82,7 @@ async function sendEmailWithRetry(emailData: any, retries = 0): Promise<boolean>
     await resend.emails.send(emailData);
     return true;
   } catch (error) {
-    console.error(`Email send attempt ${retries + 1} failed:`, error);
+    // console.error(`Email send attempt ${retries + 1} failed:`, error);
     
     if (retries < RATE_LIMIT.maxRetries) {
       await new Promise(resolve => setTimeout(resolve, RATE_LIMIT.retryDelay * (retries + 1)));
@@ -105,7 +105,7 @@ async function logAnalyticsEvent(eventName: string, data: any) {
       environment: process.env.NODE_ENV || 'development'
     });
   } catch (error) {
-    console.error("Error logging analytics event:", error);
+    // console.error("Error logging analytics event:", error);
     // Don't throw - analytics logging shouldn't break main functionality
   }
 }
@@ -119,7 +119,7 @@ export async function GET() {
   try {
     // Check rate limits
     if (!checkRateLimit()) {
-      console.warn("Rate limit exceeded");
+      // console.warn("Rate limit exceeded");
       return Response.json({ 
         error: "Rate limit exceeded",
         hourlyCount: emailCounts.hourly,
@@ -132,7 +132,7 @@ export async function GET() {
       .where("emailAutomationStatus", "==", "active")
       .get();
 
-    console.log(`Processing ${snapshot.docs.length} active users`);
+    // console.log(`Processing ${snapshot.docs.length} active users`);
 
     for (const doc of snapshot.docs) {
       const user = doc.data();
@@ -154,7 +154,7 @@ export async function GET() {
         } else {
           // Fallback to current date if signupDate is missing
           signupDate = new Date();
-          console.warn(`Missing emailAutomationSignupDate for user ${user.email}, using current date as fallback`);
+          // console.warn(`Missing emailAutomationSignupDate for user ${user.email}, using current date as fallback`);
         }
 
         // Calculate days since signup
@@ -172,13 +172,13 @@ export async function GET() {
           const template = emailTemplates[nextEmailDay as keyof typeof emailTemplates];
 
           if (!template) {
-            console.warn(`No template found for day ${nextEmailDay}`);
+            // console.warn(`No template found for day ${nextEmailDay}`);
             continue;
           }
 
           // Check rate limits again before sending
           if (!checkRateLimit()) {
-            console.warn("Rate limit reached during processing");
+            // console.warn("Rate limit reached during processing");
             break;
           }
 
@@ -208,7 +208,7 @@ export async function GET() {
               updatedAt: admin.firestore.Timestamp.fromDate(new Date())
             });
 
-            console.log(`Sent Day ${nextEmailDay} email to ${user.email}`);
+            // console.log(`Sent Day ${nextEmailDay} email to ${user.email}`);
             emailsSent++;
             emailCounts.hourly++;
             emailCounts.daily++;
@@ -230,12 +230,12 @@ export async function GET() {
         } else if (user.emailDay >= 7) {
           // User has completed the 6-day sequence (Day 2-7)
           skippedUsers++;
-          console.log(`User ${user.email} has completed email sequence (day ${user.emailDay})`);
+          // console.log(`User ${user.email} has completed email sequence (day ${user.emailDay})`);
         } else {
           skippedUsers++;
         }
       } catch (error) {
-        console.error(`Error processing user ${user.email}:`, error);
+        // console.error(`Error processing user ${user.email}:`, error);
         errors.push({ 
           email: user.email, 
           error: error instanceof Error ? error.message : "Unknown error" 
@@ -246,7 +246,7 @@ export async function GET() {
     const processingTime = Date.now() - startTime;
 
     // Log summary
-    console.log(`Email automation completed: ${emailsSent} sent, ${errors.length} errors, ${skippedUsers} skipped, ${processingTime}ms`);
+    // console.log(`Email automation completed: ${emailsSent} sent, ${errors.length} errors, ${skippedUsers} skipped, ${processingTime}ms`);
 
     // Log analytics for the run
     await logAnalyticsEvent('email_automation_run', {
@@ -270,7 +270,7 @@ export async function GET() {
       }
     });
   } catch (error) {
-    console.error("Email automation error:", error);
+    // console.error("Email automation error:", error);
     
     // Log error
     await logAnalyticsEvent('email_automation_error', {

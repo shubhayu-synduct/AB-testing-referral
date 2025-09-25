@@ -252,7 +252,7 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
           logger.error("Error fetching user profile:", error);
         }
       } else {
-        console.log('No user authenticated');
+        // console.log('No user authenticated');
         // Handle URL search even when not authenticated
         const urlQuery = searchParams.get('q')
         if (urlQuery) {
@@ -532,17 +532,17 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
 
   const toggleBookmark = async (guideline: Guideline) => {
     if (bookmarkingGuidelines.has(guideline.id)) {
-      console.log('Bookmark operation already in progress for guideline:', guideline.id);
+      // console.log('Bookmark operation already in progress for guideline:', guideline.id);
       return; // Prevent multiple simultaneous operations
     }
     
     if (!user?.uid) {
-      console.log('User not authenticated');
+      // console.log('User not authenticated');
       return;
     }
     
     try {
-      console.log('Starting bookmark operation for guideline:', guideline.id);
+      // console.log('Starting bookmark operation for guideline:', guideline.id);
       setBookmarkingGuidelines(prev => new Set([...prev, guideline.id]));
       
       const wasBookmarked = isBookmarked(guideline);
@@ -564,11 +564,11 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
         await saveBookmark(guideline);
       }
     } catch (error) {
-      console.error('Error toggling bookmark:', error);
+      // console.error('Error toggling bookmark:', error);
       logger.error('Error toggling bookmark:', error);
       // You could add a toast notification here for user feedback
     } finally {
-      console.log('Bookmark operation completed, resetting state');
+      // console.log('Bookmark operation completed, resetting state');
       setBookmarkingGuidelines(prev => new Set([...prev].filter(id => id !== guideline.id)));
     }
   }
@@ -608,7 +608,7 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
         Object.entries(bookmarkData).filter(([_, value]) => value !== undefined)
       ) as Bookmark;
       
-      console.log('Saving bookmark data:', cleanBookmarkData);
+      // console.log('Saving bookmark data:', cleanBookmarkData);
       
       await updateDoc(userRef, {
         bookmarks: arrayUnion(cleanBookmarkData)

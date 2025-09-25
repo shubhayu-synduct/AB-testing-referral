@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
       fullUserData: userData
     });
   } catch (error: any) {
-    console.error('Test subscription error:', error);
+    // console.error('Test subscription error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch user data' },
       { status: 500 }

@@ -32,7 +32,7 @@ export default function SubscriptionStatus() {
 
       setStatus(data);
     } catch (err: any) {
-      console.error('Error fetching subscription status:', err);
+      // console.error('Error fetching subscription status:', err);
       setError(err.message);
     } finally {
       setLoading(false);

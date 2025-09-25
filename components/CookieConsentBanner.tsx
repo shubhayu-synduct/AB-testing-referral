@@ -52,7 +52,7 @@ export function CookieConsentBanner({ onConsentUpdate, forceShow }: CookieConsen
         
         setShowBanner(false) // Don't show banner if already consented
       } catch (error) {
-        console.error('Error parsing cookie consent:', error)
+        // console.error('Error parsing cookie consent:', error)
         // If there's an error parsing, show the banner
         setShowBanner(true)
       }

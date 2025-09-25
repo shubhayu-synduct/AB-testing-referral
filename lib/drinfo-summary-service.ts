@@ -208,7 +208,7 @@ export async function fetchDrInfoSummary(
      }
   finally{
 
-    console.log("Request completed");
+    // console.log("Request completed");
   }
 }
 

@@ -23,12 +23,12 @@ function SignUpContent() {
           const { getFirebaseAuth } = await import("@/lib/firebase")
           const auth = await getFirebaseAuth()
           if (auth && auth.currentUser) {
-            console.log('Signing out user after account deletion...')
+            // console.log('Signing out user after account deletion...')
             await auth.signOut()
-            console.log('User signed out successfully')
+            // console.log('User signed out successfully')
           }
         } catch (error) {
-          console.error('Error signing out user:', error)
+          // console.error('Error signing out user:', error)
         }
       }
       

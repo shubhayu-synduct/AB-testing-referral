@@ -56,11 +56,11 @@ export function processStreamingContent(content: string): string {
   if (content.includes('```html') || (content.includes('```') && /<[a-z][\s\S]*>/i.test(content))) {
     // If HTML content is detected, extract and render it directly
     // This bypasses markdown parsing for HTML content during streaming
-    console.log('[STREAMING] HTML content detected, bypassing markdown parsing');
+    // console.log('[STREAMING] HTML content detected, bypassing markdown parsing');
     return extractAndRenderHtml(content);
   } else {
     // If no HTML content, process as regular markdown
-    console.log('[STREAMING] No HTML content, processing as markdown');
+    // console.log('[STREAMING] No HTML content, processing as markdown');
     return content;
   }
 }

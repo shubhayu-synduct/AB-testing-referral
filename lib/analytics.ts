@@ -20,19 +20,19 @@ export const checkUserCookieConsent = async (userId: string) => {
           analytics
         }
       } else {
-        console.log('No cookie consent data found, analytics: false');
+        // console.log('No cookie consent data found, analytics: false');
         return {
           analytics: false
         };
       }
     } else {
-      console.log('User document does not exist, analytics: false');
+      // console.log('User document does not exist, analytics: false');
       return {
         analytics: false
       };
     }
   } catch (error) {
-    console.error("Error checking cookie consent:", error);
+    // console.error("Error checking cookie consent:", error);
     return {
       analytics: false,
     };
@@ -48,7 +48,7 @@ export const checkCurrentUserCookieConsent = async () => {
     
     const auth = await getFirebaseAuth();
     if (!auth) {
-      console.log('Auth not available');
+      // console.log('Auth not available');
       return { analytics: false };
     }
 
@@ -62,11 +62,17 @@ export const checkCurrentUserCookieConsent = async () => {
     return await checkUserCookieConsent(currentUser.uid);
     
   } catch (error) {
-    console.error("Error checking current user cookie consent:", error);
+    // console.error("Error checking current user cookie consent:", error);
     return { analytics: false };
   }
 }
 
+// Example usage - call this function when you need to check consent
+export const getCurrentUserConsent = async () => {
+  const result = await checkCurrentUserCookieConsent();
+  // console.log('Current user analytics consent:', result.analytics);
+  return result;
+};
 // Global variable to store analytics consent
 export let globalAnalyticsConsent: boolean = false;
 

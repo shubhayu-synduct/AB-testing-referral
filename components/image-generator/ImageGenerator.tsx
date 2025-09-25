@@ -111,7 +111,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.error(`Image generation failed with status ${response.status}:`, errorText)
+        // console.error(`Image generation failed with status ${response.status}:`, errorText)
         throw new Error(`Image generation failed with status ${response.status}`)
       }
 
@@ -158,7 +158,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
         throw new Error(data.message || data.error || 'Failed to generate visual abstract')
       }
     } catch (err) {
-      console.error('Error generating visual abstract:', err)
+      // console.error('Error generating visual abstract:', err)
       setError('Failed to generate visual abstract. Please try again.')
       setImageGenerationStatus('idle')
       
@@ -195,7 +195,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
         }
       }, { merge: true })
       
-      console.log('Feedback saved to Firebase successfully')
+      // console.log('Feedback saved to Firebase successfully')
       setShowFeedback(false)
       setFeedbackData({
         useCase: [] as string[],
@@ -211,7 +211,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
       toast.success('Thank you for your feedback!')
       setFeedbackSubmitted(true)
     } catch (error) {
-      console.error('Error saving feedback to Firebase:', error)
+      // console.error('Error saving feedback to Firebase:', error)
       toast.error('Failed to save feedback. Please try again.')
     }
   }
@@ -231,10 +231,10 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
         }
       })
       
-      console.log('SVG saved to Firebase successfully')
+      // console.log('SVG saved to Firebase successfully')
       return threadId
     } catch (error) {
-      console.error('Error saving SVG to Firebase:', error)
+      // console.error('Error saving SVG to Firebase:', error)
       return null
     }
   }
@@ -249,7 +249,7 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
       const svgElement = container.querySelector('svg')
       
       if (!svgElement) {
-        console.error('No SVG element found in content')
+        // console.error('No SVG element found in content')
         return
       }
 
@@ -309,13 +309,13 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
       }
 
       img.onerror = () => {
-        console.error('Failed to load SVG image')
+        // console.error('Failed to load SVG image')
         URL.revokeObjectURL(svgUrl)
       }
 
       img.src = svgUrl
     } catch (error) {
-      console.error('Error downloading SVG as PNG:', error)
+      // console.error('Error downloading SVG as PNG:', error)
     }
   }
 
@@ -430,11 +430,11 @@ export function ImageGenerator({ user }: ImageGeneratorProps) {
         </div>
         
         {/* Disclaimer */}
-        <div className="mt-4 p-2">
+        {/* <div className="mt-4 p-2">
           <p className="text-md text-gray-700 font-['DM_Sans'] text-center">
             <span className="font-bold">Beta:</span> This feature is currently in testing and may contain mistakes.
           </p>
-        </div>
+        </div> */}
       </div>
 
       {/* Feedback Toggle Button */}

@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
             }
           }
         } catch (error) {
-          console.error(`Error checking session ${logData.sessionId}:`, error);
+          // console.error(`Error checking session ${logData.sessionId}:`, error);
         }
       }
 
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
     }
 
   } catch (error: any) {
-    console.error('Error in cleanup-subscriptions:', error);
+    // console.error('Error in cleanup-subscriptions:', error);
     return NextResponse.json({
       error: error.message || 'Unknown error'
     }, { status: 500 });

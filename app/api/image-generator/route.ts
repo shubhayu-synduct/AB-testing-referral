@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error in visual abstract generation API:', error)
+    // console.error('Error in visual abstract generation API:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

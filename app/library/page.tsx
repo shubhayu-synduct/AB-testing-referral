@@ -181,11 +181,11 @@ export default function LibraryPage() {
 
   const fetchVisualAbstracts = async (isLoadMore = false) => {
     if (!user) {
-      console.log('No user found, cannot fetch visual abstracts')
+      // console.log('No user found, cannot fetch visual abstracts')
       return
     }
 
-    console.log('Fetching visual abstracts for user:', user.uid)
+    // console.log('Fetching visual abstracts for user:', user.uid)
     
     try {
       setLoadingMore(isLoadMore)
@@ -193,14 +193,14 @@ export default function LibraryPage() {
       
       // Log the collection path we're querying
       const collectionPath = `visual_abstracts/${user.uid}/visuals`
-      console.log('Querying collection path:', collectionPath)
+      // console.log('Querying collection path:', collectionPath)
       
       // First, let's check if the collection exists by trying to get a simple snapshot
       try {
         const testSnapshot = await getDocs(collection(db, 'visual_abstracts', user.uid, 'visuals'))
-        console.log('Collection exists, total documents:', testSnapshot.size)
+        // console.log('Collection exists, total documents:', testSnapshot.size)
       } catch (testErr) {
-        console.log('Collection test failed:', testErr)
+        // console.log('Collection test failed:', testErr)
       }
       
       let q = query(
@@ -218,20 +218,20 @@ export default function LibraryPage() {
         )
       }
 
-      console.log('Executing query...')
+      // console.log('Executing query...')
       const querySnapshot = await getDocs(q)
-      console.log('Query result:', querySnapshot.size, 'documents found')
+      // console.log('Query result:', querySnapshot.size, 'documents found')
       
       const newAbstracts: VisualAbstract[] = []
       const seenIds = new Set<string>()
       
       querySnapshot.forEach((doc) => {
         const data = doc.data()
-        console.log('Document data:', doc.id, data)
+        // console.log('Document data:', doc.id, data)
         
         // Skip if we've already seen this ID
         if (seenIds.has(doc.id)) {
-          console.log('Skipping duplicate ID:', doc.id)
+          // console.log('Skipping duplicate ID:', doc.id)
           return
         }
         
@@ -250,7 +250,7 @@ export default function LibraryPage() {
         } as VisualAbstract)
       })
 
-      console.log('Processed abstracts:', newAbstracts.length)
+      // console.log('Processed abstracts:', newAbstracts.length)
 
       if (isLoadMore) {
         setVisualAbstracts(prev => {
@@ -274,7 +274,7 @@ export default function LibraryPage() {
       setHasMore(querySnapshot.docs.length === 12)
       setError(null)
     } catch (err) {
-      console.error('Error fetching visual abstracts:', err)
+      // console.error('Error fetching visual abstracts:', err)
       setError('Failed to load visual abstracts. Please try again.')
     } finally {
       setLoading(false)
@@ -283,7 +283,7 @@ export default function LibraryPage() {
   }
 
   useEffect(() => {
-    console.log('useEffect triggered, user:', user)
+    // console.log('useEffect triggered, user:', user)
     if (user) {
       // Track library page view
       track.libraryPageViewed(user.uid, 'library')
@@ -291,7 +291,7 @@ export default function LibraryPage() {
       // console.log('User authenticated, fetching visual abstracts...')
       fetchVisualAbstracts()
     } else {
-      console.log('No user yet, waiting for authentication...')
+      // console.log('No user yet, waiting for authentication...')
     }
   }, [user])
 
@@ -303,7 +303,7 @@ export default function LibraryPage() {
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting && hasMore && !loadingMore) {
-            console.log('Load more trigger detected')
+            // console.log('Load more trigger detected')
             fetchVisualAbstracts(true)
           }
         })
@@ -381,7 +381,7 @@ export default function LibraryPage() {
 
         setChatSessions(sessions)
       } catch (err) {
-        console.error("Error fetching chat sessions:", err)
+        // console.error("Error fetching chat sessions:", err)
         setChatHistoryError("Failed to load chat history")
       } finally {
         setChatHistoryLoading(false)
@@ -411,7 +411,7 @@ export default function LibraryPage() {
           setSavedGuidelines(bookmarks)
         }
       } catch (err) {
-        console.error("Error fetching saved guidelines:", err)
+        // console.error("Error fetching saved guidelines:", err)
         setSavedGuidelinesError("Failed to load saved guidelines")
       } finally {
         setSavedGuidelinesLoading(false)
@@ -451,9 +451,9 @@ export default function LibraryPage() {
         setVisualAbstracts(prev => prev.filter(abstract => abstract.id !== abstractId))
         
         // Show success message (you can add a toast notification here)
-        console.log('Visual abstract deleted successfully')
+        // console.log('Visual abstract deleted successfully')
       } catch (error) {
-        console.error('Error deleting visual abstract:', error)
+        // console.error('Error deleting visual abstract:', error)
         alert('Failed to delete visual abstract. Please try again.')
       }
     }
@@ -531,7 +531,7 @@ export default function LibraryPage() {
       
       setChatSessions(prev => prev.filter(session => session.id !== sessionId))
     } catch (err) {
-      console.error("Error deleting chat session:", err)
+      // console.error("Error deleting chat session:", err)
       setChatHistoryError("Failed to delete chat. Please try again.")
     }
   }
@@ -577,9 +577,9 @@ export default function LibraryPage() {
         setSelectedAbstracts(new Set())
         setIsSelectMode(false)
         
-        console.log('Bulk delete successful')
+        // console.log('Bulk delete successful')
       } catch (error) {
-        console.error('Error during bulk delete:', error)
+        // console.error('Error during bulk delete:', error)
         alert('Failed to delete some visual abstracts. Please try again.')
       }
     }
@@ -727,9 +727,9 @@ export default function LibraryPage() {
       // Update local state
       setSavedGuidelines(updatedBookmarks)
       
-      console.log('Bookmark removed successfully')
+      // console.log('Bookmark removed successfully')
     } catch (error) {
-      console.error('Error removing bookmark:', error)
+      // console.error('Error removing bookmark:', error)
       alert('Failed to remove bookmark. Please try again.')
     }
   }

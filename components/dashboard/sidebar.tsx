@@ -30,9 +30,10 @@ import { track } from '@/lib/analytics'
 interface SidebarProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
+  onSignupRequired?: () => void;
 }
 
-export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
+export function Sidebar({ isOpen, setIsOpen, onSignupRequired }: SidebarProps) {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
@@ -204,6 +205,10 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                 <button
                   className="flex items-center justify-center w-full rounded-md p-2 border border-solid border-[#cecece] hover:bg-gray-50 sidebar-new-search"
                   onClick={() => {
+                    if (!user && onSignupRequired) {
+                      onSignupRequired();
+                      return;
+                    }
                     router.push("/dashboard");
                     if (window.innerWidth < 768) {
                       setIsOpen(false);
@@ -217,7 +222,12 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
               <Link
                 href="/dashboard"
-                onClick={() => {
+                onClick={(e) => {
+                  if (!user && onSignupRequired) {
+                    e.preventDefault();
+                    onSignupRequired();
+                    return;
+                  }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);
                   }
@@ -250,7 +260,12 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
               <Link 
                 href="/guidelines"
-                onClick={() => {
+                onClick={(e) => {
+                  if (!user && onSignupRequired) {
+                    e.preventDefault();
+                    onSignupRequired();
+                    return;
+                  }
                   if (user) {
                   }
                   if (window.innerWidth < 768) {
@@ -281,7 +296,12 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
               <Link 
                 href="/drug-information"
-                onClick={() => {
+                onClick={(e) => {
+                  if (!user && onSignupRequired) {
+                    e.preventDefault();
+                    onSignupRequired();
+                    return;
+                  }
                   if (user) {
                   }
                   if (window.innerWidth < 768) {
@@ -304,7 +324,12 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
               <Link 
                 href="/image-generator"
-                onClick={() => {
+                onClick={(e) => {
+                  if (!user && onSignupRequired) {
+                    e.preventDefault();
+                    onSignupRequired();
+                    return;
+                  }
                   if (user) {
                   }
                   if (window.innerWidth < 768) {
@@ -325,7 +350,12 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
               <Link 
                 href="/library"
-                onClick={() => {
+                onClick={(e) => {
+                  if (!user && onSignupRequired) {
+                    e.preventDefault();
+                    onSignupRequired();
+                    return;
+                  }
                   if (user) {
                   }
                   if (window.innerWidth < 768) {
@@ -381,6 +411,10 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
             <div className="relative">
               <button
                 onClick={() => {
+                  if (!user && onSignupRequired) {
+                    onSignupRequired();
+                    return;
+                  }
                   if (!isOpen) {
                     setIsOpen(true);
                   }

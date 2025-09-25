@@ -49,7 +49,7 @@ if (typeof window !== 'undefined') {
       // Check if user already exists and is enrolled in email automation
       const existingUser = await getUserEmailStatus(userData.email);
       if (existingUser && existingUser.status === 'active') {
-        console.log(`User ${userData.email} already enrolled in email automation system`);
+        // console.log(`User ${userData.email} already enrolled in email automation system`);
         return {
           success: true,
           message: "User already enrolled in email automation",
@@ -71,7 +71,7 @@ if (typeof window !== 'undefined') {
       // Check if user already has email automation fields
       const existingData = userDoc.data();
       if (existingData.emailDay !== undefined && existingData.emailAutomationStatus === 'active') {
-        console.log(`User ${userData.email} already has active email automation fields`);
+        // console.log(`User ${userData.email} already has active email automation fields`);
         return {
           success: true,
           message: "User already has active email automation fields",
@@ -93,7 +93,7 @@ if (typeof window !== 'undefined') {
         updatedAt: admin.firestore.Timestamp.fromDate(new Date())
       });
   
-      console.log(`User ${userData.email} added to email automation system with ID: ${userId}`);
+      // console.log(`User ${userData.email} added to email automation system with ID: ${userId}`);
       
       // Log analytics event
       await logAnalyticsEvent('user_added_to_email_automation', {
@@ -108,7 +108,7 @@ if (typeof window !== 'undefined') {
         userId: userId
       };
     } catch (error) {
-      console.error("Error adding user to email automation:", error);
+      // console.error("Error adding user to email automation:", error);
       
       // Log error for monitoring
       await logError('add_user_to_email_automation', error, {
@@ -143,11 +143,11 @@ if (typeof window !== 'undefined') {
         lastEmailSent: emailDay > 0 ? admin.firestore.Timestamp.fromDate(new Date()) : null
       });
   
-      console.log(`Updated email day to ${emailDay} for user ${email}`);
+      // console.log(`Updated email day to ${emailDay} for user ${email}`);
       
       return { success: true, message: "Email day updated" };
     } catch (error) {
-      console.error("Error updating user email day:", error);
+      // console.error("Error updating user email day:", error);
       throw error;
     }
   }
@@ -198,7 +198,7 @@ if (typeof window !== 'undefined') {
       } else {
         // Fallback to current date if signupDate is missing
         signupDate = new Date();
-        console.warn(`Missing emailAutomationSignupDate for user ${email}, using current date as fallback`);
+        // console.warn(`Missing emailAutomationSignupDate for user ${email}, using current date as fallback`);
       }
   
       const daysSinceSignup = Math.floor(
@@ -220,7 +220,7 @@ if (typeof window !== 'undefined') {
         userId: snapshot.docs[0].id
       };
     } catch (error) {
-      console.error("Error getting user email status:", error);
+      // console.error("Error getting user email status:", error);
       throw error;
     }
   }
@@ -245,7 +245,7 @@ if (typeof window !== 'undefined') {
         unsubscribedAt: admin.firestore.Timestamp.fromDate(new Date())
       });
   
-      console.log(`User ${email} removed from email automation`);
+      // console.log(`User ${email} removed from email automation`);
       
       // Log analytics event
       await logAnalyticsEvent('user_unsubscribed', {
@@ -255,7 +255,7 @@ if (typeof window !== 'undefined') {
       
       return { success: true, message: "User removed from email automation" };
     } catch (error) {
-      console.error("Error removing user from email automation:", error);
+      // console.error("Error removing user from email automation:", error);
       throw error;
     }
   }
@@ -284,7 +284,7 @@ if (typeof window !== 'undefined') {
   
       return stats;
     } catch (error) {
-      console.error("Error getting email automation stats:", error);
+      // console.error("Error getting email automation stats:", error);
       throw error;
     }
   }
@@ -308,11 +308,11 @@ if (typeof window !== 'undefined') {
       });
   
       await batch.commit();
-      console.log(`Cleaned up ${inactiveUsers.docs.length} inactive users`);
+      // console.log(`Cleaned up ${inactiveUsers.docs.length} inactive users`);
       
       return { success: true, message: `Cleaned up ${inactiveUsers.docs.length} inactive users` };
     } catch (error) {
-      console.error("Error cleaning up inactive users:", error);
+      // console.error("Error cleaning up inactive users:", error);
       throw error;
     }
   }
@@ -329,7 +329,7 @@ if (typeof window !== 'undefined') {
         environment: process.env.NODE_ENV || 'development'
       });
     } catch (error) {
-      console.error("Error logging analytics event:", error);
+      // console.error("Error logging analytics event:", error);
       // Don't throw - analytics logging shouldn't break main functionality
     }
   }
@@ -353,7 +353,7 @@ if (typeof window !== 'undefined') {
         environment: process.env.NODE_ENV || 'development'
       });
     } catch (logError) {
-      console.error("Error logging error:", logError);
+      // console.error("Error logging error:", logError);
       // Don't throw - error logging shouldn't break main functionality
     }
   } 

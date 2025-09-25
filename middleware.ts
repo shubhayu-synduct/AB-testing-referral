@@ -138,7 +138,7 @@ export async function middleware(request: NextRequest) {
   if (!GEO_FENCING_ENABLED) {
     // Geo-fencing is disabled, skip to auth logic
     // Log for monitoring
-    console.log('ℹ️ Geo-fencing disabled, allowing all countries:', { country, path })
+    // console.log('ℹ️ Geo-fencing disabled, allowing all countries:', { country, path })
   } else {
     // Step 3: Check if country is blocked and path is not whitelisted
     const countryBlocked = isCountryBlocked(country)
@@ -146,19 +146,19 @@ export async function middleware(request: NextRequest) {
 
     // Log geo-detection for monitoring (only in production)
     if (process.env.NODE_ENV === 'production') {
-      console.log('🌍 Geo-detection:', { country, path, blocked: countryBlocked, whitelisted: pathWhitelisted })
+      // console.log('🌍 Geo-detection:', { country, path, blocked: countryBlocked, whitelisted: pathWhitelisted })
     }
 
     // Step 4: Block if country is blocked AND path is not whitelisted
     if (countryBlocked && !pathWhitelisted) {
       // Log the blocked attempt
-      console.log('🚫 Geo-fence block:', {
-        country,
-        path,
-        userAgent: request.headers.get('user-agent') || 'Unknown',
-        ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'Unknown',
-        timestamp: new Date().toISOString()
-      })
+      // console.log('🚫 Geo-fence block:', {
+      //   country,
+      //   path,
+      //   userAgent: request.headers.get('user-agent') || 'Unknown',
+      //   ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'Unknown',
+      //   timestamp: new Date().toISOString()
+      // })
 
       // Return blocked page with proper headers
       return new NextResponse(generateBlockedPage(country), {

@@ -6,15 +6,15 @@ import { logger } from '@/lib/logger';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 if (!GEMINI_API_KEY) {
-  console.error('GEMINI_API_KEY is not configured on server-side');
-  console.error('Available env vars:', Object.keys(process.env).filter(key => key.includes('GEMINI')));
+  // console.error('GEMINI_API_KEY is not configured on server-side');
+  // console.error('Available env vars:', Object.keys(process.env).filter(key => key.includes('GEMINI')));
 }
 
 let ai: GoogleGenAI | null = null;
 try {
   ai = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 } catch (initError) {
-  console.error('Failed to initialize GoogleGenAI:', initError);
+  // console.error('Failed to initialize GoogleGenAI:', initError);
 }
 
 export async function POST(request: NextRequest) {
@@ -189,13 +189,13 @@ Each suggestion MUST be a real, specific pharmaceutical name or active substance
       return NextResponse.json({ suggestions: fallbackSuggestions });
     }
   } catch (error) {
-    console.error('Error generating drug suggestions:', error);
-    console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      apiKeyExists: !!GEMINI_API_KEY,
-      aiInitialized: !!ai
-    });
+    // console.error('Error generating drug suggestions:', error);
+    // console.error('Error details:', {
+    //   message: error instanceof Error ? error.message : 'Unknown error',
+    //   stack: error instanceof Error ? error.stack : undefined,
+    //   apiKeyExists: !!GEMINI_API_KEY,
+    //   aiInitialized: !!ai
+    // });
     return NextResponse.json(
       { 
         error: 'Failed to generate drug suggestions',

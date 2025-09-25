@@ -60,12 +60,58 @@ export function NotSignedInDrInfoSummary() {
   const [imageGenerationStatus, setImageGenerationStatus] = useState<'idle' | 'generating' | 'complete'>('idle')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isAuthChecked, setIsAuthChecked] = useState(false)
+  const [showSignupModal, setShowSignupModal] = useState(false)
   
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const router = useRouter()
   const contentRef = useRef<HTMLDivElement>(null)
   const inputAnchorRef = useRef<HTMLDivElement>(null)
+
+  // Cache cleanup function
+  const cleanupCache = () => {
+    try {
+      const keys = Object.keys(sessionStorage);
+      const cacheKeys = keys.filter(key => key.startsWith('drinfo_cache_'));
+      const now = Date.now();
+      const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+      
+      cacheKeys.forEach(key => {
+        try {
+          const data = JSON.parse(sessionStorage.getItem(key) || '{}');
+          if (data.timestamp && (now - data.timestamp) > maxAge) {
+            sessionStorage.removeItem(key);
+            logger.debug("Removed expired cache:", key);
+          }
+        } catch (error) {
+          // Remove corrupted cache entries
+          sessionStorage.removeItem(key);
+          logger.debug("Removed corrupted cache:", key);
+        }
+      });
+      
+      // Keep only the 10 most recent cache entries
+      if (cacheKeys.length > 10) {
+        const cacheEntries = cacheKeys.map(key => ({
+          key,
+          timestamp: JSON.parse(sessionStorage.getItem(key) || '{}').timestamp || 0
+        })).sort((a, b) => b.timestamp - a.timestamp);
+        
+        // Remove oldest entries beyond the limit
+        cacheEntries.slice(10).forEach(entry => {
+          sessionStorage.removeItem(entry.key);
+          logger.debug("Removed old cache:", entry.key);
+        });
+      }
+    } catch (error) {
+      logger.error("Error cleaning up cache:", error);
+    }
+  };
+
+  // Clean up cache on component mount
+  useEffect(() => {
+    cleanupCache();
+  }, []);
 
   // Read question from URL query parameter on component mount
   useEffect(() => {
@@ -78,7 +124,42 @@ export function NotSignedInDrInfoSummary() {
       setQuery(decodedQuestion);
       logger.debug("Question loaded from URL:", decodedQuestion);
       
-      // Auto-trigger search
+      // Check if we have cached data for this question
+      const cacheKey = `drinfo_cache_${btoa(decodedQuestion)}`;
+      const cachedData = sessionStorage.getItem(cacheKey);
+      
+      if (cachedData) {
+        try {
+          const parsedData = JSON.parse(cachedData);
+          
+          // Check if cache is not expired (24 hours)
+          const now = Date.now();
+          const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+          if (parsedData.timestamp && (now - parsedData.timestamp) <= maxAge) {
+            logger.debug("Loading cached data for question:", decodedQuestion);
+            
+            // Set the cached messages
+            setMessages(parsedData.messages);
+            setActiveCitations(parsedData.citations || {});
+            setStatus('complete');
+            setIsLoading(false);
+            
+            // Don't make API call if we have valid cached data
+            return;
+          } else {
+            // Cache expired, remove it
+            sessionStorage.removeItem(cacheKey);
+            logger.debug("Cache expired, removed:", cacheKey);
+          }
+        } catch (error) {
+          logger.error("Error parsing cached data:", error);
+          // Remove corrupted cache
+          sessionStorage.removeItem(cacheKey);
+          // Fall through to make API call if cache is corrupted
+        }
+      }
+      
+      // Auto-trigger search if no cached data
       setTimeout(() => {
         if (isAuthChecked) {
           handleSearchWithContent(decodedQuestion, false, 'research');
@@ -311,6 +392,23 @@ export function NotSignedInDrInfoSummary() {
                   }
                 : msg
             );
+            
+            // Cache the updated messages
+            const cacheKey = `drinfo_cache_${btoa(content)}`;
+            const cacheData = {
+              messages: updatedMessages,
+              citations: data?.citations || {},
+              timestamp: Date.now()
+            };
+            
+            try {
+              sessionStorage.setItem(cacheKey, JSON.stringify(cacheData));
+              logger.debug("Cached data for question:", content);
+            } catch (error) {
+              logger.error("Error caching data:", error);
+              // Continue execution even if caching fails
+            }
+            
             return updatedMessages;
           });
 
@@ -361,31 +459,15 @@ export function NotSignedInDrInfoSummary() {
       return;
     }
     
-    // Redirect to signup page instead of allowing follow-up questions
-    window.location.href = '/signup';
+    // Show signup modal instead of redirecting
+    setShowSignupModal(true);
   };
 
-  // Scroll effect for streaming content
-  useEffect(() => {
-    if (status !== 'complete' && status !== 'complete_image' && messages.length > 0) {
-      requestAnimationFrame(() => {
-        if (contentRef.current) {
-          contentRef.current.scrollTop = contentRef.current.scrollHeight;
-        }
-      });
-    }
-  }, [messages, status]);
+  const handleSignupRequired = () => {
+    setShowSignupModal(true);
+  };
 
-  // Scroll to end after any new message
-  useEffect(() => {
-    if (messages.length > 0) {
-      requestAnimationFrame(() => {
-        if (contentRef.current) {
-          contentRef.current.scrollTop = contentRef.current.scrollHeight;
-        }
-      });
-    }
-  }, [messages]);
+  // Removed auto-scrolling effects - users can scroll manually
 
   // Handle citations from messages
   useEffect(() => {
@@ -418,11 +500,16 @@ export function NotSignedInDrInfoSummary() {
   useEffect(() => {
     if (!activeCitations || Object.keys(activeCitations).length === 0) return;
     
-    console.log('Setting up citation tooltips for:', activeCitations);
+    // console.log('Setting up citation tooltips for:', activeCitations);
 
     // Find all citation references and drug names
     const citationRefs = document.querySelectorAll('.citation-reference');
     const drugNameRefs = document.querySelectorAll('.drug-name-clickable');
+
+    // Store event handlers for proper cleanup
+    const clickHandlers = new Map();
+    const mouseenterHandlers = new Map();
+    const mouseleaveHandlers = new Map();
 
     // Handle citation number clicks and hovers
     citationRefs.forEach(ref => {
@@ -441,45 +528,36 @@ export function NotSignedInDrInfoSummary() {
       const journal = ref.getAttribute('data-citation-journal') || undefined;
       const doi = ref.getAttribute('data-citation-doi') || undefined;
       
-      const tooltip = citationObj
-        ? createCitationTooltip({
-            ...citationObj,
-            authors: Array.isArray(citationObj.authors) ? citationObj.authors.join(', ') : citationObj.authors,
-            journal: citationObj.journal,
-            doi: citationObj.doi
-          })
-        : createCitationTooltip({
-            source: source || undefined,
-            source_type: source_type || undefined,
-            title: title || undefined,
-            authors: authors || undefined,
-            journal: journal || undefined,
-            doi: doi || undefined,
-            url: url || undefined
-          });
-      ref.appendChild(tooltip);
+      // Only add tooltip if it doesn't already exist
+      if (!ref.querySelector('.citation-tooltip')) {
+        const tooltip = citationObj
+          ? createCitationTooltip({
+              ...citationObj,
+              authors: Array.isArray(citationObj.authors) ? citationObj.authors.join(', ') : citationObj.authors,
+              journal: citationObj.journal,
+              doi: citationObj.doi
+            })
+          : createCitationTooltip({
+              source: source || undefined,
+              source_type: source_type || undefined,
+              title: title || undefined,
+              authors: authors || undefined,
+              journal: journal || undefined,
+              doi: doi || undefined,
+              url: url || undefined
+            });
+        ref.appendChild(tooltip);
+      }
       
-      // Add click handler for mobile devices
-      ref.addEventListener('click', (e) => {
-        // Check if it's a mobile device (no hover capability)
-        if (window.matchMedia('(hover: none)').matches) {
-          e.preventDefault();
-          e.stopPropagation();
-          if (citationObj) {
-            // Only open citations sidebar for non-drug citations
-            if (citationObj.source_type !== 'drug_database') {
-              setSelectedCitation(citationObj);
-              setShowCitationsSidebar(true);
-            }
-            // For drug citations, do nothing on click (keep hover tooltip only)
-          }
-        }
-      });
+      // Create click handler
+      const clickHandler = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowSignupModal(true);
+      };
       
-      // Remove the click handler for desktop devices - citation numbers should only show tooltips, not open modals
-      
-      ref.addEventListener('mouseenter', () => {
-        // Only handle hover on devices that support hover
+      // Create mouseenter handler
+      const mouseenterHandler = () => {
         if (window.matchMedia('(hover: hover)').matches) {
           const tooltipEl = ref.querySelector('.citation-tooltip');
           if (!tooltipEl) return;
@@ -517,18 +595,29 @@ export function NotSignedInDrInfoSummary() {
           (tooltipEl as HTMLElement).style.left = `${left}px`;
           (tooltipEl as HTMLElement).style.zIndex = '9999';
         }
-      });
+      };
       
-      // Add mouseleave event to hide tooltip
-      ref.addEventListener('mouseleave', () => {
+      // Create mouseleave handler
+      const mouseleaveHandler = () => {
         const tooltipEl = ref.querySelector('.citation-tooltip');
         if (tooltipEl) {
           (tooltipEl as HTMLElement).style.opacity = '0';
         }
-      });
+      };
+      
+      // Store handlers for cleanup
+      clickHandlers.set(ref, clickHandler);
+      mouseenterHandlers.set(ref, mouseenterHandler);
+      mouseleaveHandlers.set(ref, mouseleaveHandler);
+      
+      // Add event listeners
+      ref.addEventListener('click', clickHandler);
+      ref.addEventListener('mouseenter', mouseenterHandler);
+      ref.addEventListener('mouseleave', mouseleaveHandler);
     });
     
     // Handle drug name clicks
+    const drugClickHandlers = new Map();
     drugNameRefs.forEach(ref => {
       const citationNumber = ref.getAttribute('data-citation-number');
       let citationObj = null;
@@ -538,29 +627,41 @@ export function NotSignedInDrInfoSummary() {
       
       logger.debug('Found drug name span:', { citationNumber, citationObj, element: ref });
       
-      // Add click handler for drug names
-      ref.addEventListener('click', (e) => {
+      // Create drug click handler
+      const drugClickHandler = (e: Event) => {
         e.preventDefault();
         e.stopPropagation();
         if (citationObj) {
-          setSelectedCitation(citationObj);
-          setShowDrugModal(true);
+          setShowSignupModal(true);
         }
-      });
+      };
+      
+      // Store handler for cleanup
+      drugClickHandlers.set(ref, drugClickHandler);
+      
+      // Add event listener
+      ref.addEventListener('click', drugClickHandler);
     });
 
     // Cleanup function
     return () => {
-      citationRefs.forEach(ref => {
-        ref.removeEventListener('click', () => {});
-        ref.removeEventListener('mouseenter', () => {});
-        ref.removeEventListener('mouseleave', () => {});
+      // Remove citation event listeners
+      clickHandlers.forEach((handler, ref) => {
+        ref.removeEventListener('click', handler);
       });
-      drugNameRefs.forEach(ref => {
-        ref.removeEventListener('click', () => {});
+      mouseenterHandlers.forEach((handler, ref) => {
+        ref.removeEventListener('mouseenter', handler);
+      });
+      mouseleaveHandlers.forEach((handler, ref) => {
+        ref.removeEventListener('mouseleave', handler);
+      });
+      
+      // Remove drug event listeners
+      drugClickHandlers.forEach((handler, ref) => {
+        ref.removeEventListener('click', handler);
       });
     };
-  }, [activeCitations, setSelectedCitation, setShowCitationsSidebar, setShowDrugModal]);
+  }, [activeCitations]);
 
   // Add this new useEffect after the existing useEffects
   useEffect(() => {
@@ -600,11 +701,15 @@ export function NotSignedInDrInfoSummary() {
         padding: 16px;
         box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         font-family: 'DM Sans', sans-serif;
-        max-width: 300px;
+        max-width: 350px;
+        width: 350px;
         pointer-events: none;
         opacity: 0;
         transition: opacity 0.2s ease;
-        white-space: nowrap;
+        white-space: normal;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        line-height: 1.4;
       }
       
       .citation-reference:hover .citation-tooltip {
@@ -612,14 +717,15 @@ export function NotSignedInDrInfoSummary() {
       }
       
       .drug-name-clickable {
+        color: #214498 !important;
         cursor: pointer;
-        color: #3771FE;
-        text-decoration: underline;
         transition: color 0.2s ease;
+        font-weight: bold !important;
+        display: inline;
       }
       
       .drug-name-clickable:hover {
-        color: #2B5CD9;
+        color: #3771FE !important;
       }
 
       /* Shimmer text effect for status message */
@@ -736,6 +842,36 @@ export function NotSignedInDrInfoSummary() {
       @keyframes reference-shimmer {
         100% { transform: translateX(100%); }
       }
+
+      /* Hide scrollbars while maintaining scroll functionality */
+      .hide-scrollbar {
+        -ms-overflow-style: none;  /* Internet Explorer 10+ */
+        scrollbar-width: none;  /* Firefox */
+      }
+      
+      .hide-scrollbar::-webkit-scrollbar {
+        display: none;  /* Safari and Chrome */
+      }
+
+      /* Apply to main content areas */
+      .overflow-y-auto {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      
+      .overflow-y-auto::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* Apply to specific scrollable containers */
+      .flex-1.overflow-y-auto {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      
+      .flex-1.overflow-y-auto::-webkit-scrollbar {
+        display: none;
+      }
     `;
     document.head.appendChild(style);
     
@@ -773,14 +909,14 @@ export function NotSignedInDrInfoSummary() {
               </div>
               <div className="flex items-center space-x-2">
                 <Link
-                  href="/signup"
+                  href="/login"
                   className="px-3 py-1.5 bg-white border border-[#C8C8C8] text-[#223258] rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
                 >
                   Sign In
                 </Link>
                 <Link
                   href="/signup"
-                  className="px-3 py-1.5 bg-[#3771FE] text-white rounded-lg hover:bg-[#2B5CD9] transition-colors font-medium text-sm"
+                  className="px-3 py-1.5 bg-[#002A7C] text-white rounded-lg hover:bg-[#1B3B8B] transition-colors font-medium text-sm"
                 >
                   Sign Up
                 </Link>
@@ -789,10 +925,10 @@ export function NotSignedInDrInfoSummary() {
           </div>
 
           {/* Sidebar - Using the exact same component as dashboard */}
-          <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
+          <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} onSignupRequired={handleSignupRequired} />
 
           {/* Main Content */}
-          <main className="flex-1 overflow-auto md:mt-0 mt-14">
+          <main className="flex-1 overflow-auto hide-scrollbar md:mt-0 mt-14">
             <div className="p-2 sm:p-4 md:p-6 h-[100dvh] flex flex-col relative overflow-hidden">
               {/* Desktop Top Bar with Sign Up/Login Buttons */}
               <div className="hidden md:flex justify-between items-center mb-4 px-2 sm:px-4">
@@ -806,7 +942,7 @@ export function NotSignedInDrInfoSummary() {
                   </Link>
                   <Link
                     href="/signup"
-                    className="px-4 py-2 bg-[#3771FE] text-white rounded-lg hover:bg-[#2B5CD9] transition-colors font-medium"
+                    className="px-4 py-2 bg-[#002A7C] text-white rounded-lg hover:bg-[#1B3B8B] transition-colors font-medium"
                   >
                     Sign Up
                   </Link>
@@ -824,7 +960,7 @@ export function NotSignedInDrInfoSummary() {
                     )}
                   </div>
                 ) : (
-                  <div className="flex-1 overflow-y-auto mb-4 max-w-4xl mx-auto w-full font-sans px-2 sm:px-4" ref={contentRef}>
+                  <div className="flex-1 overflow-y-auto hide-scrollbar mb-4 max-w-4xl mx-auto w-full font-sans px-2 sm:px-4" ref={contentRef}>
                     {error && (
                       <div className="bg-red-50 text-red-600 p-3 sm:p-4 rounded-lg mb-4">
                         {error}
@@ -937,7 +1073,7 @@ export function NotSignedInDrInfoSummary() {
                             e.target.style.height = e.target.scrollHeight + 'px';
                           }}
                           placeholder="Sign up to ask follow-up questions..."
-                          className="w-full text-base md:text-[16px] text-[#223258] font-normal font-['DM_Sans'] outline-none resize-none min-h-[24px] max-h-[200px] overflow-y-auto"
+                          className="w-full text-base md:text-[16px] text-[#223258] font-normal font-['DM_Sans'] outline-none resize-none min-h-[24px] max-h-[200px] overflow-y-auto hide-scrollbar"
                           onKeyDown={(e) => e.key === 'Enter' && handleFollowUpQuestion(e as any)}
                           rows={1}
                           style={{ height: '24px' }}
@@ -960,7 +1096,7 @@ export function NotSignedInDrInfoSummary() {
                             Acute
                           </span>
                         </label> */}
-                        <button onClick={handleFollowUpQuestion} className="flex-shrink-0" disabled={isLoading}>
+                        <button onClick={handleSignupRequired} className="flex-shrink-0" disabled={isLoading}>
                           {isLoading ? (
                             <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                           ) : (
@@ -986,6 +1122,7 @@ export function NotSignedInDrInfoSummary() {
             open={showCitationsSidebar}
             citations={activeCitations}
             onClose={() => setShowCitationsSidebar(false)}
+            onSignupRequired={handleSignupRequired}
           />
           
           <DrugInformationModal
@@ -996,6 +1133,59 @@ export function NotSignedInDrInfoSummary() {
               setSelectedCitation(null);
             }}
           />
+
+          {/* Signup Required Modal */}
+          {showSignupModal && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-[#F4F7FF] rounded-[5px] shadow-lg border border-[#3771FE]/50 max-w-sm w-full mx-4">
+                {/* Header */}
+                <div className="flex items-center justify-between p-6 border-b border-[#3771FE]/20">
+                  <h2 className="text-xl font-medium text-[#223258]" style={{ fontFamily: 'DM Sans', fontSize: 20, fontWeight: 500 }}>
+                    Sign Up Required
+                  </h2>
+                  <button 
+                    onClick={() => setShowSignupModal(false)}
+                    className="text-[#223258] hover:text-[#3771FE] transition-colors"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="p-6">
+                  <div className="text-center mb-6">
+                    <div className="flex items-center justify-center mb-4">
+                      <img src="/login-logo.svg" alt="DR. INFO Logo" width={120} height={34} className="mx-auto" />
+                    </div>
+                    <p className="text-[#223258] text-sm leading-relaxed" style={{ fontFamily: 'DM Sans', fontWeight: 400, fontSize: 14 }}>
+                      Please sign up to use this feature
+                    </p>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="space-y-3 flex flex-col items-center">
+                    <Link
+                      href="/signup"
+                      className="px-4 py-2 bg-[#002A7C] text-white rounded-lg hover:bg-[#1B3B8B] transition-colors font-medium text-sm"
+                      onClick={() => setShowSignupModal(false)}
+                    >
+                      Sign Up
+                    </Link>
+                    <Link
+                      href="/login"
+                      className="px-4 py-2 bg-white border border-[#C8C8C8] text-[#223258] rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
+                      onClick={() => setShowSignupModal(false)}
+                    >
+                      Sign In
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Citation tooltip styles */}
           <style jsx global>{`
@@ -1028,11 +1218,15 @@ export function NotSignedInDrInfoSummary() {
               padding: 16px;
               box-shadow: 0 4px 20px rgba(0,0,0,0.08);
               font-family: 'DM Sans', sans-serif;
-              max-width: 300px;
+              max-width: 350px;
+              width: 350px;
               pointer-events: none;
               opacity: 0;
               transition: opacity 0.2s ease;
-              white-space: nowrap;
+              white-space: normal;
+              word-wrap: break-word;
+              overflow-wrap: break-word;
+              line-height: 1.4;
             }
             
             .citation-reference:hover .citation-tooltip {
@@ -1040,14 +1234,15 @@ export function NotSignedInDrInfoSummary() {
             }
             
             .drug-name-clickable {
+              color: #214498 !important;
               cursor: pointer;
-              color: #3771FE;
-              text-decoration: underline;
               transition: color 0.2s ease;
+              font-weight: bold !important;
+              display: inline;
             }
             
             .drug-name-clickable:hover {
-              color: #2B5CD9;
+              color: #3771FE !important;
             }
           `}</style>
         </>

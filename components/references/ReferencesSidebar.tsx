@@ -21,9 +21,10 @@ interface ReferencesSidebarProps {
   open: boolean;
   citations: Record<string, Citation> | null;
   onClose: () => void;
+  onSignupRequired?: () => void;
 }
 
-export const ReferencesSidebar: React.FC<ReferencesSidebarProps> = ({ open, citations, onClose }) => {
+export const ReferencesSidebar: React.FC<ReferencesSidebarProps> = ({ open, citations, onClose, onSignupRequired }) => {
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
   const [showGuidelineModal, setShowGuidelineModal] = useState(false);
   const [showDrugModal, setShowDrugModal] = useState(false);
@@ -64,8 +65,12 @@ export const ReferencesSidebar: React.FC<ReferencesSidebarProps> = ({ open, cita
   const handleGuidelineClick = (citation: Citation) => {
     if (citation.source_type === 'guidelines_database') {  // Fixed: backend sends 'guidelines_database' (with 's')
       if (!checkAuthentication()) {
-        // Redirect to login if not authenticated
-        router.push('/login');
+        // Show signup modal if not authenticated
+        if (onSignupRequired) {
+          onSignupRequired();
+        } else {
+          router.push('/login');
+        }
         onClose(); // Close the sidebar
         return;
       }
@@ -77,8 +82,12 @@ export const ReferencesSidebar: React.FC<ReferencesSidebarProps> = ({ open, cita
   const handleDrugClick = (citation: Citation) => {
     if (citation.source_type === 'drug_database') {
       if (!checkAuthentication()) {
-        // Redirect to login if not authenticated
-        router.push('/login');
+        // Show signup modal if not authenticated
+        if (onSignupRequired) {
+          onSignupRequired();
+        } else {
+          router.push('/login');
+        }
         onClose(); // Close the sidebar
         return;
       }
