@@ -964,56 +964,8 @@ export const track = {
   },
 
   // ===== PROFILE FORM EVENTS =====
-  profileFieldChanged: (fieldName: string, value: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-    
-    trackEngagement('profile_field_changed', {
-      field_name: fieldName,
-      value,
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('profile_field_changed', {
-      field_name: fieldName,
-      value,
-      user_id: userId,
-      page
-    })
-  },
 
-  profileCountryDropdownOpened: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
 
-    trackEngagement('profile_country_dropdown_opened', {
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('profile_country_dropdown_opened', {
-      user_id: userId,
-      page
-    })
-  },
-
-  profileCountrySearched: (searchTerm: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-
-    trackEngagement('profile_country_searched', {
-      search_term: searchTerm,
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('profile_country_searched', {
-      search_term: searchTerm,
-      user_id: userId,
-      page
-    })
-  },
 
   profileCountrySelected: (country: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
@@ -1032,37 +984,7 @@ export const track = {
     })
   },
 
-  profilePlaceOfWorkDropdownOpened: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
 
-    trackEngagement('profile_place_of_work_dropdown_opened', {
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('profile_place_of_work_dropdown_opened', {
-      user_id: userId,
-      page
-    })
-  },
-
-  profilePlaceOfWorkSearched: (searchTerm: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-
-    trackEngagement('profile_place_of_work_searched', {
-      search_term: searchTerm,
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('profile_place_of_work_searched', {
-      search_term: searchTerm,
-      user_id: userId,
-      page
-    })
-  },
 
   profilePlaceOfWorkSelected: (placeOfWork: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
@@ -1081,54 +1003,8 @@ export const track = {
     })
   },
 
-  profileOtherPlaceOfWorkEntered: (placeOfWork: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
 
-    trackEngagement('profile_other_place_of_work_entered', {
-      place_of_work: placeOfWork,
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('profile_other_place_of_work_entered', {
-      place_of_work: placeOfWork,
-      user_id: userId,
-      page
-    })
-  },
 
-  profileSpecialtiesDropdownOpened: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
-
-    trackEngagement('profile_specialties_dropdown_opened', {
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('profile_specialties_dropdown_opened', {
-      user_id: userId,
-      page
-    })
-  },
-
-  profileSpecialtySearched: (searchTerm: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-
-    trackEngagement('profile_specialty_searched', {
-      search_term: searchTerm,
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('profile_specialty_searched', {
-      search_term: searchTerm,
-      user_id: userId,
-      page
-    })
-  },
 
   profileSpecialtyAdded: (specialty: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
@@ -1164,22 +1040,6 @@ export const track = {
     })
   },
 
-  profileOtherSpecialtyEntered: (specialty: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-
-    trackEngagement('profile_other_specialty_entered', {
-      specialty,
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('profile_other_specialty_entered', {
-      specialty,
-      user_id: userId,
-      page
-    })
-  },
 
   profileFormSubmitted: (userId: string, page: string) => {
     if (!shouldTrack()) return;
@@ -1196,20 +1056,6 @@ export const track = {
     })
   },
 
-  profileFormSaved: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
-
-    trackEngagement('profile_form_saved', {
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('profile_form_saved', {
-      user_id: userId,
-      page
-    })
-  },
 
   // ===== PREFERENCES EVENTS =====
   cookiePreferenceToggled: (preferenceType: 'analytics' | 'marketing' | 'functional', isEnabled: boolean, userId: string, page: string) => {
@@ -1246,20 +1092,6 @@ export const track = {
     })
   },
 
-  preferencesFormSaved: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
-
-    trackEngagement('preferences_form_saved', {
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('preferences_form_saved', {
-      user_id: userId,
-      page
-    })
-  },
 
   privacyPolicyClicked: (userId: string, page: string) => {
     if (!shouldTrack()) return;
@@ -1292,60 +1124,8 @@ export const track = {
   },
 
   // ===== SUBSCRIPTION EVENTS =====
-  billingIntervalToggled: (interval: 'monthly' | 'yearly', userId: string, page: string) => {
-    if (!shouldTrack()) return;
 
-    trackEngagement('billing_interval_toggled', {
-      interval,
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('billing_interval_toggled', {
-      interval,
-      user_id: userId,
-      page
-    })
-  },
 
-  subscriptionPlanSelected: (plan: string, interval: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-
-    trackEngagement('subscription_plan_selected', {
-      plan,
-      interval,
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('subscription_plan_selected', {
-      plan,
-      interval,
-      user_id: userId,
-      page
-    })
-  },
-
-  subscriptionPlanButtonClicked: (plan: string, interval: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-
-    trackEngagement('subscription_plan_button_clicked', {
-      plan,
-      interval,
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('subscription_plan_button_clicked', {
-      plan,
-      interval,
-      user_id: userId,
-      page
-    })
-  },
 
   contactSalesClicked: (userId: string, page: string) => {
     if (!shouldTrack()) return;
@@ -2075,24 +1855,6 @@ export const track = {
     })
   },
 
-  drugInformationSuggestionViewed: (drugName: string, searchType: 'ai_suggestion' | 'ai_search' | 'direct_brand' | 'brand_option', userId: string, page: string) => {
-    if (!shouldTrack()) return;
-    
-    trackEngagement('drug_information_suggestion_viewed', {
-      drug_name: drugName,
-      search_type: searchType,
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('drug_information_suggestion_viewed', {
-      drug_name: drugName,
-      search_type: searchType,
-      user_id: userId,
-      page
-    })
-  },
 
 
   // ===== DICTIONARY/ALPHABET NAVIGATION EVENTS =====
@@ -2116,7 +1878,7 @@ export const track = {
 
   drugInformationAlphabetLetterClicked: (letter: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
-
+    
     trackEngagement('drug_information_alphabet_letter_clicked', {
       letter,
       user_id: userId,
@@ -2151,98 +1913,12 @@ export const track = {
     })
   },
 
-  drugInformationDrugViewed: (drugName: string, activeSubstances: string[], userId: string, page: string) => {
-    if (!shouldTrack()) return;
-
-    trackEngagement('drug_information_drug_viewed', {
-      drug_name: drugName,
-      active_substances: activeSubstances,
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('drug_information_drug_viewed', {
-      drug_name: drugName,
-      active_substances: activeSubstances,
-      user_id: userId,
-      page
-    })
-  },
 
 
   // ===== SEARCH RESULTS EVENTS =====
-  drugInformationAISearchResultsLoaded: (searchTerm: string, resultCount: number, userId: string, page: string) => {
-    if (!shouldTrack()) return;
 
-    trackEngagement('drug_information_ai_search_results_loaded', {
-      search_term: searchTerm,
-      result_count: resultCount,
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('drug_information_ai_search_results_loaded', {
-      search_term: searchTerm,
-      result_count: resultCount,
-      user_id: userId,
-      page
-    })
-  },
 
-  drugInformationEMASearchResultsLoaded: (searchTerm: string, resultCount: number, userId: string, page: string) => {
-    if (!shouldTrack()) return;
 
-    trackEngagement('drug_information_ema_search_results_loaded', {
-      search_term: searchTerm,
-      result_count: resultCount,
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('drug_information_ema_search_results_loaded', {
-      search_term: searchTerm,
-      result_count: resultCount,
-      user_id: userId,
-      page
-    })
-  },
-
-  drugInformationAISearchResultsEmpty: (searchTerm: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-
-    trackEngagement('drug_information_ai_search_results_empty', {
-      search_term: searchTerm,
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('drug_information_ai_search_results_empty', {
-      search_term: searchTerm,
-      user_id: userId,
-      page
-    })
-  },
-
-  drugInformationEMASearchResultsEmpty: (searchTerm: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-
-    trackEngagement('drug_information_ema_search_results_empty', {
-      search_term: searchTerm,
-      user_id: userId,
-      page,
-      timestamp: new Date().toISOString()
-    })
-    
-    trackGA4Event('drug_information_ema_search_results_empty', {
-      search_term: searchTerm,
-      user_id: userId,
-      page
-    })
-  },
 
 
 

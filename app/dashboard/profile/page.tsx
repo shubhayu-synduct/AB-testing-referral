@@ -242,10 +242,6 @@ function ProfilePageContent() {
     const { name, value } = e.target;
     setProfile((prev: any) => ({ ...prev, [name]: value }));
     
-    // Track field change
-    if (user) {
-      track.profileFieldChanged(name, value, user.uid, 'profile');
-    }
   };
 
   const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -312,8 +308,6 @@ function ProfilePageContent() {
       setOriginalCookiePreferences(cookiePreferences);
       setPreferencesSuccess(true);
       
-      // Track successful preferences save
-      track.preferencesFormSaved(user.uid, 'profile');
     }
     setPreferencesSaving(false);
   };
@@ -438,9 +432,6 @@ function ProfilePageContent() {
       return;
     }
 
-    // Track plan selection
-    track.subscriptionPlanSelected(plan, interval, user.uid, 'profile');
-    track.subscriptionPlanButtonClicked(plan, interval, user.uid, 'profile');
 
     setPlanLoading(true);
     setError('');
@@ -583,8 +574,6 @@ function ProfilePageContent() {
       await updateDoc(docRef, updateData);
       setSuccess(true);
       
-      // Track successful save
-      track.profileFormSaved(user.uid, 'profile');
     }
     setSaving(false);
   };
@@ -761,9 +750,6 @@ function ProfilePageContent() {
                       tabIndex={0}
                       onClick={() => {
                         setShowCountryDropdown(true);
-                        if (user) {
-                          track.profileCountryDropdownOpened(user.uid, 'profile');
-                        }
                       }}
                       style={{ cursor: 'text', position: 'relative' }}
                     >
@@ -788,9 +774,6 @@ function ProfilePageContent() {
                             className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[6px] text-sm text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent"
                             onChange={(e) => {
                               setCountrySearchTerm(e.target.value);
-                              if (user && e.target.value) {
-                                track.profileCountrySearched(e.target.value, user.uid, 'profile');
-                              }
                             }}
                             onKeyDown={(e) => {
                               if (e.key === 'Escape') {
@@ -1034,9 +1017,6 @@ function ProfilePageContent() {
                       tabIndex={0}
                       onClick={() => {
                         setShowPlaceOfWorkDropdown(true);
-                        if (user) {
-                          track.profilePlaceOfWorkDropdownOpened(user.uid, 'profile');
-                        }
                       }}
                       style={{ cursor: 'text', position: 'relative' }}
                     >
@@ -1061,9 +1041,6 @@ function ProfilePageContent() {
                             className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[6px] text-sm text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent"
                             onChange={(e) => {
                               setPlaceOfWorkSearchTerm(e.target.value);
-                              if (user && e.target.value) {
-                                track.profilePlaceOfWorkSearched(e.target.value, user.uid, 'profile');
-                              }
                             }}
                             onKeyDown={(e) => {
                               if (e.key === 'Escape') {
@@ -1116,9 +1093,6 @@ function ProfilePageContent() {
                         value={profile.otherPlaceOfWork || ""}
                         onChange={e => {
                           setProfile((prev: any) => ({ ...prev, otherPlaceOfWork: e.target.value }));
-                          if (user) {
-                            track.profileOtherPlaceOfWorkEntered(e.target.value, user.uid, 'profile');
-                          }
                         }}
                         className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[8px] text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent text-sm bg-white"
                         style={{ fontSize: 14 }}
@@ -1138,9 +1112,6 @@ function ProfilePageContent() {
                       tabIndex={0}
                       onClick={() => {
                         setShowSpecialtiesDropdown(true);
-                        if (user) {
-                          track.profileSpecialtiesDropdownOpened(user.uid, 'profile');
-                        }
                       }}
                       style={{ cursor: 'text', position: 'relative' }}
                     >
@@ -1205,9 +1176,6 @@ function ProfilePageContent() {
                             className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[6px] text-sm text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent"
                             onChange={(e) => {
                               setSpecialtiesSearchTerm(e.target.value);
-                              if (user && e.target.value) {
-                                track.profileSpecialtySearched(e.target.value, user.uid, 'profile');
-                              }
                             }}
                             onKeyDown={(e) => {
                               if (e.key === 'Escape') {
@@ -1266,9 +1234,6 @@ function ProfilePageContent() {
                         value={profile.otherSpecialty || ""}
                         onChange={e => {
                           setProfile((prev: any) => ({ ...prev, otherSpecialty: e.target.value }));
-                          if (user) {
-                            track.profileOtherSpecialtyEntered(e.target.value, user.uid, 'profile');
-                          }
                         }}
                         className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[8px] text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent text-sm bg-white"
                         style={{ fontSize: 14 }}
@@ -1544,9 +1509,6 @@ function ProfilePageContent() {
                 <button
                   onClick={() => {
                     setBillingInterval('monthly');
-                    if (user) {
-                      track.billingIntervalToggled('monthly', user.uid, 'profile');
-                    }
                   }}
                   className={`px-6 py-2 rounded-[8px] font-medium transition-colors ${
                     billingInterval === 'monthly' 
@@ -1559,9 +1521,6 @@ function ProfilePageContent() {
                 <button
                   onClick={() => {
                     setBillingInterval('yearly');
-                    if (user) {
-                      track.billingIntervalToggled('yearly', user.uid, 'profile');
-                    }
                   }}
                   className={`px-6 py-2 rounded-[8px] font-medium transition-colors ${
                     billingInterval === 'yearly' 

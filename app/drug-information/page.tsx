@@ -249,12 +249,6 @@ export default function DrugInformationPage() {
         const aiResults = allRecommendations.filter(drug => drug.search_type === 'ai_suggestion' || drug.search_type === 'ai_search');
         const emaResults = allRecommendations.filter(drug => drug.search_type === 'direct_brand' || drug.search_type === 'brand_option');
         
-        if (aiResults.length > 0) {
-          track.drugInformationAISearchResultsLoaded(term, aiResults.length, user.uid, 'drug-information');
-        }
-        if (emaResults.length > 0) {
-          track.drugInformationEMASearchResultsLoaded(term, emaResults.length, user.uid, 'drug-information');
-        }
       }
       
       if (searchInputRef.current) {
