@@ -1,8 +1,7 @@
 import { track as vercelTrack } from '@vercel/analytics'
-import { trackEvent, trackEngagement, trackSearch, trackLogin, trackSignUp } from './gtag'
+import { trackGA4Event, trackEngagement, trackSearch, trackLogin, trackSignUp } from './gtag'
 import { doc, getDoc } from 'firebase/firestore'
 import { getFirebaseFirestore } from './firebase'
-
 
 // Function that requires userId parameter
 export const checkUserCookieConsent = async (userId: string) => {
@@ -11,15 +10,12 @@ export const checkUserCookieConsent = async (userId: string) => {
     const userDocRef = doc(db, "users", userId);
     const userDoc = await getDoc(userDocRef);
     
-    // console.log(`Checking cookie consent for user: ${userId}`);
-    
     if (userDoc.exists()) {
       const userData = userDoc.data();
       const cookieConsent = userData.cookieConsent;
             
       if (cookieConsent) {
          const analytics = cookieConsent.analytics;
-        //  console.log('Analytics consent:', analytics);
          return {
           analytics
         }
@@ -59,12 +55,9 @@ export const checkCurrentUserCookieConsent = async () => {
     // Get current user
     const currentUser = auth.currentUser;
     if (!currentUser) {
-      // console.log('No authenticated user found');
       return { analytics: false };
     }
 
-    // console.log(`Checking cookie consent for current user: ${currentUser.uid}`);
-    
     // Use the existing function with the current user's ID
     return await checkUserCookieConsent(currentUser.uid);
     
@@ -80,7 +73,6 @@ export const getCurrentUserConsent = async () => {
   // console.log('Current user analytics consent:', result.analytics);
   return result;
 };
-
 // Global variable to store analytics consent
 export let globalAnalyticsConsent: boolean = false;
 
@@ -88,7 +80,6 @@ export let globalAnalyticsConsent: boolean = false;
 export const updateGlobalConsent = async () => {
   const result = await checkCurrentUserCookieConsent();
   globalAnalyticsConsent = result.analytics;
-  // console.log('Global analytics consent updated:', globalAnalyticsConsent);
   return result;
 };
 
@@ -100,31 +91,10 @@ updateGlobalConsent().then(() => {
 // Helper function to check if analytics should be tracked
 const shouldTrack = () => globalAnalyticsConsent;
 
-// Enhanced analytics that tracks to both Vercel and Google Analytics
+// Clean analytics tracking - only real user behavior events
 export const track = {
-  // Search events
-  searchQuery: (query: string, mode: string, hasUser: boolean, resultsCount?: number) => {
-    if (!shouldTrack()) return;
-    
-    // Vercel Analytics
-    vercelTrack('SearchQuerySubmitted', {
-      queryLength: query.length,
-      mode,
-      hasUser
-    })
-    
-    // Google Analytics
-    trackSearch(query, resultsCount)
-    trackEngagement('search_query', {
-      search_term: query,
-      mode,
-      has_user: hasUser,
-      query_length: query.length,
-      results_count: resultsCount
-    })
-  },
 
-  // Authentication events
+  // ===== AUTHENTICATION EVENTS =====
   signUpAttempted: (method: string, provider?: string, emailProvided?: boolean) => {
     if (!shouldTrack()) return;
     
@@ -145,7 +115,6 @@ export const track = {
   },
 
   signInAttempted: (method: string, provider?: string, emailProvided?: boolean) => {
-    // Vercel Analytics
     if (!shouldTrack()) return;
     vercelTrack('SignInAttempted', {
       method,
@@ -162,101 +131,9 @@ export const track = {
     })
   },
 
-
-  // Custom events
-  customEvent: (eventName: string, parameters: Record<string, any>) => {
-    // Vercel Analytics
-    if (!shouldTrack()) return;
-    vercelTrack(eventName, parameters)
-    
-    // Google Analytics
-    trackEngagement(eventName, parameters)
-  },
-
-  // User interaction events
-  userInteraction: (interaction: string, element: string, page: string, details?: Record<string, any>) => {
-    // Vercel Analytics
-    if (!shouldTrack()) return;
-    vercelTrack('UserInteraction', {
-      interaction,
-      element,
-      page,
-      ...details
-    })
-    
-    // Google Analytics
-    trackEngagement('user_interaction', {
-      interaction_type: interaction,
-      element,
-      page,
-      ...details
-    })
-  },
-
-  // Conversion events
-  conversion: (conversionType: string, value?: number, currency?: string, details?: Record<string, any>) => {
-    if (!shouldTrack()) return;
-    
-    // Vercel Analytics
-    vercelTrack('Conversion', {
-      conversion_type: conversionType,
-      ...(value !== undefined && { value }),
-      ...(currency && { currency }),
-      ...details
-    })
-    
-    // Google Analytics
-    trackEngagement('conversion', {
-      conversion_type: conversionType,
-      value,
-      currency,
-      ...details
-    })
-  },
-
-  // Error tracking
-  error: (errorType: string, errorMessage: string, page: string, details?: Record<string, any>) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('Error', {
-      error_type: errorType,
-      error_message: errorMessage,
-      page,
-      ...details
-    })
-    
-    // Google Analytics
-    trackEngagement('error', {
-      error_type: errorType,
-      error_message: errorMessage,
-      page,
-      ...details
-    })
-  },
-
-  // ===== PAGE EVENTS =====
-  pageViewed: (page: string, user: string, userCountry?: string, timestamp?: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('PageViewed', {
-      page,
-      user,
-      userCountry: userCountry || 'unknown',
-      timestamp: timestamp || new Date().toISOString()
-    })
-    
-    // Google Analytics
-    trackEngagement('page_viewed', {
-      page_name: page,
-      user_status: user,
-      user_country: userCountry,
-      timestamp: timestamp || new Date().toISOString()
-    })
-  },
-
-  // ===== AUTHENTICATION EVENTS =====
   userSignupInitiated: (method: string, provider?: string, emailProvided?: boolean) => {
     if (!shouldTrack()) return;
+    
     // Vercel Analytics
     vercelTrack('UserSignupInitiated', {
       method,
@@ -272,13 +149,14 @@ export const track = {
     })
   },
 
-  userSignupCompleted: (method: string, provider?: string, userId?: string) => {
-    // Vercel Analytics
+  userSignupCompleted: (method: string, userId: string, provider?: string) => {
     if (!shouldTrack()) return;
+    
+    // Vercel Analytics
     vercelTrack('UserSignupCompleted', {
       method,
       ...(provider && { provider }),
-      ...(userId && { userId })
+      userId
     })
     
     // Google Analytics
@@ -290,15 +168,15 @@ export const track = {
   },
 
   userEmailVerificationSent: (email: string, method: string) => {
-    // Vercel Analytics
     if (!shouldTrack()) return;
+    
+    // Vercel Analytics
     vercelTrack('UserEmailVerificationSent', {
       email,
       method
     })
     
     // Google Analytics
-    if (!shouldTrack()) return;
     trackEngagement('user_email_verification_sent', {
       email,
       method
@@ -306,8 +184,9 @@ export const track = {
   },
 
   userEmailVerified: (email: string, method: string) => {
-    // Vercel Analytics
     if (!shouldTrack()) return;
+    
+    // Vercel Analytics
     vercelTrack('UserEmailVerified', {
       email,
       method
@@ -320,13 +199,14 @@ export const track = {
     })
   },
 
-  userLoginSuccessful: (method: string, provider?: string, userId?: string) => {
-    // Vercel Analytics
+  userLoginSuccessful: (method: string, userId: string, provider?: string) => {
     if (!shouldTrack()) return;
+    
+    // Vercel Analytics
     vercelTrack('UserLoginSuccessful', {
       method,
       ...(provider && { provider }),
-      ...(userId && { userId })
+      userId
     })
     
     // Google Analytics
@@ -337,12 +217,13 @@ export const track = {
     })
   },
 
-  userLogout: (method: string, userId?: string) => {
-    // Vercel Analytics
+  userLogout: (method: string, userId: string) => {
     if (!shouldTrack()) return;
+    
+    // Vercel Analytics
     vercelTrack('UserLogout', {
       method,
-      ...(userId && { userId })
+      userId
     })
     
     // Google Analytics
@@ -353,8 +234,9 @@ export const track = {
   },
 
   userPasswordResetRequested: (email: string) => {
-    // Vercel Analytics
     if (!shouldTrack()) return;
+    
+    // Vercel Analytics
     vercelTrack('UserPasswordResetRequested', {
       email
     })
@@ -366,8 +248,9 @@ export const track = {
   },
 
   userPasswordResetCompleted: (email: string) => {
-    // Vercel Analytics
     if (!shouldTrack()) return;
+    
+    // Vercel Analytics
     vercelTrack('UserPasswordResetCompleted', {
       email
     })
@@ -378,9 +261,279 @@ export const track = {
     })
   },
 
+
+  // ===== DASHBOARD EVENTS =====
+  dashboardSearchPerformed: (query: string, mode: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('dashboard_search_performed', {
+      query,
+      mode,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('dashboard_search_performed', {
+      query,
+      mode,
+      user_id: userId,
+      page
+    })
+  },
+
+  dashboardSuggestionClicked: (suggestion: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+    
+    trackEngagement('dashboard_suggestion_clicked', {
+      suggestion,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('dashboard_suggestion_clicked', {
+      suggestion,
+      user_id: userId,
+      page
+    })
+  },
+
+  dashboardTourPromptShown: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('dashboard_tour_prompt_shown', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('dashboard_tour_prompt_shown', {
+      user_id: userId,
+      page
+    })
+  },
+
+  dashboardTourAccepted: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('dashboard_tour_accepted', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('dashboard_tour_accepted', {
+      user_id: userId,
+      page
+    })
+  },
+
+  dashboardTourDeclined: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('dashboard_tour_declined', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('dashboard_tour_declined', {
+      user_id: userId,
+      page
+    })
+  },
+
+  dashboardModeChanged: (fromMode: string, toMode: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('dashboard_mode_changed', {
+      from_mode: fromMode,
+      to_mode: toMode,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('dashboard_mode_changed', {
+      from_mode: fromMode,
+      to_mode: toMode,
+      user_id: userId,
+      page
+    })
+  },
+
+  // ===== DRINFO SUMMARY EVENTS =====
+  drinfoSummaryPageViewed: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('drinfo_summary_page_viewed', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drinfo_summary_page_viewed', {
+      user_id: userId,
+      page
+    })
+  },
+
+  drinfoSummaryQuerySubmitted: (query: string, mode: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('drinfo_summary_query_submitted', {
+      query,
+      mode,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drinfo_summary_query_submitted', {
+      query,
+      mode,
+      user_id: userId,
+      page
+    })
+  },
+
+  drinfoSummaryFollowUpAsked: (followUpQuestion: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('drinfo_summary_follow_up_asked', {
+      follow_up_question: followUpQuestion,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drinfo_summary_follow_up_asked', {
+      follow_up_question: followUpQuestion,
+      user_id: userId,
+      page
+    })
+  },
+
+  drinfoSummaryCitationClicked: (citationId: string, citationTitle: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('drinfo_summary_citation_clicked', {
+      citation_id: citationId,
+      citation_title: citationTitle,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drinfo_summary_citation_clicked', {
+      citation_id: citationId,
+      citation_title: citationTitle,
+      user_id: userId,
+      page
+    })
+  },
+
+  drinfoSummaryImageGenerated: (imageCount: number, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('drinfo_summary_image_generated', {
+      image_count: imageCount,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drinfo_summary_image_generated', {
+      image_count: imageCount,
+      user_id: userId,
+      page
+    })
+  },
+
+  drinfoSummaryFeedbackSubmitted: (feedbackType: 'positive' | 'negative', userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('drinfo_summary_feedback_submitted', {
+      feedback_type: feedbackType,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drinfo_summary_feedback_submitted', {
+      feedback_type: feedbackType,
+      user_id: userId,
+      page
+    })
+  },
+
+  drinfoSummaryLikedAnswer: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('drinfo_summary_liked_answer', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drinfo_summary_liked_answer', {
+      user_id: userId,
+      page
+    })
+  },
+
+  drinfoSummaryDislikedAnswer: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('drinfo_summary_disliked_answer', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drinfo_summary_disliked_answer', {
+      user_id: userId,
+      page
+    })
+  },
+
+  drinfoSummaryClickedRetry: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('drinfo_summary_clicked_retry', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drinfo_summary_clicked_retry', {
+      user_id: userId,
+      page
+    })
+  },
+
+  drinfoSummaryShared: (shareMethod: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('drinfo_summary_shared', {
+      share_method: shareMethod,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drinfo_summary_shared', {
+      share_method: shareMethod,
+      user_id: userId,
+      page
+    })
+  },
+
   // ===== ONBOARDING EVENTS =====
   onboardingStarted: (userId: string, method: string) => {
     if (!shouldTrack()) return;
+    
     // Vercel Analytics
     vercelTrack('OnboardingStarted', {
       userId,
@@ -394,200 +547,379 @@ export const track = {
     })
   },
 
-  onboardingStepCompleted: (step: string, userId: string, stepNumber: number) => {
+  // ===== SPECIFIC FORM FIELD EVENTS =====
+  onboardingFirstNameEntered: (userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('OnboardingStepCompleted', {
-      step,
-      userId,
-      stepNumber
+    
+    trackEngagement('onboarding_first_name_entered', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
-    trackEngagement('onboarding_step_completed', {
-      step,
+    trackGA4Event('onboarding_first_name_entered', {
       user_id: userId,
-      step_number: stepNumber
+      page
     })
   },
 
-  onboardingFieldFocused: (fieldName: string, userId: string, step: string) => {
+  onboardingLastNameEntered: (userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('OnboardingFieldFocused', {
-      fieldName,
-      userId,
-      step
+    
+    trackEngagement('onboarding_last_name_entered', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
-    trackEngagement('onboarding_field_focused', {
-      field_name: fieldName,
+    trackGA4Event('onboarding_last_name_entered', {
       user_id: userId,
-      step
+      page
     })
   },
 
-  onboardingFieldChanged: (fieldName: string, userId: string, step: string, value?: string) => {
+  onboardingInstitutionEntered: (userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('OnboardingFieldChanged', {
-      fieldName,
-      userId,
-      step,
-      ...(value && { value })
+
+    trackEngagement('onboarding_institution_entered', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
-    trackEngagement('onboarding_field_changed', {
-      field_name: fieldName,
+    trackGA4Event('onboarding_institution_entered', {
       user_id: userId,
-      step,
-      value
+      page
     })
   },
 
-  onboardingFieldCompleted: (fieldName: string, userId: string, step: string) => {
+  onboardingOtherProfessionEntered: (profession: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('OnboardingFieldCompleted', {
-      fieldName,
-      userId,
-      step
+
+    trackEngagement('onboarding_other_profession_entered', {
+      profession,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
-    trackEngagement('onboarding_field_completed', {
-      field_name: fieldName,
+    trackGA4Event('onboarding_other_profession_entered', {
+      profession,
       user_id: userId,
-      step
+      page
     })
   },
 
-  onboardingFieldAbandoned: (fieldName: string, userId: string, step: string, timeSpent?: number) => {
+  onboardingOtherPlaceOfWorkEntered: (placeOfWork: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('OnboardingFieldAbandoned', {
-      fieldName,
-      userId,
-      step,
-      ...(timeSpent && { timeSpent })
+
+    trackEngagement('onboarding_other_place_of_work_entered', {
+      place_of_work: placeOfWork,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
-    trackEngagement('onboarding_field_abandoned', {
-      field_name: fieldName,
+    trackGA4Event('onboarding_other_place_of_work_entered', {
+      place_of_work: placeOfWork,
       user_id: userId,
-      step,
-      time_spent: timeSpent
+      page
     })
   },
 
-  onboardingDropdownOpened: (dropdownName: string, userId: string, step: string) => {
+  onboardingOtherSpecialtyEntered: (specialty: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('OnboardingDropdownOpened', {
-      dropdownName,
-      userId,
-      step
-    })
-    
-    // Google Analytics
-    trackEngagement('onboarding_dropdown_opened', {
-      dropdown_name: dropdownName,
-      user_id: userId,
-      step
-    })
-  },
 
-  onboardingDropdownSelection: (dropdownName: string, selection: string, userId: string, step: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('OnboardingDropdownSelection', {
-      dropdownName,
-      selection,
-      userId,
-      step
-    })
-    
-    // Google Analytics
-    trackEngagement('onboarding_dropdown_selection', {
-      dropdown_name: dropdownName,
-      selection,
-      user_id: userId,
-      step
-    })
-  },
-
-  onboardingSpecialtyAdded: (specialty: string, userId: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('OnboardingSpecialtyAdded', {
+    trackEngagement('onboarding_other_specialty_entered', {
       specialty,
-      userId
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
+    trackGA4Event('onboarding_other_specialty_entered', {
+      specialty,
+      user_id: userId,
+      page
+    })
+  },
+
+  // ===== DROPDOWN EVENTS =====
+  onboardingProfessionDropdownOpened: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('onboarding_profession_dropdown_opened', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('onboarding_profession_dropdown_opened', {
+      user_id: userId,
+      page
+    })
+  },
+
+  onboardingProfessionSelected: (profession: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('onboarding_profession_selected', {
+      profession,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('onboarding_profession_selected', {
+      profession,
+      user_id: userId,
+      page
+    })
+  },
+
+  onboardingExperienceDropdownOpened: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('onboarding_experience_dropdown_opened', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('onboarding_experience_dropdown_opened', {
+      user_id: userId,
+      page
+    })
+  },
+
+  onboardingExperienceSelected: (experience: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('onboarding_experience_selected', {
+      experience,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('onboarding_experience_selected', {
+      experience,
+      user_id: userId,
+      page
+    })
+  },
+
+  onboardingPlaceOfWorkDropdownOpened: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('onboarding_place_of_work_dropdown_opened', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('onboarding_place_of_work_dropdown_opened', {
+      user_id: userId,
+      page
+    })
+  },
+
+  onboardingPlaceOfWorkSelected: (placeOfWork: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('onboarding_place_of_work_selected', {
+      place_of_work: placeOfWork,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('onboarding_place_of_work_selected', {
+      place_of_work: placeOfWork,
+      user_id: userId,
+      page
+    })
+  },
+
+  onboardingSpecialtiesDropdownOpened: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('onboarding_specialties_dropdown_opened', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('onboarding_specialties_dropdown_opened', {
+      user_id: userId,
+      page
+    })
+  },
+
+  onboardingSpecialtySearched: (searchTerm: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('onboarding_specialty_searched', {
+      search_term: searchTerm,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('onboarding_specialty_searched', {
+      search_term: searchTerm,
+      user_id: userId,
+      page
+    })
+  },
+
+  onboardingSpecialtyAdded: (specialty: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
     trackEngagement('onboarding_specialty_added', {
       specialty,
-      user_id: userId
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('onboarding_specialty_added', {
+      specialty,
+      user_id: userId,
+      page
     })
   },
 
-  onboardingSpecialtyRemoved: (specialty: string, userId: string) => {
+  onboardingSpecialtyRemoved: (specialty: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('OnboardingSpecialtyRemoved', {
-      specialty,
-      userId
-    })
-    
-    // Google Analytics
+
     trackEngagement('onboarding_specialty_removed', {
       specialty,
-      user_id: userId
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('onboarding_specialty_removed', {
+      specialty,
+      user_id: userId,
+      page
     })
   },
 
-  onboardingTermsAccepted: (userId: string) => {
+  onboardingCountryDropdownOpened: (userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('OnboardingTermsAccepted', {
-      userId
+
+    trackEngagement('onboarding_country_dropdown_opened', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
+    trackGA4Event('onboarding_country_dropdown_opened', {
+      user_id: userId,
+      page
+    })
+  },
+
+  onboardingCountrySearched: (searchTerm: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('onboarding_country_searched', {
+      search_term: searchTerm,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('onboarding_country_searched', {
+      search_term: searchTerm,
+      user_id: userId,
+      page
+    })
+  },
+
+  onboardingCountrySelected: (country: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('onboarding_country_selected', {
+      country,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('onboarding_country_selected', {
+      country,
+      user_id: userId,
+      page
+    })
+  },
+
+  // ===== CHECKBOX EVENTS =====
+  onboardingHealthcareProfessionalChecked: (isChecked: boolean, profession: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('onboarding_healthcare_professional_checked', {
+      is_checked: isChecked,
+      profession,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('onboarding_healthcare_professional_checked', {
+      is_checked: isChecked,
+      profession,
+      user_id: userId,
+      page
+    })
+  },
+
+  onboardingTermsAccepted: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
     trackEngagement('onboarding_terms_accepted', {
-      user_id: userId
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('onboarding_terms_accepted', {
+      user_id: userId,
+      page
     })
   },
 
-  onboardingValidationError: (fieldName: string, errorMessage: string, userId: string, step: string) => {
+  // ===== VALIDATION EVENTS =====
+  onboardingValidationError: (fieldName: string, errorMessage: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('OnboardingValidationError', {
-      fieldName,
-      errorMessage,
-      userId,
-      step
-    })
-    
-    // Google Analytics
+
     trackEngagement('onboarding_validation_error', {
       field_name: fieldName,
       error_message: errorMessage,
       user_id: userId,
-      step
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('onboarding_validation_error', {
+      field_name: fieldName,
+      error_message: errorMessage,
+      user_id: userId,
+      page
     })
   },
 
-  onboardingCompleted: (userId: string, timeSpent?: number, specialties?: string[]) => {
+  // ===== COMPLETION EVENTS =====
+  onboardingCompleted: (userId: string, specialties?: string[], timeSpent?: number) => {
     if (!shouldTrack()) return;
+    
     // Vercel Analytics
     vercelTrack('OnboardingCompleted', {
       userId,
-      ...(timeSpent && { timeSpent }),
-      ...(specialties && { specialties: specialties.join(',') })
+      ...(timeSpent !== undefined && { timeSpent }),
+      specialtiesCount: specialties?.length || 0
     })
     
     // Google Analytics
@@ -598,436 +930,1311 @@ export const track = {
     })
   },
 
-  onboardingSkipped: (userId: string, step?: string) => {
+  // ===== PROFILE EVENTS =====
+  profilePageViewed: (userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('OnboardingSkipped', {
-      userId,
-      ...(step && { step })
-    })
     
-    // Google Analytics
-    trackEngagement('onboarding_skipped', {
+    trackEngagement('profile_page_viewed', {
       user_id: userId,
-      step
-    })
-  },
-
-  // ===== NAVIGATION & INTERACTION EVENTS =====
-  newSearchClicked: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('NewSearchClicked', {
-      userId,
-      page
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
-    trackEngagement('new_search_clicked', {
+    trackGA4Event('profile_page_viewed', {
       user_id: userId,
       page
     })
   },
 
-  medicalQuerySubmitted: (query: string, mode: string, userId: string, queryLength: number) => {
+  profileTabClicked: (tab: 'profile' | 'preferences' | 'subscription', userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('MedicalQuerySubmitted', {
-      query,
-      mode,
-      userId,
-      queryLength
-    })
-    
-    // Google Analytics
-    trackEngagement('medical_query_submitted', {
-      query,
-      mode,
+
+    trackEngagement('profile_tab_clicked', {
+      tab,
       user_id: userId,
-      query_length: queryLength
-    })
-  },
-
-  // acuteModeEnabled: (userId: string, enabled: boolean) => {
-  //   if (!shouldTrack()) return;
-  //   // Vercel Analytics
-  //   vercelTrack('AcuteModeEnabled', {
-  //     userId,
-  //     enabled
-  //   })
-    
-  //   // Google Analytics
-  //   trackEngagement('acute_mode_enabled', {
-  //     user_id: userId,
-  //     enabled
-  //   })
-  // },
-
-  libraryClicked: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('LibraryClicked', {
-      userId,
-      page
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
-    trackEngagement('library_clicked', {
+    trackGA4Event('profile_tab_clicked', {
+      tab,
       user_id: userId,
       page
     })
   },
 
-  guidelinesClicked: (userId: string, page: string) => {
+  // ===== PROFILE FORM EVENTS =====
+
+
+
+  profileCountrySelected: (country: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('GuidelinesClicked', {
-      userId,
-      page
+
+    trackEngagement('profile_country_selected', {
+      country,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
-    trackEngagement('guidelines_clicked', {
+    trackGA4Event('profile_country_selected', {
+      country,
       user_id: userId,
       page
     })
   },
 
-  visualAbstractClicked: (userId: string, page: string) => {
+
+
+  profilePlaceOfWorkSelected: (placeOfWork: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('VisualAbstractClicked', {
-      userId,
-      page
+
+    trackEngagement('profile_place_of_work_selected', {
+      place_of_work: placeOfWork,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
-    trackEngagement('visual_abstract_clicked', {
+    trackGA4Event('profile_place_of_work_selected', {
+      place_of_work: placeOfWork,
       user_id: userId,
       page
     })
   },
 
-  authMethodSelected: (method: string, page: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('AuthMethodSelected', {
-      method,
-      page
-    })
-    
-    // Google Analytics
-    trackEngagement('auth_method_selected', {
-      method,
-      page
-    })
-  },
 
-  openReferencesSidebar: (userId: string, page: string) => {
+
+
+  profileSpecialtyAdded: (specialty: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('OpenReferencesSidebar', {
-      userId,
-      page
+
+    trackEngagement('profile_specialty_added', {
+      specialty,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
-    trackEngagement('open_references_sidebar', {
+    trackGA4Event('profile_specialty_added', {
+      specialty,
       user_id: userId,
       page
     })
   },
 
-  closeReferencesSidebar: (userId: string, page: string) => {
+  profileSpecialtyRemoved: (specialty: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('CloseReferencesSidebar', {
-      userId,
-      page
+
+    trackEngagement('profile_specialty_removed', {
+      specialty,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
-    trackEngagement('close_references_sidebar', {
+    trackGA4Event('profile_specialty_removed', {
+      specialty,
       user_id: userId,
       page
     })
   },
 
-  openGuidelineModal: (guidelineId: string, userId: string, page: string) => {
+
+  profileFormSubmitted: (userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('OpenGuidelineModal', {
-      guidelineId,
-      userId,
-      page
+
+    trackEngagement('profile_form_submitted', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
-    trackEngagement('open_guideline_modal', {
+    trackGA4Event('profile_form_submitted', {
+      user_id: userId,
+      page
+    })
+  },
+
+
+  // ===== PREFERENCES EVENTS =====
+  cookiePreferenceToggled: (preferenceType: 'analytics' | 'marketing' | 'functional', isEnabled: boolean, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('cookie_preference_toggled', {
+      preference_type: preferenceType,
+      is_enabled: isEnabled,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('cookie_preference_toggled', {
+      preference_type: preferenceType,
+      is_enabled: isEnabled,
+      user_id: userId,
+      page
+    })
+  },
+
+  preferencesFormSubmitted: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('preferences_form_submitted', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('preferences_form_submitted', {
+      user_id: userId,
+      page
+    })
+  },
+
+
+  privacyPolicyClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('privacy_policy_clicked', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('privacy_policy_clicked', {
+      user_id: userId,
+      page
+    })
+  },
+
+  cookiePolicyClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('cookie_policy_clicked', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('cookie_policy_clicked', {
+      user_id: userId,
+      page
+    })
+  },
+
+  // ===== SUBSCRIPTION EVENTS =====
+
+
+
+  contactSalesClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('contact_sales_clicked', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('contact_sales_clicked', {
+      user_id: userId,
+      page
+    })
+  },
+
+  // ===== SPECIFIC SUBSCRIPTION PLAN EVENTS =====
+  studentMonthlyClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('student_monthly_clicked', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('student_monthly_clicked', {
+      user_id: userId,
+      page
+    })
+  },
+
+  studentYearlyClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('student_yearly_clicked', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('student_yearly_clicked', {
+      user_id: userId,
+      page
+    })
+  },
+
+  clinicianMonthlyClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('clinician_monthly_clicked', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('clinician_monthly_clicked', {
+      user_id: userId,
+      page
+    })
+  },
+
+  clinicianYearlyClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('clinician_yearly_clicked', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('clinician_yearly_clicked', {
+      user_id: userId,
+      page
+    })
+  },
+
+  enterpriseMonthlyClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('enterprise_monthly_clicked', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('enterprise_monthly_clicked', {
+      user_id: userId,
+      page
+    })
+  },
+
+  enterpriseYearlyClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('enterprise_yearly_clicked', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('enterprise_yearly_clicked', {
+      user_id: userId,
+      page
+    })
+  },
+
+  cancelSubscriptionClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('cancel_subscription_clicked', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('cancel_subscription_clicked', {
+      user_id: userId,
+      page
+    })
+  },
+
+  cancelSubscriptionConfirmed: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('cancel_subscription_confirmed', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('cancel_subscription_confirmed', {
+      user_id: userId,
+      page
+    })
+  },
+
+  // ===== DELETE PROFILE EVENTS =====
+  deleteProfileClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('delete_profile_clicked', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('delete_profile_clicked', {
+      user_id: userId,
+      page
+    })
+  },
+
+  deleteProfileConfirmed: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('delete_profile_confirmed', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('delete_profile_confirmed', {
+      user_id: userId,
+      page
+    })
+  },
+
+  // ===== LIBRARY EVENTS =====
+  libraryPageViewed: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('library_page_viewed', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('library_page_viewed', {
+      user_id: userId,
+      page
+    })
+  },
+
+  libraryTabClicked: (tab: 'visual-abstracts' | 'conversations' | 'saved-guidelines', userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('library_tab_clicked', {
+      tab,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('library_tab_clicked', {
+      tab,
+      user_id: userId,
+      page
+    })
+  },
+
+  // ===== VISUAL ABSTRACTS EVENTS =====
+  visualAbstractViewed: (abstractId: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('visual_abstract_viewed', {
+      abstract_id: abstractId,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('visual_abstract_viewed', {
+      abstract_id: abstractId,
+      user_id: userId,
+      page
+    })
+  },
+
+  visualAbstractDownloaded: (abstractId: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('visual_abstract_downloaded', {
+      abstract_id: abstractId,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('visual_abstract_downloaded', {
+      abstract_id: abstractId,
+      user_id: userId,
+      page
+    })
+  },
+
+  visualAbstractDeleted: (abstractId: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('visual_abstract_deleted', {
+      abstract_id: abstractId,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('visual_abstract_deleted', {
+      abstract_id: abstractId,
+      user_id: userId,
+      page
+    })
+  },
+
+  visualAbstractSelectionModeToggled: (isEnabled: boolean, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('visual_abstract_selection_mode_toggled', {
+      is_enabled: isEnabled,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('visual_abstract_selection_mode_toggled', {
+      is_enabled: isEnabled,
+      user_id: userId,
+      page
+    })
+  },
+
+  visualAbstractSelected: (abstractId: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('visual_abstract_selected', {
+      abstract_id: abstractId,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('visual_abstract_selected', {
+      abstract_id: abstractId,
+      user_id: userId,
+      page
+    })
+  },
+
+  visualAbstractDeselected: (abstractId: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('visual_abstract_deselected', {
+      abstract_id: abstractId,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('visual_abstract_deselected', {
+      abstract_id: abstractId,
+      user_id: userId,
+      page
+    })
+  },
+
+  visualAbstractSelectAllToggled: (isSelected: boolean, count: number, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('visual_abstract_select_all_toggled', {
+      is_selected: isSelected,
+      count,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('visual_abstract_select_all_toggled', {
+      is_selected: isSelected,
+      count,
+      user_id: userId,
+      page
+    })
+  },
+
+  visualAbstractBulkDownloaded: (count: number, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('visual_abstract_bulk_downloaded', {
+      count,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('visual_abstract_bulk_downloaded', {
+      count,
+      user_id: userId,
+      page
+    })
+  },
+
+  visualAbstractBulkDeleted: (count: number, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('visual_abstract_bulk_deleted', {
+      count,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('visual_abstract_bulk_deleted', {
+      count,
+      user_id: userId,
+      page
+    })
+  },
+
+  createVisualAbstractClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('create_visual_abstract_clicked', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('create_visual_abstract_clicked', {
+      user_id: userId,
+      page
+    })
+  },
+
+  // ===== CONVERSATIONS EVENTS =====
+  conversationSearched: (searchTerm: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('conversation_searched', {
+      search_term: searchTerm,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('conversation_searched', {
+      search_term: searchTerm,
+      user_id: userId,
+      page
+    })
+  },
+
+  conversationSearchSuggestionClicked: (suggestion: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('conversation_search_suggestion_clicked', {
+      suggestion,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('conversation_search_suggestion_clicked', {
+      suggestion,
+      user_id: userId,
+      page
+    })
+  },
+
+  conversationSearchCleared: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('conversation_search_cleared', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('conversation_search_cleared', {
+      user_id: userId,
+      page
+    })
+  },
+
+  conversationSortChanged: (sortOption: 'newest' | 'oldest' | 'alphabetical', userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('conversation_sort_changed', {
+      sort_option: sortOption,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('conversation_sort_changed', {
+      sort_option: sortOption,
+      user_id: userId,
+      page
+    })
+  },
+
+  conversationClicked: (conversationId: string, title: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('conversation_clicked', {
+      conversation_id: conversationId,
+      title,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('conversation_clicked', {
+      conversation_id: conversationId,
+      title,
+      user_id: userId,
+      page
+    })
+  },
+
+  conversationDeleted: (conversationId: string, title: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('conversation_deleted', {
+      conversation_id: conversationId,
+      title,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('conversation_deleted', {
+      conversation_id: conversationId,
+      title,
+      user_id: userId,
+      page
+    })
+  },
+
+  // ===== SAVED GUIDELINES EVENTS =====
+  savedGuidelineViewed: (guidelineId: number, title: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('saved_guideline_viewed', {
       guideline_id: guidelineId,
+      title,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('saved_guideline_viewed', {
+      guideline_id: guidelineId,
+      title,
       user_id: userId,
       page
     })
   },
 
-  openDrugModal: (drugName: string, userId: string, page: string) => {
+  savedGuidelineClicked: (guidelineId: number, title: string, url: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('OpenDrugModal', {
-      drugName,
-      userId,
-      page
+
+    trackEngagement('saved_guideline_clicked', {
+      guideline_id: guidelineId,
+      title,
+      url,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
-    trackEngagement('open_drug_modal', {
+    trackGA4Event('saved_guideline_clicked', {
+      guideline_id: guidelineId,
+      title,
+      url,
+      user_id: userId,
+      page
+    })
+  },
+
+  savedGuidelineRemoved: (guidelineId: number, title: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('saved_guideline_removed', {
+      guideline_id: guidelineId,
+      title,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('saved_guideline_removed', {
+      guideline_id: guidelineId,
+      title,
+      user_id: userId,
+      page
+    })
+  },
+
+  savedGuidelineAISummaryClicked: (guidelineId: number, title: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('saved_guideline_ai_summary_clicked', {
+      guideline_id: guidelineId,
+      title,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('saved_guideline_ai_summary_clicked', {
+      guideline_id: guidelineId,
+      title,
+      user_id: userId,
+      page
+    })
+  },
+
+  browseGuidelinesClicked: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('browse_guidelines_clicked', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('browse_guidelines_clicked', {
+      user_id: userId,
+      page
+    })
+  },
+
+  // ===== MODAL EVENTS =====
+  visualAbstractModalOpened: (abstractId: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('visual_abstract_modal_opened', {
+      abstract_id: abstractId,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('visual_abstract_modal_opened', {
+      abstract_id: abstractId,
+      user_id: userId,
+      page
+    })
+  },
+
+  visualAbstractModalClosed: (abstractId: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('visual_abstract_modal_closed', {
+      abstract_id: abstractId,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('visual_abstract_modal_closed', {
+      abstract_id: abstractId,
+      user_id: userId,
+      page
+    })
+  },
+
+
+  // ===== VISUAL ABSTRACT GENERATOR EVENTS =====
+  visualAbstractPageViewed: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('visual_abstract_page_viewed', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('visual_abstract_page_viewed', {
+      user_id: userId,
+      page
+    })
+  },
+
+  visualAbstractGenerateClicked: (textLength: number, wordCount: number, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('visual_abstract_generate_clicked', {
+      text_length: textLength,
+      word_count: wordCount,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('visual_abstract_generate_clicked', {
+      text_length: textLength,
+      word_count: wordCount,
+      user_id: userId,
+      page
+    })
+  },
+
+  // ===== DRUG INFORMATION EVENTS =====
+  drugInformationPageViewed: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('drug_information_page_viewed', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drug_information_page_viewed', {
+      user_id: userId,
+      page
+    })
+  },
+
+
+  drugInformationAISearchPerformed: (searchTerm: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('drug_information_ai_search_performed', {
+      search_term: searchTerm,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drug_information_ai_search_performed', {
+      search_term: searchTerm,
+      user_id: userId,
+      page
+    })
+  },
+
+  drugInformationEMASearchPerformed: (searchTerm: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('drug_information_ema_search_performed', {
+      search_term: searchTerm,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drug_information_ema_search_performed', {
+      search_term: searchTerm,
+      user_id: userId,
+      page
+    })
+  },
+
+  drugInformationSearchButtonClicked: (searchTerm: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('drug_information_search_button_clicked', {
+      search_term: searchTerm,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drug_information_search_button_clicked', {
+      search_term: searchTerm,
+      user_id: userId,
+      page
+    })
+  },
+
+  drugInformationSuggestionClicked: (drugName: string, searchType: 'ai_suggestion' | 'ai_search' | 'direct_brand' | 'brand_option', userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('drug_information_suggestion_clicked', {
       drug_name: drugName,
-      user_id: userId,
-      page
-    })
-  },
-
-  referencesBackNavigated: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('ReferencesBackNavigated', {
-      userId,
-      page
-    })
-    
-    // Google Analytics
-    trackEngagement('references_back_navigated', {
-      user_id: userId,
-      page
-    })
-  },
-
-  feedbackHelpfulSelected: (feedbackId: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('FeedbackHelpfulSelected', {
-      feedbackId,
-      userId,
-      page
-    })
-    
-    // Google Analytics
-    trackEngagement('feedback_helpful_selected', {
-      feedback_id: feedbackId,
-      user_id: userId,
-      page
-    })
-  },
-
-  feedbackNotHelpfulSelected: (feedbackId: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('FeedbackNotHelpfulSelected', {
-      feedbackId,
-      userId,
-      page
-    })
-    
-    // Google Analytics
-    trackEngagement('feedback_not_helpful_selected', {
-      feedback_id: feedbackId,
-      user_id: userId,
-      page
-    })
-  },
-
-  retryAnswerRequested: (queryId: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('RetryAnswerRequested', {
-      queryId,
-      userId,
-      page
-    })
-    
-    // Google Analytics
-    trackEngagement('retry_answer_requested', {
-      query_id: queryId,
-      user_id: userId,
-      page
-    })
-  },
-
-  sharePopupOpened: (contentType: string, contentId: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('SharePopupOpened', {
-      contentType,
-      contentId,
-      userId,
-      page
-    })
-    
-    // Google Analytics
-    trackEngagement('share_popup_opened', {
-      content_type: contentType,
-      content_id: contentId,
-      user_id: userId,
-      page
-    })
-  },
-
-  sharePopupClosed: (contentType: string, contentId: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('SharePopupClosed', {
-      contentType,
-      contentId,
-      userId,
-      page
-    })
-    
-    // Google Analytics
-    trackEngagement('share_popup_closed', {
-      content_type: contentType,
-      content_id: contentId,
-      user_id: userId,
-      page
-    })
-  },
-
-  // ===== ENGAGEMENT EVENTS =====
-  dashboardVisited: (userId: string, userCountry?: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('DashboardVisited', {
-      userId,
-      userCountry: userCountry || 'unknown'
-    })
-    
-    // Google Analytics
-    trackEngagement('dashboard_visited', {
-      user_id: userId,
-      user_country: userCountry
-    })
-  },
-
-  chatSessionStarted: (sessionId: string, userId: string, mode: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('ChatSessionStarted', {
-      sessionId,
-      userId,
-      mode
-    })
-    
-    // Google Analytics
-    trackEngagement('chat_session_started', {
-      session_id: sessionId,
-      user_id: userId,
-      mode
-    })
-  },
-
-  messageSent: (sessionId: string, userId: string, messageType: string, messageLength: number) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('MessageSent', {
-      sessionId,
-      userId,
-      messageType,
-      messageLength
-    })
-    
-    // Google Analytics
-    trackEngagement('message_sent', {
-      session_id: sessionId,
-      user_id: userId,
-      message_type: messageType,
-      message_length: messageLength
-    })
-  },
-
-  messageReceived: (sessionId: string, userId: string, responseTime?: number) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('MessageReceived', {
-      sessionId,
-      userId,
-      ...(responseTime && { responseTime })
-    })
-    
-    // Google Analytics
-    trackEngagement('message_received', {
-      session_id: sessionId,
-      user_id: userId,
-      response_time: responseTime
-    })
-  },
-
-  chatSessionEnded: (sessionId: string, userId: string, duration?: number, messageCount?: number) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('ChatSessionEnded', {
-      sessionId,
-      userId,
-      ...(duration && { duration }),
-      ...(messageCount && { messageCount })
-    })
-    
-    // Google Analytics
-    trackEngagement('chat_session_ended', {
-      session_id: sessionId,
-      user_id: userId,
-      duration,
-      message_count: messageCount
-    })
-  },
-
-  featureAccessed: (featureName: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('FeatureAccessed', {
-      featureName,
-      userId,
-      page
-    })
-    
-    // Google Analytics
-    trackEngagement('feature_accessed', {
-      feature_name: featureName,
-      user_id: userId,
-      page
-    })
-  },
-
-  formSubmitted: (formName: string, userId: string, page: string, success: boolean) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('FormSubmitted', {
-      formName,
-      userId,
-      page,
-      success
-    })
-    
-    // Google Analytics
-    trackEngagement('form_submitted', {
-      form_name: formName,
+      search_type: searchType,
       user_id: userId,
       page,
-      success
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drug_information_suggestion_clicked', {
+      drug_name: drugName,
+      search_type: searchType,
+      user_id: userId,
+      page
     })
   },
 
-  // ===== CONTENT EVENTS =====
-  guidelineAccessed: (guidelineId: string, guidelineTitle: string, userId: string, page: string) => {
+
+
+  // ===== DICTIONARY/ALPHABET NAVIGATION EVENTS =====
+  drugInformationDictionaryUsed: (letter: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('GuidelineAccessed', {
-      guidelineId,
-      guidelineTitle,
-      userId,
-      page
+
+    trackEngagement('drug_information_dictionary_used', {
+      letter,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
-    trackEngagement('guideline_accessed', {
+    trackGA4Event('drug_information_dictionary_used', {
+      letter,
+      user_id: userId,
+      page
+    })
+  },
+
+
+  drugInformationAlphabetLetterClicked: (letter: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+    
+    trackEngagement('drug_information_alphabet_letter_clicked', {
+      letter,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drug_information_alphabet_letter_clicked', {
+      letter,
+      user_id: userId,
+      page
+    })
+  },
+
+  // ===== DRUG TABLE EVENTS =====
+  drugInformationDrugClicked: (drugName: string, activeSubstances: string[], userId: string, page: string) => {
+    if (!shouldTrack()) return;
+    
+    trackEngagement('drug_information_drug_clicked', {
+      drug_name: drugName,
+      active_substances: activeSubstances,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('drug_information_drug_clicked', {
+      drug_name: drugName,
+      active_substances: activeSubstances,
+      user_id: userId,
+      page
+    })
+  },
+
+
+
+  // ===== SEARCH RESULTS EVENTS =====
+
+
+
+
+
+
+
+  // ===== GUIDELINES EVENTS =====
+  guidelinesPageViewed: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('guidelines_page_viewed', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('guidelines_page_viewed', {
+      user_id: userId,
+      page
+    })
+  },
+
+
+  guidelinesSearchPerformed: (searchTerm: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('guidelines_search_performed', {
+      search_term: searchTerm,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('guidelines_search_performed', {
+      search_term: searchTerm,
+      user_id: userId,
+      page
+    })
+  },
+
+
+  guidelinesPopularSearchClicked: (searchTerm: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('guidelines_popular_search_clicked', {
+      search_term: searchTerm,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('guidelines_popular_search_clicked', {
+      search_term: searchTerm,
+      user_id: userId,
+      page
+    })
+  },
+
+  // ===== CATEGORY EVENTS =====
+
+  guidelinesNationalCategoryViewed: (guidelineCount: number, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('guidelines_national_category_viewed', {
+      guideline_count: guidelineCount,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('guidelines_national_category_viewed', {
+      guideline_count: guidelineCount,
+      user_id: userId,
+      page
+    })
+  },
+
+  guidelinesEuropeCategoryViewed: (guidelineCount: number, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('guidelines_europe_category_viewed', {
+      guideline_count: guidelineCount,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('guidelines_europe_category_viewed', {
+      guideline_count: guidelineCount,
+      user_id: userId,
+      page
+    })
+  },
+
+  guidelinesInternationalCategoryViewed: (guidelineCount: number, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('guidelines_international_category_viewed', {
+      guideline_count: guidelineCount,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('guidelines_international_category_viewed', {
+      guideline_count: guidelineCount,
+      user_id: userId,
+      page
+    })
+  },
+
+  guidelinesUSACategoryViewed: (guidelineCount: number, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('guidelines_usa_category_viewed', {
+      guideline_count: guidelineCount,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('guidelines_usa_category_viewed', {
+      guideline_count: guidelineCount,
+      user_id: userId,
+      page
+    })
+  },
+
+  // ===== GUIDELINE EVENTS =====
+
+  guidelinesGuidelineViewed: (guidelineId: number, guidelineTitle: string, category: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('guidelines_guideline_viewed', {
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      category,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('guidelines_guideline_viewed', {
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      category,
+      user_id: userId,
+      page
+    })
+  },
+
+
+  guidelinesGuidelineLinkClicked: (guidelineId: number, guidelineTitle: string, url: string, category: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('guidelines_guideline_link_clicked', {
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      url,
+      category,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('guidelines_guideline_link_clicked', {
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      url,
+      category,
+      user_id: userId,
+      page
+    })
+  },
+
+  // ===== BOOKMARK EVENTS =====
+  guidelinesBookmarkToggled: (guidelineId: number, guidelineTitle: string, isBookmarked: boolean, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('guidelines_bookmark_toggled', {
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      is_bookmarked: isBookmarked,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('guidelines_bookmark_toggled', {
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      is_bookmarked: isBookmarked,
+      user_id: userId,
+      page
+    })
+  },
+
+  guidelinesBookmarkSaved: (guidelineId: number, guidelineTitle: string, category: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('guidelines_bookmark_saved', {
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      category,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('guidelines_bookmark_saved', {
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      category,
+      user_id: userId,
+      page
+    })
+  },
+
+  guidelinesBookmarkRemoved: (guidelineId: number, guidelineTitle: string, category: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('guidelines_bookmark_removed', {
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      category,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('guidelines_bookmark_removed', {
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      category,
+      user_id: userId,
+      page
+    })
+  },
+
+
+  // ===== AI SUMMARY EVENTS =====
+  guidelinesAISummaryClicked: (guidelineId: number, guidelineTitle: string, category: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('guidelines_ai_summary_clicked', {
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      category,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('guidelines_ai_summary_clicked', {
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      category,
+      user_id: userId,
+      page
+    })
+  },
+
+  guidelinesAISummaryModalOpened: (guidelineId: number, guidelineTitle: string, category: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('guidelines_ai_summary_modal_opened', {
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      category,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('guidelines_ai_summary_modal_opened', {
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      category,
+      user_id: userId,
+      page
+    })
+  },
+
+  guidelinesAISummaryModalClosed: (guidelineId: number, guidelineTitle: string, category: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('guidelines_ai_summary_modal_closed', {
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      category,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('guidelines_ai_summary_modal_closed', {
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      category,
+      user_id: userId,
+      page
+    })
+  },
+
+  guidelinesAISummaryCitationClicked: (citationNumber: string, guidelineId: number, guidelineTitle: string, userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('guidelines_ai_summary_citation_clicked', {
+      citation_number: citationNumber,
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('guidelines_ai_summary_citation_clicked', {
+      citation_number: citationNumber,
       guideline_id: guidelineId,
       guideline_title: guidelineTitle,
       user_id: userId,
@@ -1035,103 +2242,27 @@ export const track = {
     })
   },
 
-  drugInformationViewed: (drugName: string, drugId: string, userId: string, page: string) => {
+  guidelinesAISummaryFollowupAsked: (question: string, guidelineId: number, guidelineTitle: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('DrugInformationViewed', {
-      drugName,
-      drugId,
-      userId,
-      page
+
+    trackEngagement('guidelines_ai_summary_followup_asked', {
+      question,
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
     })
     
-    // Google Analytics
-    trackEngagement('drug_information_viewed', {
-      drug_name: drugName,
-      drug_id: drugId,
+    trackGA4Event('guidelines_ai_summary_followup_asked', {
+      question,
+      guideline_id: guidelineId,
+      guideline_title: guidelineTitle,
       user_id: userId,
       page
     })
   },
 
-  clinicalTrialSearched: (searchTerm: string, resultsCount: number, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('ClinicalTrialSearched', {
-      searchTerm,
-      resultsCount,
-      userId,
-      page
-    })
-    
-    // Google Analytics
-    trackEngagement('clinical_trial_searched', {
-      search_term: searchTerm,
-      results_count: resultsCount,
-      user_id: userId,
-      page
-    })
-  },
 
-  referenceClicked: (referenceId: string, referenceType: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('ReferenceClicked', {
-      referenceId,
-      referenceType,
-      userId,
-      page
-    })
-    
-    // Google Analytics
-    trackEngagement('reference_clicked', {
-      reference_id: referenceId,
-      reference_type: referenceType,
-      user_id: userId,
-      page
-    })
-  },
 
-  contentShared: (contentType: string, contentId: string, shareMethod: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('ContentShared', {
-      contentType,
-      contentId,
-      shareMethod,
-      userId,
-      page
-    })
-    
-    // Google Analytics
-    trackEngagement('content_shared', {
-      content_type: contentType,
-      content_id: contentId,
-      share_method: shareMethod,
-      user_id: userId,
-      page
-    })
-  },
-
-  feedbackSubmitted: (feedbackType: string, contentId: string, rating: number, userId: string, page: string) => {
-    if (!shouldTrack()) return;
-    // Vercel Analytics
-    vercelTrack('FeedbackSubmitted', {
-      feedbackType,
-      contentId,
-      rating,
-      userId,
-      page
-    })
-    
-    // Google Analytics
-    trackEngagement('feedback_submitted', {
-      feedback_type: feedbackType,
-      content_id: contentId,
-      rating,
-      user_id: userId,
-      page
-    })
-  }
 }
-

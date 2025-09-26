@@ -267,7 +267,6 @@ export function Sidebar({ isOpen, setIsOpen, onSignupRequired }: SidebarProps) {
                     return;
                   }
                   if (user) {
-                    track.guidelinesClicked(user.uid, pathname)
                   }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);
@@ -304,7 +303,6 @@ export function Sidebar({ isOpen, setIsOpen, onSignupRequired }: SidebarProps) {
                     return;
                   }
                   if (user) {
-                    track.drugInformationViewed('drug_search', 'search', user.uid, pathname)
                   }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);
@@ -333,7 +331,6 @@ export function Sidebar({ isOpen, setIsOpen, onSignupRequired }: SidebarProps) {
                     return;
                   }
                   if (user) {
-                    track.visualAbstractClicked(user.uid, pathname)
                   }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);
@@ -360,7 +357,6 @@ export function Sidebar({ isOpen, setIsOpen, onSignupRequired }: SidebarProps) {
                     return;
                   }
                   if (user) {
-                    track.libraryClicked(user.uid, pathname)
                   }
                   if (window.innerWidth < 768) {
                     setIsOpen(false);

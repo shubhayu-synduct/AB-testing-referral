@@ -14,6 +14,7 @@ import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import GuidelineSummaryModal from '@/components/guidelines/guideline-summary-modal'
 import GuidelineSummaryMobileModal from '@/components/guidelines/guideline-summary-mobile-modal'
 import { useIsMobile } from '@/components/ui/use-mobile'
+import { track } from '@/lib/analytics'
 
 interface VisualAbstract {
   id: string
@@ -133,21 +134,36 @@ export default function LibraryPage() {
     setSearchQuery(value)
     generateSuggestions(value)
     setShowSuggestions(value.length > 0)
-  }, [generateSuggestions])
+    
+    // Track search
+    if (user && value.trim()) {
+      track.conversationSearched(value, user.uid, 'library')
+    }
+  }, [generateSuggestions, user])
 
   // Handle suggestion click
   const handleSuggestionClick = useCallback((suggestion: string) => {
     setSearchQuery(suggestion)
     setShowSuggestions(false)
     setSuggestions([])
-  }, [])
+    
+    // Track suggestion click
+    if (user) {
+      track.conversationSearchSuggestionClicked(suggestion, user.uid, 'library')
+    }
+  }, [user])
 
   // Clear search
   const clearSearch = useCallback(() => {
     setSearchQuery('')
     setShowSuggestions(false)
     setSuggestions([])
-  }, [])
+    
+    // Track search clear
+    if (user) {
+      track.conversationSearchCleared(user.uid, 'library')
+    }
+  }, [user])
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -269,6 +285,9 @@ export default function LibraryPage() {
   useEffect(() => {
     // console.log('useEffect triggered, user:', user)
     if (user) {
+      // Track library page view
+      track.libraryPageViewed(user.uid, 'library')
+      
       // console.log('User authenticated, fetching visual abstracts...')
       fetchVisualAbstracts()
     } else {
@@ -441,28 +460,50 @@ export default function LibraryPage() {
   }
 
   const toggleSelectMode = () => {
-    setIsSelectMode(!isSelectMode)
+    const newMode = !isSelectMode
+    setIsSelectMode(newMode)
     if (isSelectMode) {
       setSelectedAbstracts(new Set())
+    }
+    
+    // Track selection mode toggle
+    if (user) {
+      track.visualAbstractSelectionModeToggled(newMode, user.uid, 'library')
     }
   }
 
   const toggleSelectAll = () => {
-    if (selectedAbstracts.size === visualAbstracts.length) {
+    const isCurrentlyAllSelected = selectedAbstracts.size === visualAbstracts.length
+    if (isCurrentlyAllSelected) {
       setSelectedAbstracts(new Set())
     } else {
       setSelectedAbstracts(new Set(visualAbstracts.map(abstract => abstract.id)))
+    }
+    
+    // Track select all toggle
+    if (user) {
+      track.visualAbstractSelectAllToggled(!isCurrentlyAllSelected, visualAbstracts.length, user.uid, 'library')
     }
   }
 
   const toggleSelectAbstract = (abstractId: string) => {
     const newSelected = new Set(selectedAbstracts)
-    if (newSelected.has(abstractId)) {
+    const wasSelected = newSelected.has(abstractId)
+    if (wasSelected) {
       newSelected.delete(abstractId)
     } else {
       newSelected.add(abstractId)
     }
     setSelectedAbstracts(newSelected)
+    
+    // Track individual selection/deselection
+    if (user) {
+      if (wasSelected) {
+        track.visualAbstractDeselected(abstractId, user.uid, 'library')
+      } else {
+        track.visualAbstractSelected(abstractId, user.uid, 'library')
+      }
+    }
   }
 
   // Chat History Functions
@@ -473,6 +514,15 @@ export default function LibraryPage() {
     
     if (!confirm("Are you sure you want to delete this chat?")) {
       return
+    }
+    
+    // Find the session to get its title for tracking
+    const session = chatSessions.find(s => s.id === sessionId)
+    const sessionTitle = session?.title || 'Unknown'
+    
+    // Track conversation deletion
+    if (user) {
+      track.conversationDeleted(sessionId, sessionTitle, user.uid, 'library')
     }
     
     try {
@@ -511,6 +561,9 @@ export default function LibraryPage() {
     if (selectedAbstracts.size === 0 || !user) return
     
     if (window.confirm(`Are you sure you want to delete ${selectedAbstracts.size} visual abstract(s)? This action cannot be undone.`)) {
+      // Track bulk delete
+      track.visualAbstractBulkDeleted(selectedAbstracts.size, user.uid, 'library')
+      
       try {
         const db = getFirebaseFirestore()
         const deletePromises = Array.from(selectedAbstracts).map(abstractId =>
@@ -586,6 +639,11 @@ export default function LibraryPage() {
   const handleBulkDownload = async () => {
     if (selectedAbstracts.size === 0) return
     
+    // Track bulk download
+    if (user) {
+      track.visualAbstractBulkDownloaded(selectedAbstracts.size, user.uid, 'library')
+    }
+    
     for (const abstractId of selectedAbstracts) {
       const abstract = visualAbstracts.find(a => a.id === abstractId)
       if (abstract) {
@@ -598,27 +656,55 @@ export default function LibraryPage() {
   const handleGuidelineClick = (guideline: SavedGuideline) => {
     setSelectedGuideline(guideline)
     setIsModalOpen(true)
+    
+    // Track guideline view and modal open
+    if (user) {
+      track.savedGuidelineViewed(guideline.guidelineId, guideline.guidelineTitle, user.uid, 'library')
+      track.guidelineSummaryModalOpened(guideline.guidelineId, guideline.guidelineTitle, user.uid, 'library')
+    }
   }
 
   const handleModalClose = () => {
+    const guidelineId = selectedGuideline?.guidelineId
+    const guidelineTitle = selectedGuideline?.guidelineTitle
     setIsModalOpen(false)
     setSelectedGuideline(null)
+    
+    // Track modal close
+    if (user && guidelineId && guidelineTitle) {
+      track.guidelineSummaryModalClosed(guidelineId, guidelineTitle, user.uid, 'library')
+    }
   }
 
   const handleAbstractClick = (abstract: VisualAbstract) => {
     if (!isSelectMode) {
       setSelectedAbstract(abstract)
       setIsAbstractModalOpen(true)
+      
+      // Track abstract view and modal open
+      if (user) {
+        track.visualAbstractViewed(abstract.id, user.uid, 'library')
+        track.visualAbstractModalOpened(abstract.id, user.uid, 'library')
+      }
     }
   }
 
   const handleAbstractModalClose = () => {
+    const abstractId = selectedAbstract?.id
     setIsAbstractModalOpen(false)
     setSelectedAbstract(null)
+    
+    // Track modal close
+    if (user && abstractId) {
+      track.visualAbstractModalClosed(abstractId, user.uid, 'library')
+    }
   }
 
   const removeBookmark = async (guideline: SavedGuideline) => {
     if (!user) return
+    
+    // Track guideline removal
+    track.savedGuidelineRemoved(guideline.guidelineId, guideline.guidelineTitle, user.uid, 'library')
     
     try {
       const db = getFirebaseFirestore()
@@ -750,7 +836,12 @@ export default function LibraryPage() {
             <div className="mb-6 flex justify-center">
               <div className="flex space-x-8">
                 <button
-                  onClick={() => setActiveTab('visual-abstracts')}
+                  onClick={() => {
+                    setActiveTab('visual-abstracts');
+                    if (user) {
+                      track.libraryTabClicked('visual-abstracts', user.uid, 'library');
+                    }
+                  }}
                   className={`pb-2 px-1 text-base font-medium transition-colors ${
                     activeTab === 'visual-abstracts'
                       ? 'text-[#214498] border-b-2 border-[#214498]'
@@ -761,7 +852,12 @@ export default function LibraryPage() {
                   Visual Abstracts
                 </button>
                 <button
-                  onClick={() => setActiveTab('conversations')}
+                  onClick={() => {
+                    setActiveTab('conversations');
+                    if (user) {
+                      track.libraryTabClicked('conversations', user.uid, 'library');
+                    }
+                  }}
                   className={`pb-2 px-1 text-base font-medium transition-colors ${
                     activeTab === 'conversations'
                       ? 'text-[#214498] border-b-2 border-[#214498]'
@@ -772,7 +868,12 @@ export default function LibraryPage() {
                   Conversations
                 </button>
                 <button
-                  onClick={() => setActiveTab('saved-guidelines')}
+                  onClick={() => {
+                    setActiveTab('saved-guidelines');
+                    if (user) {
+                      track.libraryTabClicked('saved-guidelines', user.uid, 'library');
+                    }
+                  }}
                   className={`pb-2 px-1 text-base font-medium transition-colors ${
                     activeTab === 'saved-guidelines'
                       ? 'text-[#214498] border-b-2 border-[#214498]'
@@ -877,7 +978,12 @@ export default function LibraryPage() {
                     <h3 className="text-xl font-semibold text-[#223258] mb-2">No visual abstracts yet</h3>
                     <p className="text-[#223258]/70 mb-4">Your generated visual abstracts will appear here</p>
                     <Button 
-                      onClick={() => window.location.href = '/image-generator'}
+                      onClick={() => {
+                        if (user) {
+                          track.createVisualAbstractClicked(user.uid, 'library')
+                        }
+                        window.location.href = '/image-generator'
+                      }}
                       className="bg-[#223258] hover:bg-[#223258]/90 text-white"
                     >
                       Create a visual abstract
@@ -924,6 +1030,9 @@ export default function LibraryPage() {
                               className="h-6 w-6 p-0 bg-white/90 backdrop-blur-sm border border-[#B5C9FC] hover:bg-white hover:border-[#223258] transition-all"
                               onClick={(e) => {
                                 e.stopPropagation()
+                                if (user) {
+                                  track.visualAbstractDownloaded(abstract.id, user.uid, 'library')
+                                }
                                 downloadAsPNG(abstract.svg.svg_data, `visual-abstract-${abstract.id}.png`)
                               }}
                             >
@@ -1017,7 +1126,13 @@ export default function LibraryPage() {
                   <div className="relative min-w-[180px]">
                     <select
                       value={sortOption}
-                      onChange={(e) => setSortOption(e.target.value as SortOption)}
+                      onChange={(e) => {
+                        const newSortOption = e.target.value as SortOption
+                        setSortOption(newSortOption)
+                        if (user) {
+                          track.conversationSortChanged(newSortOption, user.uid, 'library')
+                        }
+                      }}
                       className="appearance-none pl-10 pr-10 h-11 w-full border rounded-[2px] focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs md:text-base text-[#214498] font-normal"
                       style={{ fontFamily: 'DM Sans, sans-serif', color: '#214498', fontWeight: 400, borderColor: 'rgba(55, 113, 254, 0.5)' }}
                     >
@@ -1090,7 +1205,15 @@ export default function LibraryPage() {
                               <div className="space-y-4">
                                 {sessions.map(session => (
                                   <div key={session.id} className="bg-[#F4F7FF] rounded-[2px] p-4 flex items-start shadow-sm hover:shadow-md transition-shadow relative border" style={{ borderColor: 'rgba(55, 113, 254, 0.5)' }}>
-                                    <Link href={`/dashboard/${session.id}`} className="flex-1 min-w-0 group pr-10">
+                                    <Link 
+                                      href={`/dashboard/${session.id}`} 
+                                      className="flex-1 min-w-0 group pr-10"
+                                      onClick={() => {
+                                        if (user) {
+                                          track.conversationClicked(session.id, session.title, user.uid, 'library')
+                                        }
+                                      }}
+                                    >
                                       <div className="text-base font-medium mb-2 group-hover:underline truncate overflow-hidden whitespace-nowrap" style={{ fontFamily: 'DM Sans, sans-serif', color: '#223258', fontSize: '16px' }}>
                                         {label === 'Pinned' && (
                                           <Pin size={14} className="inline mr-2 text-[#214498]" />
@@ -1153,7 +1276,12 @@ export default function LibraryPage() {
                     <h3 className="text-xl font-semibold text-[#223258] mb-2">No saved guidelines yet</h3>
                     <p className="text-[#223258]/70 mb-4">Your bookmarked guidelines will appear here</p>
                     <Button 
-                      onClick={() => window.location.href = '/guidelines'}
+                      onClick={() => {
+                        if (user) {
+                          track.browseGuidelinesClicked(user.uid, 'library')
+                        }
+                        window.location.href = '/guidelines'
+                      }}
                       className="bg-[#223258] hover:bg-[#223258]/90 text-white"
                     >
                       Browse Guidelines
@@ -1171,6 +1299,11 @@ export default function LibraryPage() {
                               target="_blank" 
                               rel="noopener noreferrer"
                               className="block"
+                              onClick={() => {
+                                if (user) {
+                                  track.savedGuidelineClicked(guideline.guidelineId, guideline.guidelineTitle, guideline.url, user.uid, 'library')
+                                }
+                              }}
                               style={{
                                 fontFamily: 'DM Sans, sans-serif',
                                 color: '#214498',
@@ -1236,7 +1369,12 @@ export default function LibraryPage() {
                               
                               {/* Guideline AI Summary Button */}
                               <button 
-                                onClick={() => handleGuidelineClick(guideline)}
+                                onClick={() => {
+                                  if (user) {
+                                    track.savedGuidelineAISummaryClicked(guideline.guidelineId, guideline.guidelineTitle, user.uid, 'library')
+                                  }
+                                  handleGuidelineClick(guideline)
+                                }}
                                 disabled={!guideline.pdf_saved}
                                 className={`flex items-center gap-1 px-3 sm:px-4 py-1.5 sm:py-2 transition-colors text-xs sm:text-sm
                                 ${guideline.pdf_saved 
@@ -1330,7 +1468,12 @@ export default function LibraryPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => downloadAsPNG(selectedAbstract.svg.svg_data, `visual-abstract-${selectedAbstract.id}.png`)}
+                onClick={() => {
+                  if (user) {
+                    track.visualAbstractDownloaded(selectedAbstract.id, user.uid, 'library')
+                  }
+                  downloadAsPNG(selectedAbstract.svg.svg_data, `visual-abstract-${selectedAbstract.id}.png`)
+                }}
                 className="bg-[#002A7C] hover:bg-[#1B3B8B] border-[#002A7C] text-white"
               >
                 <Download className="h-4 w-4 mr-2" />

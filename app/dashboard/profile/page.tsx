@@ -8,6 +8,7 @@ import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useSearchParams, useRouter } from "next/navigation";
 import { CleanupService } from "@/lib/cleanup-service";
+import { track } from "@/lib/analytics";
 
 
 function ProfilePageContent() {
@@ -134,6 +135,9 @@ function ProfilePageContent() {
     if (authLoading) return; // Wait for auth to finish
     if (!user) return; // Optionally redirect to login here
 
+    // Track profile page view
+    track.profilePageViewed(user.uid, 'profile');
+
     const fetchProfile = async () => {
       try {
         const db = getFirebaseFirestore();
@@ -237,6 +241,7 @@ function ProfilePageContent() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setProfile((prev: any) => ({ ...prev, [name]: value }));
+    
   };
 
   const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -249,16 +254,27 @@ function ProfilePageContent() {
   };
 
   const toggleCookie = (type: 'analytics' | 'marketing' | 'functional') => {
+    const newValue = !cookiePreferences[type];
     setCookiePreferences(prev => ({
       ...prev,
-      [type]: !prev[type]
+      [type]: newValue
     }));
+    
+    // Track cookie preference toggle
+    if (user) {
+      track.cookiePreferenceToggled(type, newValue, user.uid, 'profile');
+    }
   };
 
   const handlePreferencesSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPreferencesSaving(true);
     setPreferencesSuccess(false);
+    
+    // Track preferences form submission
+    if (user) {
+      track.preferencesFormSubmitted(user.uid, 'profile');
+    }
     
     const auth = await getFirebaseAuth();
     const user = auth.currentUser;
@@ -291,6 +307,7 @@ function ProfilePageContent() {
       // Update original preferences to match current
       setOriginalCookiePreferences(cookiePreferences);
       setPreferencesSuccess(true);
+      
     }
     setPreferencesSaving(false);
   };
@@ -397,6 +414,11 @@ function ProfilePageContent() {
   const handleTabChange = (tab: 'profile' | 'preferences' | 'subscription' | 'feedback') => {
     setActiveTab(tab);
     router.push(`/dashboard/profile?tab=${tab}`);
+    
+    // Track tab click
+    if (user) {
+      track.profileTabClicked(tab, user.uid, 'profile');
+    }
   };
 
   const handlePlanSelect = async (plan: string, interval: string) => {
@@ -409,6 +431,7 @@ function ProfilePageContent() {
       setError('Please select a paid plan');
       return;
     }
+
 
     setPlanLoading(true);
     setError('');
@@ -447,6 +470,11 @@ function ProfilePageContent() {
 
   const handleCancelSubscription = () => {
     setShowCancelSubscriptionModal(true);
+    
+    // Track cancel subscription click
+    if (user) {
+      track.cancelSubscriptionClicked(user.uid, 'profile');
+    }
   };
 
   const confirmCancelSubscription = async () => {
@@ -461,6 +489,9 @@ function ProfilePageContent() {
       setError('No active subscription to cancel');
       return;
     }
+
+    // Track cancel subscription confirmation
+    track.cancelSubscriptionConfirmed(user.uid, 'profile');
 
     setCancelling(true);
     setError('');
@@ -511,6 +542,12 @@ function ProfilePageContent() {
     e.preventDefault();
     setSaving(true);
     setSuccess(false);
+    
+    // Track form submission
+    if (user) {
+      track.profileFormSubmitted(user.uid, 'profile');
+    }
+    
     const auth = await getFirebaseAuth();
     const user = auth.currentUser;
     if (user) {
@@ -536,12 +573,18 @@ function ProfilePageContent() {
       
       await updateDoc(docRef, updateData);
       setSuccess(true);
+      
     }
     setSaving(false);
   };
 
   const deleteProfile = async () => {
     if (deleteConfirmation !== 'DELETE') return;
+    
+    // Track delete profile confirmation
+    if (user) {
+      track.deleteProfileConfirmed(user.uid, 'profile');
+    }
     
     setDeleting(true);
     try {
@@ -705,7 +748,9 @@ function ProfilePageContent() {
                     <div
                       className={`w-full min-h-[40px] px-2 py-1 border border-[#B5C9FC] rounded-[8px] bg-white flex items-center justify-between gap-1 focus-within:ring-2 focus-within:ring-[#B5C9FC] focus-within:border-transparent`}
                       tabIndex={0}
-                      onClick={() => setShowCountryDropdown(true)}
+                      onClick={() => {
+                        setShowCountryDropdown(true);
+                      }}
                       style={{ cursor: 'text', position: 'relative' }}
                     >
                       {!profile?.country && (
@@ -944,6 +989,9 @@ function ProfilePageContent() {
                               setProfile((prev: any) => ({ ...prev, country: value }));
                               setShowCountryDropdown(false);
                               setCountrySearchTerm('');
+                              if (user) {
+                                track.profileCountrySelected(value, user.uid, 'profile');
+                              }
                             }}
                           >
                             {label}
@@ -967,7 +1015,9 @@ function ProfilePageContent() {
                     <div
                       className={`w-full min-h-[40px] px-2 py-1 border border-[#B5C9FC] rounded-[8px] bg-white flex items-center justify-between gap-1 focus-within:ring-2 focus-within:ring-[#B5C9FC] focus-within:border-transparent`}
                       tabIndex={0}
-                      onClick={() => setShowPlaceOfWorkDropdown(true)}
+                      onClick={() => {
+                        setShowPlaceOfWorkDropdown(true);
+                      }}
                       style={{ cursor: 'text', position: 'relative' }}
                     >
                       {!profile?.placeOfWork && (
@@ -1022,6 +1072,9 @@ function ProfilePageContent() {
                               }));
                               setShowPlaceOfWorkDropdown(false);
                               setPlaceOfWorkSearchTerm('');
+                              if (user) {
+                                track.profilePlaceOfWorkSelected(opt.value, user.uid, 'profile');
+                              }
                             }}
                           >
                             {opt.label}
@@ -1038,7 +1091,9 @@ function ProfilePageContent() {
                         name="otherPlaceOfWork"
                         placeholder="Please specify your place of work"
                         value={profile.otherPlaceOfWork || ""}
-                        onChange={e => setProfile((prev: any) => ({ ...prev, otherPlaceOfWork: e.target.value }))}
+                        onChange={e => {
+                          setProfile((prev: any) => ({ ...prev, otherPlaceOfWork: e.target.value }));
+                        }}
                         className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[8px] text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent text-sm bg-white"
                         style={{ fontSize: 14 }}
                       />
@@ -1055,7 +1110,9 @@ function ProfilePageContent() {
                     <div
                       className={`w-full min-h-[40px] px-2 py-1 border border-[#B5C9FC] rounded-[8px] bg-white flex flex-wrap items-center gap-1 focus-within:ring-2 focus-within:ring-[#B5C9FC] focus-within:border-transparent`}
                       tabIndex={0}
-                      onClick={() => setShowSpecialtiesDropdown(true)}
+                      onClick={() => {
+                        setShowSpecialtiesDropdown(true);
+                      }}
                       style={{ cursor: 'text', position: 'relative' }}
                     >
                       {(!specialtiesArray || specialtiesArray.length === 0) && (
@@ -1088,6 +1145,11 @@ function ProfilePageContent() {
                                   otherSpecialty: shouldClearOtherSpecialty ? "" : prev.otherSpecialty
                                 };
                               });
+                              
+                              // Track specialty removal
+                              if (user) {
+                                track.profileSpecialtyRemoved(specialty, user.uid, 'profile');
+                              }
                             }}
                             className="ml-1 text-[#3771FE] hover:text-[#223258]"
                           >
@@ -1149,6 +1211,11 @@ function ProfilePageContent() {
                               });
                               setShowSpecialtiesDropdown(false);
                               setSpecialtiesSearchTerm('');
+                              
+                              // Track specialty addition
+                              if (user) {
+                                track.profileSpecialtyAdded(opt.value, user.uid, 'profile');
+                              }
                             }}
                           >
                             {opt.label}
@@ -1165,7 +1232,9 @@ function ProfilePageContent() {
                         name="otherSpecialty"
                         placeholder="Please specify your specialty"
                         value={profile.otherSpecialty || ""}
-                        onChange={e => setProfile((prev: any) => ({ ...prev, otherSpecialty: e.target.value }))}
+                        onChange={e => {
+                          setProfile((prev: any) => ({ ...prev, otherSpecialty: e.target.value }));
+                        }}
                         className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[8px] text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent text-sm bg-white"
                         style={{ fontSize: 14 }}
                       />
@@ -1188,7 +1257,12 @@ function ProfilePageContent() {
             <div className="flex justify-end mt-4 w-full mb-4 md:mb-0">
               <button
                 type="button"
-                onClick={() => setShowDeleteModal(true)}
+                onClick={() => {
+                  setShowDeleteModal(true);
+                  if (user) {
+                    track.deleteProfileClicked(user.uid, 'profile');
+                  }
+                }}
                 className="bg-[#F4F7FF] border border-[#B5C9FC] text-[#747474] font-regular px-8 py-2 rounded-[8px] transition-colors text-lg w-48 hover:bg-[#E8F0FF] hover:text-[#223258]"
               >
                 Delete Profile
@@ -1355,6 +1429,7 @@ function ProfilePageContent() {
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="text-black underline hover:text-[#3771FE] transition-colors"
+                        onClick={() => user && track.privacyPolicyClicked(user.uid, 'profile')}
                       >
                         privacy policy
                       </a>
@@ -1364,6 +1439,7 @@ function ProfilePageContent() {
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="text-black underline hover:text-[#3771FE] transition-colors"
+                        onClick={() => user && track.cookiePolicyClicked(user.uid, 'profile')}
                       >
                         cookie policy
                       </a>
@@ -1431,7 +1507,9 @@ function ProfilePageContent() {
             <div className="flex justify-center mb-8">
               <div className="bg-white border border-[#B5C9FC] rounded-[10px] p-1 inline-flex">
                 <button
-                  onClick={() => setBillingInterval('monthly')}
+                  onClick={() => {
+                    setBillingInterval('monthly');
+                  }}
                   className={`px-6 py-2 rounded-[8px] font-medium transition-colors ${
                     billingInterval === 'monthly' 
                       ? 'bg-[#3771FE] text-white' 
@@ -1441,7 +1519,9 @@ function ProfilePageContent() {
                   Monthly
                 </button>
                 <button
-                  onClick={() => setBillingInterval('yearly')}
+                  onClick={() => {
+                    setBillingInterval('yearly');
+                  }}
                   className={`px-6 py-2 rounded-[8px] font-medium transition-colors ${
                     billingInterval === 'yearly' 
                       ? 'bg-[#3771FE] text-white' 
@@ -1585,7 +1665,12 @@ function ProfilePageContent() {
                 
                 {/* Button positioned above features */}
                 <button
-                  onClick={() => window.location.href = 'mailto:info@synduct.com?subject=Enterprise Plan Inquiry'}
+                  onClick={() => {
+                    if (user) {
+                      track.contactSalesClicked(user.uid, 'profile');
+                    }
+                    window.location.href = 'mailto:info@synduct.com?subject=Enterprise Plan Inquiry';
+                  }}
                   className="w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-6 bg-[#3771FE] text-white hover:bg-[#2A5CDB]"
                 >
                   Contact Sales

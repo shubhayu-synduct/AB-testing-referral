@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { logger } from '@/lib/logger'
 import { useDrinfoSummaryTour } from '@/components/TourContext'
+import { track } from '@/lib/analytics'
 
 interface DrInfoSummaryProps {
   user: any;
@@ -311,6 +312,9 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         hasId: !!user.id,
         authenticationType: user.uid ? "Firebase Auth" : "Custom Auth",
       });
+      
+      // Track page viewed
+      track.drinfoSummaryPageViewed(userId, 'drinfo-summary');
     } else {
       logger.debug("DrInfoSummary component initialized with NO USER");
     }
@@ -690,6 +694,13 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
   const handleFollowUpQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!followUpQuestion.trim()) return;
+    
+    // Track follow-up question asked
+    const userId = user?.uid || user?.id;
+    if (userId) {
+      track.drinfoSummaryFollowUpAsked(followUpQuestion, userId, 'drinfo-summary');
+    }
+    
     setLastQuestion(followUpQuestion);
     setQuestionCount(prev => {
       const newCount = prev + 1;
@@ -1177,6 +1188,12 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
           e.stopPropagation();
           
           if (citationObj) {
+            // Track citation clicked
+            const userId = user?.uid || user?.id;
+            if (userId) {
+              track.drinfoSummaryCitationClicked(citationObj.id || citationNumber, citationObj.title || 'Unknown', userId, 'drinfo-summary');
+            }
+            
             // Check if it's a mobile device (no hover capability)
             if (window.matchMedia('(hover: none)').matches) {
               // Only open citations sidebar for non-drug citations on mobile
@@ -1352,6 +1369,9 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       return;
     }
 
+    // Track query submitted
+    track.drinfoSummaryQuerySubmitted(content, mode || 'research', userId, 'drinfo-summary');
+
     // Determine parent_thread_id for Firebase thread-based follow-up detection
     const parentThreadId = isFollowUp && messages.length > 0 
       ? messages[messages.length - 1]?.threadId  // Get the last assistant message's thread ID
@@ -1408,6 +1428,23 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
           setImageGenerationStatus('generating');
         } else if (newStatus === 'complete_image') {
           setImageGenerationStatus('complete');
+          
+          // Track image generated
+          const userId = user?.uid || user?.id;
+          if (userId && message) {
+            try {
+              const imageData = JSON.parse(message);
+              if (imageData.svg_content) {
+                const imageCount = Array.isArray(imageData.svg_content) 
+                  ? imageData.svg_content.filter((content: any) => content !== null && content !== undefined).length
+                  : 1;
+                track.drinfoSummaryImageGenerated(imageCount, userId, 'drinfo-summary');
+              }
+            } catch (error) {
+              // If parsing fails, still track with count 1
+              track.drinfoSummaryImageGenerated(1, userId, 'drinfo-summary');
+            }
+          }
         }
         
         // Handle complete_image status independently of hasCompleted flag
@@ -1599,6 +1636,10 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       return;
     }
 
+    // Track share initiated
+    const userId = user.uid || user.id;
+    track.drinfoSummaryShared('initiated', userId, 'drinfo-summary');
+
     setIsSharing(true);
     setShowSharePopup(true);
 
@@ -1673,6 +1714,12 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
   const copyToClipboard = async () => {
     if (!shareLink) return;
     
+    // Track copy to clipboard
+    const userId = user?.uid || user?.id;
+    if (userId) {
+      track.drinfoSummaryShared('copy_clipboard', userId, 'drinfo-summary');
+    }
+    
     try {
       await navigator.clipboard.writeText(shareLink);
       setIsCopied(true);
@@ -1684,18 +1731,39 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
 
   const shareOnLinkedIn = () => {
     if (!shareLink) return;
+    
+    // Track LinkedIn share
+    const userId = user?.uid || user?.id;
+    if (userId) {
+      track.drinfoSummaryShared('linkedin', userId, 'drinfo-summary');
+    }
+    
     const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareLink)}`;
     window.open(url, '_blank');
   };
 
   const shareOnWhatsApp = () => {
     if (!shareLink) return;
+    
+    // Track WhatsApp share
+    const userId = user?.uid || user?.id;
+    if (userId) {
+      track.drinfoSummaryShared('whatsapp', userId, 'drinfo-summary');
+    }
+    
     const url = `https://wa.me/?text=${encodeURIComponent(`Check out this chat: ${shareLink}`)}`;
     window.open(url, '_blank');
   };
 
   const shareViaEmail = () => {
     if (!shareLink) return;
+    
+    // Track email share
+    const userId = user?.uid || user?.id;
+    if (userId) {
+      track.drinfoSummaryShared('email', userId, 'drinfo-summary');
+    }
+    
     const subject = 'Shared Chat from DrInfo';
     const body = `I wanted to share this chat with you: ${shareLink}`;
     const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;

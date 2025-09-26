@@ -10,6 +10,7 @@ import Image from 'next/image';
 import { getCachedAuthStatus, UserAuthStatus } from '@/lib/background-auth';
 import { logger } from '@/lib/logger';
 import { SparkleIcon } from '@/components/ui/sparkle-icon';
+import { track } from '@/lib/analytics';
 
 
 interface Drug {
@@ -33,6 +34,14 @@ export default function DrugInformationPage() {
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [selectedLetter, setSelectedLetter] = useState('A');
+  const [dictionaryUsed, setDictionaryUsed] = useState(false);
+
+  // Track page view when user is available
+  useEffect(() => {
+    if (user) {
+      track.drugInformationPageViewed(user.uid, 'drug-information');
+    }
+  }, [user]);
   
   const alphabetBarRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -69,6 +78,11 @@ export default function DrugInformationPage() {
         left: direction === 'left' ? scrollLeft - scrollAmount : scrollLeft + scrollAmount,
         behavior: 'smooth',
       });
+      
+      // Track alphabet scroll
+      if (user) {
+        track.drugInformationAlphabetScrolled(direction, user.uid, 'drug-information');
+      }
     }
   };
   
@@ -76,6 +90,14 @@ export default function DrugInformationPage() {
   useEffect(() => {
     const fetchDrugs = async () => {
       setIsLoading(true);
+      
+      // Track dictionary usage
+      if (user && !dictionaryUsed) {
+        setDictionaryUsed(true);
+        track.drugInformationDictionaryUsed(selectedLetter, user.uid, 'drug-information');
+        track.drugInformationDictionaryUsageTracked(true, user.uid, 'drug-information');
+      }
+      
       try {
         // Get authentication status in background with fallback
         const authStatus = await getCachedAuthStatus();
@@ -100,7 +122,7 @@ export default function DrugInformationPage() {
     };
     
     fetchDrugs();
-  }, [selectedLetter]);
+  }, [selectedLetter, user, dictionaryUsed]);
   
   // Fetch unified suggestions (both EMA drugs and AI suggestions) for autocomplete
   const fetchAISuggestions = async (term: string) => {
@@ -222,11 +244,25 @@ export default function DrugInformationPage() {
       // Limit total to 6 suggestions (3 EMA + 3 AI)
       setRecommendations(allRecommendations.slice(0, 6));
       
+      // Track search results loaded - separate AI and EMA results
+      if (user) {
+        const aiResults = allRecommendations.filter(drug => drug.search_type === 'ai_suggestion' || drug.search_type === 'ai_search');
+        const emaResults = allRecommendations.filter(drug => drug.search_type === 'direct_brand' || drug.search_type === 'brand_option');
+        
+      }
+      
       if (searchInputRef.current) {
         searchInputRef.current.focus();
       }
     } catch (error) {
       logger.error('Error fetching unified suggestions:', error);
+      
+      // Track search error - track both AI and EMA errors since it's a unified search
+      if (user) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        track.drugInformationAISearchError(term, errorMessage, user.uid, 'drug-information');
+        track.drugInformationEMASearchError(term, errorMessage, user.uid, 'drug-information');
+      }
       
       // Fallback: try EMA search with English database + AI fallback
       try {
@@ -450,6 +486,11 @@ export default function DrugInformationPage() {
   const handleSearch = () => {
     if (searchTerm.trim() === '') return;
     
+    // Track AI search performed (since it navigates to AI results page)
+    if (user) {
+      track.drugInformationAISearchPerformed(searchTerm.trim(), user.uid, 'drug-information');
+    }
+    
     // Navigate to AI results page with the search query
     router.push(`/ai-results?q=${encodeURIComponent(searchTerm.trim())}`);
   };
@@ -525,7 +566,9 @@ export default function DrugInformationPage() {
               placeholder="Search drugs..."
               className="flex-1 py-2 md:py-3 pl-3 md:pl-4 pr-2 md:pr-3 outline-none text-[#223258] font-['DM_Sans'] font-[400] text-[14px] md:text-[16px] leading-[100%] tracking-[0%] placeholder-[#9599A8] placeholder:font-['DM_Sans'] placeholder:text-[14px] md:placeholder:text-[16px]"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+              }}
               onFocus={() => {
                 if (searchTerm.trim() !== '') {
                   setShowRecommendations(true);
@@ -552,7 +595,13 @@ export default function DrugInformationPage() {
             
             <button 
               className="flex items-center justify-center border-none bg-transparent relative ml-2 md:ml-3 hover:opacity-80 transition-opacity text-[#6366f1] p-1"
-              onClick={handleSearch}
+              onClick={() => {
+                // Track search button click
+                if (user) {
+                  track.drugInformationSearchButtonClicked(searchTerm, user.uid, 'drug-information');
+                }
+                handleSearch();
+              }}
             >
               <svg 
                 width="28" 
@@ -579,13 +628,30 @@ export default function DrugInformationPage() {
                     drug.search_type === 'ai_suggestion' ? 'border-l-4 border-l-[#2196f3]' : drug.search_type === 'ai_search' ? 'border-l-4 border-l-[#ffa500]' : 'border-l-4 border-l-[#28a745]'
                   }`}
                   onClick={() => {
+                    // Track suggestion click
+                    if (user) {
+                      track.drugInformationSuggestionClicked(drug.brand_name, drug.search_type, user.uid, 'drug-information');
+                    }
+                    
                     if (drug.search_type === 'ai_suggestion') {
+                      // Track AI search performed
+                      if (user) {
+                        track.drugInformationAISearchPerformed(drug.brand_name, user.uid, 'drug-information');
+                      }
                       // Navigate to AI results page for AI suggestions
                       router.push(`/ai-results?q=${encodeURIComponent(drug.brand_name)}`);
                     } else if (drug.search_type === 'ai_search') {
+                      // Track AI search performed
+                      if (user) {
+                        track.drugInformationAISearchPerformed(drug.brand_name, user.uid, 'drug-information');
+                      }
                       // Navigate to AI results page
                       router.push(`/ai-results?q=${encodeURIComponent(drug.brand_name)}`);
                     } else {
+                      // Track EMA search performed
+                      if (user) {
+                        track.drugInformationEMASearchPerformed(drug.brand_name, user.uid, 'drug-information');
+                      }
                       // Navigate to EMA drug page
                       router.push(`/drug-information/${slugify(drug.brand_name)}`);
                     }
@@ -594,6 +660,7 @@ export default function DrugInformationPage() {
                       searchInputRef.current.focus();
                     }
                   }}
+                  onMouseEnter={() => {}}
                   onMouseDown={(e) => {
                     e.preventDefault();
                   }}
@@ -708,7 +775,13 @@ export default function DrugInformationPage() {
                       ? 'text-[#263969]' 
                       : 'text-[#878787] hover:text-[#263969]'
                   }`}
-                  onClick={() => setSelectedLetter(letter)}
+                  onClick={() => {
+                    setSelectedLetter(letter);
+                    // Track alphabet letter click
+                    if (user) {
+                      track.drugInformationAlphabetLetterClicked(letter, user.uid, 'drug-information');
+                    }
+                  }}
                 >
                   {letter}
                 </button>
@@ -720,7 +793,13 @@ export default function DrugInformationPage() {
                     ? 'text-[#263969]' 
                     : 'text-[#878787] hover:text-[#263969]'
                 }`}
-                onClick={() => setSelectedLetter('#')}
+                onClick={() => {
+                  setSelectedLetter('#');
+                  // Track alphabet letter click
+                  if (user) {
+                    track.drugInformationAlphabetLetterClicked('#', user.uid, 'drug-information');
+                  }
+                }}
               >
                 #
               </button>
@@ -769,6 +848,13 @@ export default function DrugInformationPage() {
                             <Link 
                               href={`/drug-information/${slugify(drug.brand_name)}`} 
                               className="text-[#263969] font-['DM_Sans'] font-normal text-[16px] hover:text-[#214498] hover:underline transition-colors"
+                              onClick={() => {
+                                // Track drug click
+                                if (user) {
+                                  track.drugInformationDrugClicked(drug.brand_name, sortedActiveSubstances, user.uid, 'drug-information');
+                                }
+                              }}
+                              onMouseEnter={() => {}}
                             >
                               {drug.brand_name}
                             </Link>

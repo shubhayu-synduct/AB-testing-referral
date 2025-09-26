@@ -87,11 +87,32 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
   }, {} as Record<string, Guideline[]>);
 
   const toggleCategory = (category: string) => {
-    setExpandedCategories(prev => 
-      prev.includes(category) 
+    setExpandedCategories(prev => {
+      const isCurrentlyExpanded = prev.includes(category);
+      const newExpandedCategories = isCurrentlyExpanded 
         ? prev.filter(c => c !== category)
-        : [...prev, category]
-    );
+        : [...prev, category];
+      
+      // Track category toggle with specific events
+      if (user) {
+        switch (category) {
+          case 'National':
+            track.guidelinesNationalCategoryToggled(!isCurrentlyExpanded, user.uid, 'guidelines');
+            break;
+          case 'Europe':
+            track.guidelinesEuropeCategoryToggled(!isCurrentlyExpanded, user.uid, 'guidelines');
+            break;
+          case 'International':
+            track.guidelinesInternationalCategoryToggled(!isCurrentlyExpanded, user.uid, 'guidelines');
+            break;
+          case 'USA':
+            track.guidelinesUSACategoryToggled(!isCurrentlyExpanded, user.uid, 'guidelines');
+            break;
+        }
+      }
+      
+      return newExpandedCategories;
+    });
   };
 
   // Function to update URL parameters
@@ -249,17 +270,36 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
       setIsLoading(true);
       setError(null);
       
+      // Track search performed
+      if (user) {
+        track.guidelinesSearchPerformed(query, user.uid, 'guidelines');
+      }
+      
       const results = await getSearchResults(query, country, specialties, otherSpecialty);
       setGuidelines(results);
       setRetryCount(0);
+      
+      // Track search results loaded
+      if (user) {
+        if (results.length > 0) {
+          track.guidelinesSearchResultsLoaded(query, results.length, user.uid, 'guidelines');
+        } else {
+          track.guidelinesSearchResultsEmpty(query, user.uid, 'guidelines');
+        }
+      }
     } catch (err: any) {
       logger.error('Error performing search:', err);
       setError(err.message || 'Search failed. Please try again.');
       setGuidelines([]);
+      
+      // Track search error
+      if (user) {
+        track.guidelinesSearchError(query, err.message || 'Search failed', user.uid, 'guidelines');
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [getSearchResults]);
+  }, [getSearchResults, user]);
 
   // Separate effect to handle search parameter changes without re-fetching user profile
   useEffect(() => {
@@ -298,7 +338,6 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
   }, [searchParams, userCountry, userSpecialties, user, performSearch, lastSearchQuery]); // Only when search params change
 
   useEffect(() => {
-    track.pageViewed('GuidelinesPage', user ? 'authenticated' : 'unauthenticated', userCountry);
   }, [user, userCountry]);
 
   const fetchInitialGuidelines = async (country: string, specialties: string[], otherSpecialty: string) => {
@@ -451,8 +490,18 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
   }
 
   const handleGuidelineClick = (guideline: Guideline) => {
+    // Track guideline click
+    if (user) {
+      track.guidelinesGuidelineClicked(guideline.id, guideline.title, guideline.category || 'Other', user.uid, 'guidelines');
+    }
+    
     setSelectedGuideline(guideline)
     setIsModalOpen(true)
+    
+    // Track AI summary modal opened
+    if (user) {
+      track.guidelinesAISummaryModalOpened(guideline.id, guideline.title, guideline.category || 'Other', user.uid, 'guidelines');
+    }
     
     // Update URL to include guideline modal
     const currentParams = new URLSearchParams(searchParams.toString())
@@ -464,6 +513,11 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
   }
 
   const handleModalClose = () => {
+    // Track AI summary modal closed
+    if (user && selectedGuideline) {
+      track.guidelinesAISummaryModalClosed(selectedGuideline.id, selectedGuideline.title, selectedGuideline.category || 'Other', user.uid, 'guidelines');
+    }
+    
     setIsModalOpen(false)
     setSelectedGuideline(null)
     
@@ -491,12 +545,21 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
       // console.log('Starting bookmark operation for guideline:', guideline.id);
       setBookmarkingGuidelines(prev => new Set([...prev, guideline.id]));
       
-      if (isBookmarked(guideline)) {
-        // console.log('Removing bookmark');
+      const wasBookmarked = isBookmarked(guideline);
+      
+      // Track bookmark toggle
+      track.guidelinesBookmarkToggled(guideline.id, guideline.title, !wasBookmarked, user.uid, 'guidelines');
+      
+      if (wasBookmarked) {
+        console.log('Removing bookmark');
+        // Track bookmark removed
+        track.guidelinesBookmarkRemoved(guideline.id, guideline.title, guideline.category || 'Other', user.uid, 'guidelines');
         // Remove from bookmarks
         await removeBookmark(guideline);
       } else {
-        // console.log('Adding bookmark');
+        console.log('Adding bookmark');
+        // Track bookmark saved
+        track.guidelinesBookmarkSaved(guideline.id, guideline.title, guideline.category || 'Other', user.uid, 'guidelines');
         // Add to bookmarks and library
         await saveBookmark(guideline);
       }
@@ -666,7 +729,34 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
         return [...prev, firstCategoryWithGuidelines];
       });
     }
-  }, [guidelines, userCountry]);
+
+    // Track category views when guidelines are loaded
+    if (user && guidelines.length > 0) {
+      const categoryCounts = guidelines.reduce((acc, guideline) => {
+        const category = guideline.category || 'Other';
+        acc[category] = (acc[category] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Track each category that has guidelines
+      Object.entries(categoryCounts).forEach(([category, count]) => {
+        switch (category) {
+          case 'National':
+            track.guidelinesNationalCategoryViewed(count, user.uid, 'guidelines');
+            break;
+          case 'Europe':
+            track.guidelinesEuropeCategoryViewed(count, user.uid, 'guidelines');
+            break;
+          case 'International':
+            track.guidelinesInternationalCategoryViewed(count, user.uid, 'guidelines');
+            break;
+          case 'USA':
+            track.guidelinesUSACategoryViewed(count, user.uid, 'guidelines');
+            break;
+        }
+      });
+    }
+  }, [guidelines, userCountry, user]);
 
   useEffect(() => {
     if (selectedGuideline) {
@@ -726,7 +816,11 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
               className="w-full py-2 sm:py-3 px-4 sm:px-6 border text-gray-600 text-base sm:text-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-200"
               style={{ borderColor: 'rgba(55, 113, 254, 0.5)', fontSize: 'clamp(14px, 1.5vw, 16px)' }}
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+              }}
+              onFocus={() => {}}
+              onBlur={() => {}}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   handleSearch()
@@ -736,14 +830,26 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
             <div className="absolute right-1.5 sm:right-2 md:right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
               {searchTerm && (
                 <button 
-                  onClick={clearSearch}
+                  onClick={() => {
+                    clearSearch();
+                    // Track search cleared
+                    if (user) {
+                      track.guidelinesSearchCleared(user.uid, 'guidelines');
+                    }
+                  }}
                   className="text-gray-400 hover:text-gray-600 transition-colors p-1"
                 >
                   ✕
                 </button>
               )}
               <button 
-                onClick={handleSearch}
+                onClick={() => {
+                  // Track search button click
+                  if (user) {
+                    track.guidelinesSearchButtonClicked(searchTerm, user.uid, 'guidelines');
+                  }
+                  handleSearch();
+                }}
                 disabled={isLoading}
                 className="bg-blue-500 p-1.5 sm:p-2 text-white hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               >
@@ -760,7 +866,15 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
           {!hasSearched && (
             <div className="flex justify-center mt-3">
               <button 
-                onClick={() => setShowBookmarks(!showBookmarks)}
+                onClick={() => {
+                  const newShowBookmarks = !showBookmarks;
+                  setShowBookmarks(newShowBookmarks);
+                  
+                  // Track bookmarks toggle
+                  if (user) {
+                    track.guidelinesBookmarksToggled(newShowBookmarks, bookmarkedGuidelines.length, user.uid, 'guidelines');
+                  }
+                }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
                   showBookmarks 
                     ? 'bg-[#01257C] text-white border border-[#01257C]' 
@@ -796,7 +910,13 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
               {['hypertension', 'arthritis', 'obesity', 'pneumonia', 'diabetes', 'asthma', 'cancer'].map((term) => (
                 <button
                   key={term}
-                  onClick={() => handlePopularSearch(term)}
+                  onClick={() => {
+                    // Track popular search click
+                    if (user) {
+                      track.guidelinesPopularSearchClicked(term, user.uid, 'guidelines');
+                    }
+                    handlePopularSearch(term);
+                  }}
                   className="px-3 py-1.5 text-xs sm:text-sm bg-[#F4F7FF] border border-[#B5C9FC] text-[#223258] rounded-[6px] hover:bg-[#E8F0FF] hover:border-[#3771FE] transition-colors"
                   style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500 }}
                 >
@@ -831,6 +951,13 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
                               target="_blank" 
                               rel="noopener noreferrer"
                               className="block"
+                              onClick={() => {
+                                // Track guideline link click
+                                if (user) {
+                                  track.guidelinesGuidelineLinkClicked(guideline.guidelineId, guideline.guidelineTitle, guideline.url || '', guideline.category || 'Other', user.uid, 'guidelines');
+                                }
+                              }}
+                              onMouseEnter={() => {}}
                               style={{
                                 fontFamily: 'DM Sans, sans-serif',
                                 color: '#214498',
@@ -909,17 +1036,23 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
                               
                               {/* Dive In button */}
                               <button 
-                                onClick={() => handleGuidelineClick({
-                                  id: guideline.guidelineId,
-                                  title: guideline.guidelineTitle,
-                                  description: '',
-                                  category: guideline.category,
-                                  last_updated: guideline.lastUpdated,
-                                  url: guideline.url,
-                                  society: guideline.society,
-                                  link: guideline.link,
-                                  pdf_saved: guideline.pdf_saved
-                                } as Guideline)}
+                                onClick={() => {
+                                  // Track AI summary click
+                                  if (user) {
+                                    track.guidelinesAISummaryClicked(guideline.guidelineId, guideline.guidelineTitle, guideline.category || 'Other', user.uid, 'guidelines');
+                                  }
+                                  handleGuidelineClick({
+                                    id: guideline.guidelineId,
+                                    title: guideline.guidelineTitle,
+                                    description: '',
+                                    category: guideline.category,
+                                    last_updated: guideline.lastUpdated,
+                                    url: guideline.url,
+                                    society: guideline.society,
+                                    link: guideline.link,
+                                    pdf_saved: guideline.pdf_saved
+                                  } as Guideline);
+                                }}
                                 disabled={!guideline.pdf_saved}
                                 className={`flex items-center gap-1 px-3 sm:px-4 py-1.5 sm:py-2 transition-colors text-xs sm:text-sm
                                 ${guideline.pdf_saved 
@@ -1072,6 +1205,13 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
                                           target="_blank" 
                                           rel="noopener noreferrer"
                                           className="block"
+                                          onClick={() => {
+                                            // Track guideline link click
+                                            if (user) {
+                                              track.guidelinesGuidelineLinkClicked(guideline.id, guideline.title, guideline.url || '', guideline.category || 'Other', user.uid, 'guidelines');
+                                            }
+                                          }}
+                                          onMouseEnter={() => {}}
                                           style={{
                                             fontFamily: 'DM Sans, sans-serif',
                                             color: '#214498',
@@ -1145,7 +1285,13 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
                                           
                                           {/* Dive In button */}
                                           <button 
-                                            onClick={() => handleGuidelineClick(guideline)}
+                                            onClick={() => {
+                                              // Track AI summary click
+                                              if (user) {
+                                                track.guidelinesAISummaryClicked(guideline.id, guideline.title, guideline.category || 'Other', user.uid, 'guidelines');
+                                              }
+                                              handleGuidelineClick(guideline);
+                                            }}
                                             disabled={!guideline.pdf_saved}
                                             className={`flex items-center gap-1 px-3 sm:px-4 py-1.5 sm:py-2 transition-colors text-xs sm:text-sm
                                             ${guideline.pdf_saved 
@@ -1248,6 +1394,13 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
                                   target="_blank" 
                                   rel="noopener noreferrer"
                                     className="block"
+                                    onClick={() => {
+                                      // Track guideline link click
+                                      if (user) {
+                                        track.guidelinesGuidelineLinkClicked(guideline.id, guideline.title, guideline.url || '', guideline.category || 'Other', user.uid, 'guidelines');
+                                      }
+                                    }}
+                                    onMouseEnter={() => {}}
                                     style={{
                                       fontFamily: 'DM Sans, sans-serif',
                                       color: '#214498',
@@ -1321,7 +1474,13 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
                                     
                                     {/* Dive In button */}
                                     <button 
-                                      onClick={() => handleGuidelineClick(guideline)}
+                                      onClick={() => {
+                                        // Track AI summary click
+                                        if (user) {
+                                          track.guidelinesAISummaryClicked(guideline.id, guideline.title, guideline.category || 'Other', user.uid, 'guidelines');
+                                        }
+                                        handleGuidelineClick(guideline);
+                                      }}
                                       disabled={!guideline.pdf_saved}
                                         className={`flex items-center gap-1 px-3 sm:px-4 py-1.5 sm:py-2 transition-colors text-xs sm:text-sm
                                         ${guideline.pdf_saved 
