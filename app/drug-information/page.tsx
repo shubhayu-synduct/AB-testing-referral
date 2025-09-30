@@ -80,9 +80,9 @@ export default function DrugInformationPage() {
       });
       
       // Track alphabet scroll
-      if (user) {
-        track.drugInformationAlphabetScrolled(direction, user.uid, 'drug-information');
-      }
+      // if (user) {
+      //   track.drugInformationAlphabetScrolled(direction, user.uid, 'drug-information');
+      // }
     }
   };
   
@@ -94,8 +94,8 @@ export default function DrugInformationPage() {
       // Track dictionary usage
       if (user && !dictionaryUsed) {
         setDictionaryUsed(true);
-        track.drugInformationDictionaryUsed(selectedLetter, user.uid, 'drug-information');
-        track.drugInformationDictionaryUsageTracked(true, user.uid, 'drug-information');
+        // track.drugInformationDictionaryUsed(selectedLetter, user.uid, 'drug-information');
+        // track.drugInformationDictionaryUsageTracked(true, user.uid, 'drug-information');
       }
       
       try {
@@ -260,8 +260,8 @@ export default function DrugInformationPage() {
       // Track search error - track both AI and EMA errors since it's a unified search
       if (user) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        track.drugInformationAISearchError(term, errorMessage, user.uid, 'drug-information');
-        track.drugInformationEMASearchError(term, errorMessage, user.uid, 'drug-information');
+        // track.drugInformationAISearchError(term, errorMessage, user.uid, 'drug-information');
+        // track.drugInformationEMASearchError(term, errorMessage, user.uid, 'drug-information');
       }
       
       // Fallback: try EMA search with English database + AI fallback
@@ -629,9 +629,9 @@ export default function DrugInformationPage() {
                   }`}
                   onClick={() => {
                     // Track suggestion click
-                    if (user) {
-                      track.drugInformationSuggestionClicked(drug.brand_name, drug.search_type, user.uid, 'drug-information');
-                    }
+                    // if (user) {
+                    //   track.drugInformationSuggestionClicked(drug.brand_name, drug.search_type, user.uid, 'drug-information');
+                    // }
                     
                     if (drug.search_type === 'ai_suggestion') {
                       // Track AI search performed
