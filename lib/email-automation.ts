@@ -81,7 +81,7 @@ if (typeof window !== 'undefined') {
   
       // Update the existing user document with email automation fields
       await userDoc.ref.update({
-        emailDay: 0, // Track which email day they're on (0 = no emails sent yet)
+        emailDay: 1, // Track which email day they're on (1 = ready for Day 1 email)
         emailAutomationSignupDate: admin.firestore.Timestamp.fromDate(userData.signupDate || new Date()),
         lastEmailSent: null,
         totalEmailsSent: 0,

@@ -1,6 +1,7 @@
 import admin from "firebase-admin";
 import { Resend } from "resend";
 import { 
+  day1Template,
   day2Template, 
   day3Template, 
   day4Template, 
@@ -36,8 +37,9 @@ const RATE_LIMIT = {
   retryDelay: 1000, // 1 second
 };
 
-// Store email templates starting from Day 2 (Day 1 is sent right after authentication/onboarding)
+// Store email templates for all days (Day 1-7)
 const emailTemplates = {
+  1: day1Template,
   2: day2Template,
   3: day3Template,
   4: day4Template,
@@ -115,15 +117,22 @@ export async function GET() {
   let emailsSent = 0;
   let errors: any[] = [];
   let skippedUsers = 0;
+  let debugLog: string[] = [];
 
   try {
+    debugLog.push(`[${new Date().toISOString()}] Starting email automation cron job`);
+    debugLog.push(`Environment: ${process.env.NODE_ENV}`);
+    debugLog.push(`Firebase Project: ${process.env.FIREBASE_PROJECT_ID}`);
+    debugLog.push(`Resend configured: ${!!process.env.RESEND_API_KEY}`);
+
     // Check rate limits
     if (!checkRateLimit()) {
-      // console.warn("Rate limit exceeded");
+      debugLog.push(`❌ Rate limit exceeded - hourly: ${emailCounts.hourly}, daily: ${emailCounts.daily}`);
       return Response.json({ 
         error: "Rate limit exceeded",
         hourlyCount: emailCounts.hourly,
-        dailyCount: emailCounts.daily
+        dailyCount: emailCounts.daily,
+        debugLog: debugLog.join('\n')
       }, { status: 429 });
     }
 
@@ -132,10 +141,11 @@ export async function GET() {
       .where("emailAutomationStatus", "==", "active")
       .get();
 
-    // console.log(`Processing ${snapshot.docs.length} active users`);
+    debugLog.push(`📊 Found ${snapshot.docs.length} active users`);
 
     for (const doc of snapshot.docs) {
       const user = doc.data();
+      debugLog.push(`\n--- Processing user: ${user.email} ---`);
 
       try {
         // Handle signupDate safely - it might be a Firestore Timestamp, Date, or string
@@ -154,7 +164,7 @@ export async function GET() {
         } else {
           // Fallback to current date if signupDate is missing
           signupDate = new Date();
-          // console.warn(`Missing emailAutomationSignupDate for user ${user.email}, using current date as fallback`);
+          debugLog.push(`⚠️ Missing emailAutomationSignupDate for user ${user.email}, using current date as fallback`);
         }
 
         // Calculate days since signup
@@ -163,27 +173,53 @@ export async function GET() {
             (1000 * 60 * 60 * 24)
         ) + 1;
 
-        // Check if within 7 days and needs a new email (starting from Day 2)
-        const nextEmailDay = (user.emailDay || 0) + 1;
+        debugLog.push(`Signup date: ${signupDate.toISOString()}`);
+        debugLog.push(`Days since signup: ${daysSinceSignup}`);
+        debugLog.push(`Current emailDay: ${user.emailDay || 0}`);
+
+        // Handle users at emailDay 0 - increment to emailDay 1 first
+        let currentEmailDay = user.emailDay || 0;
+        if (currentEmailDay === 0) {
+          debugLog.push(`🔄 User at emailDay 0 - incrementing to emailDay 1`);
+          try {
+            await db.collection("users").doc(doc.id).update({
+              emailDay: 1,
+              updatedAt: admin.firestore.Timestamp.fromDate(new Date())
+            });
+            currentEmailDay = 1;
+            debugLog.push(`✅ Updated user to emailDay 1`);
+          } catch (updateError) {
+            debugLog.push(`❌ Failed to update user to emailDay 1: ${updateError}`);
+            // Continue with current logic even if update fails
+          }
+        }
+
+        // Check if user needs the next email in sequence
+        const nextEmailToSend = currentEmailDay + 1; // emailDay 1 → send Day 2, emailDay 2 → send Day 3, etc.
+        debugLog.push(`Current emailDay: ${currentEmailDay}, Next email to send: Day ${nextEmailToSend}`);
+
         if (
-          nextEmailDay >= 2 &&
-          nextEmailDay <= 7
+          currentEmailDay >= 1 &&
+          currentEmailDay <= 6
         ) {
-          const template = emailTemplates[nextEmailDay as keyof typeof emailTemplates];
+          const template = emailTemplates[nextEmailToSend as keyof typeof emailTemplates];
 
           if (!template) {
-            // console.warn(`No template found for day ${nextEmailDay}`);
+            debugLog.push(`❌ No template found for day ${nextEmailToSend}`);
             continue;
           }
 
+          debugLog.push(`✅ Template found for day ${nextEmailToSend}`);
+
           // Check rate limits again before sending
           if (!checkRateLimit()) {
-            // console.warn("Rate limit reached during processing");
+            debugLog.push(`❌ Rate limit reached during processing`);
             break;
           }
 
           // Get user's name with fallback
           const userName = user.displayName || user.firstName || user.name || 'Healthcare Professional';
+          debugLog.push(`User name: ${userName}`);
           
           // Prepare email data with personalization and unsubscribe links
           const emailData = {
@@ -195,20 +231,25 @@ export async function GET() {
               .replace('{{unsubscribe_url}}', `https://app.drinfo.ai/unsubscribe?email=${encodeURIComponent(user.email)}`)
           };
 
+          debugLog.push(`Prepared email data for ${user.email}`);
+
           // Send email with retry logic
           const emailSent = await sendEmailWithRetry(emailData);
           
           if (emailSent) {
             // Update user's emailDay and stats
+            const newEmailDay = currentEmailDay + 1;
+            const isCompleted = newEmailDay === 7; // Mark as completed when reaching emailDay 7
+            
             await db.collection("users").doc(doc.id).update({
-              emailDay: nextEmailDay,
+              emailDay: newEmailDay,
               lastEmailSent: admin.firestore.Timestamp.fromDate(new Date()),
               totalEmailsSent: (user.totalEmailsSent || 0) + 1,
-              emailAutomationStatus: nextEmailDay === 7 ? 'completed' : 'active', // Mark as completed after day 7 (6 emails total)
+              emailAutomationStatus: isCompleted ? 'completed' : 'active',
               updatedAt: admin.firestore.Timestamp.fromDate(new Date())
             });
 
-            // console.log(`Sent Day ${nextEmailDay} email to ${user.email}`);
+            debugLog.push(`✅ Sent Day ${nextEmailToSend} email to ${user.email} and updated emailDay to ${newEmailDay}${isCompleted ? ' (COMPLETED)' : ''}`);
             emailsSent++;
             emailCounts.hourly++;
             emailCounts.daily++;
@@ -217,25 +258,27 @@ export async function GET() {
             await logAnalyticsEvent('email_sent', {
               email: user.email,
               userId: doc.id,
-              emailDay: nextEmailDay,
-              template: `day_${nextEmailDay}`
+              emailDay: newEmailDay,
+              template: `day_${nextEmailToSend}`
             });
           } else {
+            debugLog.push(`❌ Failed to send email to ${user.email} after retries`);
             errors.push({ 
               email: user.email, 
               error: "Failed to send email after retries",
-              day: nextEmailDay 
+              day: nextEmailToSend 
             });
           }
         } else if (user.emailDay >= 7) {
-          // User has completed the 6-day sequence (Day 2-7)
+          // User has completed the email sequence
+          debugLog.push(`✅ User ${user.email} has completed email sequence (emailDay: ${user.emailDay})`);
           skippedUsers++;
-          // console.log(`User ${user.email} has completed email sequence (day ${user.emailDay})`);
         } else {
+          debugLog.push(`⚠️ User ${user.email} not ready for email (currentEmailDay: ${currentEmailDay})`);
           skippedUsers++;
         }
       } catch (error) {
-        // console.error(`Error processing user ${user.email}:`, error);
+        debugLog.push(`❌ Error processing user ${user.email}: ${error}`);
         errors.push({ 
           email: user.email, 
           error: error instanceof Error ? error.message : "Unknown error" 
@@ -245,8 +288,11 @@ export async function GET() {
 
     const processingTime = Date.now() - startTime;
 
-    // Log summary
-    // console.log(`Email automation completed: ${emailsSent} sent, ${errors.length} errors, ${skippedUsers} skipped, ${processingTime}ms`);
+    debugLog.push(`\n--- Summary ---`);
+    debugLog.push(`Emails sent: ${emailsSent}`);
+    debugLog.push(`Errors: ${errors.length}`);
+    debugLog.push(`Skipped: ${skippedUsers}`);
+    debugLog.push(`Processing time: ${processingTime}ms`);
 
     // Log analytics for the run
     await logAnalyticsEvent('email_automation_run', {
@@ -267,7 +313,8 @@ export async function GET() {
       rateLimit: {
         hourlyCount: emailCounts.hourly,
         dailyCount: emailCounts.daily
-      }
+      },
+      debugLog: debugLog.join('\n')
     });
   } catch (error) {
     // console.error("Email automation error:", error);

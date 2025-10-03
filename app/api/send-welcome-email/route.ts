@@ -47,6 +47,33 @@ export async function POST(request: Request) {
       throw new Error('Failed to send welcome email')
     }
 
+    // Update user's emailDay to 1 after Day 1 email is sent
+    try {
+      const admin = await import("firebase-admin")
+      const db = admin.firestore()
+      
+      // Find user by email and update emailDay to 1
+      const userSnapshot = await db.collection("users")
+        .where("email", "==", userEmail.toLowerCase().trim())
+        .get()
+      
+      if (!userSnapshot.empty) {
+        const userDoc = userSnapshot.docs[0]
+        await db.collection("users").doc(userDoc.id).update({
+          emailDay: 1,
+          lastEmailSent: admin.firestore.Timestamp.fromDate(new Date()),
+          totalEmailsSent: 1,
+          updatedAt: admin.firestore.Timestamp.fromDate(new Date())
+        })
+        logger.apiLog("Updated user emailDay to 1 for:", userEmail)
+      } else {
+        logger.error("User not found in database for email:", userEmail)
+      }
+    } catch (updateError) {
+      logger.error("Failed to update user emailDay after Day 1 email:", updateError)
+      // Don't fail the email send if update fails
+    }
+
     logger.apiLog("Day 1 welcome email sent successfully to:", userEmail)
 
     return NextResponse.json({ 

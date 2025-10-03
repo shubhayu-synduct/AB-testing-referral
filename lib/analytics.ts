@@ -969,7 +969,7 @@ export const track = {
 
   profileCountrySelected: (country: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
-
+    
     trackEngagement('profile_country_selected', {
       country,
       user_id: userId,
@@ -1860,7 +1860,7 @@ export const track = {
   // ===== DICTIONARY/ALPHABET NAVIGATION EVENTS =====
   drugInformationDictionaryUsed: (letter: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
-
+    
     trackEngagement('drug_information_dictionary_used', {
       letter,
       user_id: userId,
@@ -1942,7 +1942,7 @@ export const track = {
 
   guidelinesSearchPerformed: (searchTerm: string, userId: string, page: string) => {
     if (!shouldTrack()) return;
-
+    
     trackEngagement('guidelines_search_performed', {
       search_term: searchTerm,
       user_id: userId,

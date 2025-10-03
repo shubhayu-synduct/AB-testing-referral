@@ -396,7 +396,7 @@ export default function Onboarding() {
       // Track onboarding completion
       track.onboardingCompleted(user.uid, formData.specialties)
       
-      // Send Day 1 welcome email only to medical professionals
+      // Send Day 1 welcome email immediately after onboarding completion
       if (isMedicalProfessional) {
         try {
           const response = await fetch('/api/send-welcome-email', {
@@ -419,7 +419,7 @@ export default function Onboarding() {
           logger.error("Error sending welcome email:", error);
         }
       } else {
-        logger.info("Non-medical professional registered - no welcome email sent, user will be waitlisted");
+        logger.info("Non-medical professional registered - user will be waitlisted");
       }
 
       // Dispatch a custom event to notify auth provider that onboarding is complete
