@@ -94,22 +94,22 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
         : [...prev, category];
       
       // Track category toggle with specific events
-      if (user) {
-        switch (category) {
-          case 'National':
-            track.guidelinesNationalCategoryToggled(!isCurrentlyExpanded, user.uid, 'guidelines');
-            break;
-          case 'Europe':
-            track.guidelinesEuropeCategoryToggled(!isCurrentlyExpanded, user.uid, 'guidelines');
-            break;
-          case 'International':
-            track.guidelinesInternationalCategoryToggled(!isCurrentlyExpanded, user.uid, 'guidelines');
-            break;
-          case 'USA':
-            track.guidelinesUSACategoryToggled(!isCurrentlyExpanded, user.uid, 'guidelines');
-            break;
-        }
-      }
+      // if (user) {
+      //   switch (category) {
+      //     case 'National':
+      //       track.guidelinesNationalCategoryToggled(!isCurrentlyExpanded, user.uid, 'guidelines');
+      //       break;
+      //     case 'Europe':
+      //       track.guidelinesEuropeCategoryToggled(!isCurrentlyExpanded, user.uid, 'guidelines');
+      //       break;
+      //     case 'International':
+      //       track.guidelinesInternationalCategoryToggled(!isCurrentlyExpanded, user.uid, 'guidelines');
+      //       break;
+      //     case 'USA':
+      //       track.guidelinesUSACategoryToggled(!isCurrentlyExpanded, user.uid, 'guidelines');
+      //       break;
+      //   }
+      // }
       
       return newExpandedCategories;
     });
@@ -280,22 +280,22 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
       setRetryCount(0);
       
       // Track search results loaded
-      if (user) {
-        if (results.length > 0) {
-          track.guidelinesSearchResultsLoaded(query, results.length, user.uid, 'guidelines');
-        } else {
-          track.guidelinesSearchResultsEmpty(query, user.uid, 'guidelines');
-        }
-      }
+      // if (user) {
+      //   if (results.length > 0) {
+      //     track.guidelinesSearchResultsLoaded(query, results.length, user.uid, 'guidelines');
+      //   } else {
+      //     track.guidelinesSearchResultsEmpty(query, user.uid, 'guidelines');
+      //   }
+      // }
     } catch (err: any) {
       logger.error('Error performing search:', err);
       setError(err.message || 'Search failed. Please try again.');
       setGuidelines([]);
       
       // Track search error
-      if (user) {
-        track.guidelinesSearchError(query, err.message || 'Search failed', user.uid, 'guidelines');
-      }
+      // if (user) {
+      //   track.guidelinesSearchError(query, err.message || 'Search failed', user.uid, 'guidelines');
+      // }
     } finally {
       setIsLoading(false);
     }
@@ -491,9 +491,9 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
 
   const handleGuidelineClick = (guideline: Guideline) => {
     // Track guideline click
-    if (user) {
-      track.guidelinesGuidelineClicked(guideline.id, guideline.title, guideline.category || 'Other', user.uid, 'guidelines');
-    }
+    // if (user) {
+    //   track.guidelinesGuidelineClicked(guideline.id, guideline.title, guideline.category || 'Other', user.uid, 'guidelines');
+    // }
     
     setSelectedGuideline(guideline)
     setIsModalOpen(true)
@@ -833,9 +833,9 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
                   onClick={() => {
                     clearSearch();
                     // Track search cleared
-                    if (user) {
-                      track.guidelinesSearchCleared(user.uid, 'guidelines');
-                    }
+                    // if (user) {
+                    //   track.guidelinesSearchCleared(user.uid, 'guidelines');
+                    // }
                   }}
                   className="text-gray-400 hover:text-gray-600 transition-colors p-1"
                 >
@@ -845,9 +845,9 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
               <button 
                 onClick={() => {
                   // Track search button click
-                  if (user) {
-                    track.guidelinesSearchButtonClicked(searchTerm, user.uid, 'guidelines');
-                  }
+                  // if (user) {
+                  //   track.guidelinesSearchButtonClicked(searchTerm, user.uid, 'guidelines');
+                  // }
                   handleSearch();
                 }}
                 disabled={isLoading}
@@ -871,9 +871,9 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
                   setShowBookmarks(newShowBookmarks);
                   
                   // Track bookmarks toggle
-                  if (user) {
-                    track.guidelinesBookmarksToggled(newShowBookmarks, bookmarkedGuidelines.length, user.uid, 'guidelines');
-                  }
+                  // if (user) {
+                  //   track.guidelinesBookmarksToggled(newShowBookmarks, bookmarkedGuidelines.length, user.uid, 'guidelines');
+                  // }
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
                   showBookmarks 
