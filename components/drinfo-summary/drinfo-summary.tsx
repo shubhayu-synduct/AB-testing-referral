@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { ArrowRight, ChevronDown, Copy, Search, ExternalLink, X, FileEdit, ThumbsUp, ThumbsDown, Share2, Check, Mail, RotateCcw } from 'lucide-react'
 import { fetchDrInfoSummary, sendFollowUpQuestion, Citation } from '@/lib/drinfo-summary-service'
 import { getFirebaseFirestore } from '@/lib/firebase'
-import { collection, addDoc, updateDoc, doc, getDoc, getDocs, query as firestoreQuery, where, orderBy, serverTimestamp, FieldPath, setDoc, deleteDoc } from 'firebase/firestore'
+import { collection, addDoc, updateDoc, doc, getDoc, getDocs, query as firestoreQuery, where, orderBy, serverTimestamp, FieldPath, setDoc, deleteDoc, increment } from 'firebase/firestore'
 import { v4 as uuidv4 } from 'uuid'
 import { useRouter, usePathname } from 'next/navigation'
 import AnswerFeedback from '../feedback/answer-feedback'
@@ -172,6 +172,65 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
   const [imageGenerationStatus, setImageGenerationStatus] = useState<'idle' | 'generating' | 'complete'>('idle');
   const [expandedImage, setExpandedImage] = useState<{index: number, svgContent: string} | null>(null);
   const [remainingLimit, setRemainingLimit] = useState<number | undefined>(undefined);
+
+  // Helper function to update remaining monthly limit in Firebase
+  const updateRemainingLimitInFirebase = async (limit: number) => {
+    try {
+      if (!user) return;
+      
+      const db = getFirebaseFirestore();
+      const userId = user.uid || user.id;
+      const userDocRef = doc(db, "users", userId);
+      
+      await updateDoc(userDocRef, {
+        remaining_monthly_limit: limit
+      });
+      
+      logger.debug("Updated remaining_monthly_limit in Firebase:", limit);
+    } catch (error) {
+      logger.error("Error updating remaining_monthly_limit in Firebase:", error);
+    }
+  };
+
+  // Helper function to atomically increment total_questions_asked in Firebase
+  const incrementTotalQuestionsAsked = async () => {
+    try {
+      if (!user) return;
+      
+      const db = getFirebaseFirestore();
+      const userId = user.uid || user.id;
+      const userDocRef = doc(db, "users", userId);
+      
+      // First, try to get the current document to check if the field exists
+      const userDoc = await getDoc(userDocRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        
+        // If the field doesn't exist, create it with value 1
+        if (userData.total_questions_asked === undefined) {
+          await setDoc(userDocRef, {
+            total_questions_asked: 1
+          }, { merge: true });
+          logger.debug("Created total_questions_asked field in Firebase with value 1");
+        } else {
+          // If the field exists, use atomic increment to add 1
+          await updateDoc(userDocRef, {
+            total_questions_asked: increment(1)
+          });
+          logger.debug("Incremented total_questions_asked in Firebase by 1");
+        }
+      } else {
+        // If document doesn't exist, create it with total_questions_asked = 1
+        await setDoc(userDocRef, {
+          total_questions_asked: 1
+        });
+        logger.debug("Created user document with total_questions_asked = 1 in Firebase");
+      }
+    } catch (error) {
+      logger.error("Error incrementing total_questions_asked in Firebase:", error);
+    }
+  };
   const answerIconRef = useRef<HTMLDivElement>(null);
 
   // Modal state and timer
@@ -1190,9 +1249,9 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
           if (citationObj) {
             // Track citation clicked
             const userId = user?.uid || user?.id;
-            if (userId) {
-              track.drinfoSummaryCitationClicked(citationObj.id || citationNumber, citationObj.title || 'Unknown', userId, 'drinfo-summary');
-            }
+            // if (userId) {
+            //   track.drinfoSummaryCitationClicked(citationObj.id || citationNumber, citationObj.title || 'Unknown', userId, 'drinfo-summary');
+            // }
             
             // Check if it's a mobile device (no hover capability)
             if (window.matchMedia('(hover: none)').matches) {
@@ -1544,9 +1603,17 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
             // Convert to number if it's a string, otherwise use as is
             const limit = typeof data.remaining_limit === 'string' ? parseInt(data.remaining_limit, 10) : data.remaining_limit;
             setRemainingLimit(isNaN(limit) ? undefined : limit);
+            
+            // Update Firebase with the remaining limit
+            if (!isNaN(limit)) {
+              updateRemainingLimitInFirebase(limit);
+            }
           } else {
             setRemainingLimit(undefined);
           }
+          
+          // Increment total questions asked counter
+          incrementTotalQuestionsAsked();
           
           // console.log('[CITATIONS_DEBUG] Setting activeCitations:', {
           //   hasCitations: !!data?.citations,
@@ -2032,9 +2099,17 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
               // Convert to number if it's a string, otherwise use as is
               const limit = typeof data.remaining_limit === 'string' ? parseInt(data.remaining_limit, 10) : data.remaining_limit;
               setRemainingLimit(isNaN(limit) ? undefined : limit);
+              
+              // Update Firebase with the remaining limit
+              if (!isNaN(limit)) {
+                updateRemainingLimitInFirebase(limit);
+              }
             } else {
               setRemainingLimit(undefined);
             }
+
+            // Increment total questions asked counter
+            incrementTotalQuestionsAsked();
 
             setStatus('complete');
             setIsLoading(false);

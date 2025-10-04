@@ -660,7 +660,7 @@ export default function LibraryPage() {
     // Track guideline view and modal open
     if (user) {
       track.savedGuidelineViewed(guideline.guidelineId, guideline.guidelineTitle, user.uid, 'library')
-      track.guidelineSummaryModalOpened(guideline.guidelineId, guideline.guidelineTitle, user.uid, 'library')
+      // track.guidelineSummaryModalOpened(guideline.guidelineId, guideline.guidelineTitle, user.uid, 'library')
     }
   }
 
@@ -671,9 +671,9 @@ export default function LibraryPage() {
     setSelectedGuideline(null)
     
     // Track modal close
-    if (user && guidelineId && guidelineTitle) {
-      track.guidelineSummaryModalClosed(guidelineId, guidelineTitle, user.uid, 'library')
-    }
+    // if (user && guidelineId && guidelineTitle) {
+    //   track.guidelineSummaryModalClosed(guidelineId, guidelineTitle, user.uid, 'library')
+    // }
   }
 
   const handleAbstractClick = (abstract: VisualAbstract) => {
