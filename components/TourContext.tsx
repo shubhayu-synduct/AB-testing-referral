@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import steps, { guidelineTourSteps, drugTourSteps, drinfoSummaryTourSteps } from "@/lib/tourSteps";
+import { track } from "@/lib/analytics";
 
 // Dynamically import Joyride to prevent SSR issues
 const Joyride = dynamic(() => import("react-joyride-next"), { ssr: false });
@@ -79,6 +80,13 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
     
+    // Track that user agreed to see the product tour
+    const currentPage = typeof window !== 'undefined' ? window.location.pathname : 'unknown';
+    const userId = typeof window !== 'undefined' ? 
+      (window as any).__authUser?.uid || 'anonymous' : 'anonymous';
+    
+    track.agreedToSeeProductTour(userId, currentPage);
+    
     setStepIndex(0);
     setRun(true);
   }, [checkTourPreference]);
@@ -102,6 +110,14 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
     const { status, index, type, action } = data;
     
     if (status === "finished") {
+      // Track that user completed the product tour
+      const currentPage = typeof window !== 'undefined' ? window.location.pathname : 'unknown';
+      const userId = typeof window !== 'undefined' ? 
+        (window as any).__authUser?.uid || 'anonymous' : 'anonymous';
+      const totalSteps = getValidSteps().length;
+      
+      track.completedProductTour(userId, currentPage, totalSteps);
+      
       saveTourPreference('completed');
       setRun(false);
       // Close sidebar when tour is completed
@@ -600,6 +616,13 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
       return;
     }
     
+    // Track that user agreed to see the drinfo summary product tour
+    const currentPage = typeof window !== 'undefined' ? window.location.pathname : 'unknown';
+    const userId = typeof window !== 'undefined' ? 
+      (window as any).__authUser?.uid || 'anonymous' : 'anonymous';
+    
+    track.agreedToSeeProductTour(userId, currentPage);
+    
     setStepIndex(0);
     setRun(true);
   }, [checkTourPreference]);
@@ -629,6 +652,14 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
     // console.log('DrinfoSummaryTour callback:', { status, index, type, action });
     
     if (status === "finished") {
+      // Track that user completed the drinfo summary product tour
+      const currentPage = typeof window !== 'undefined' ? window.location.pathname : 'unknown';
+      const userId = typeof window !== 'undefined' ? 
+        (window as any).__authUser?.uid || 'anonymous' : 'anonymous';
+      const totalSteps = drinfoSummaryTourSteps.length;
+      
+      track.completedProductTour(userId, currentPage, totalSteps);
+      
       saveTourPreference('completed');
       setRun(false);
     } else if (status === "skipped") {

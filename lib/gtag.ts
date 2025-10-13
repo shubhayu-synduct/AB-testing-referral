@@ -30,6 +30,7 @@ export const initGA = () => {
   window.gtag('config', GA_TRACKING_ID, {
     page_title: document.title,
     page_location: window.location.href,
+    debug_mode: process.env.NODE_ENV === 'development', // Enable debug mode in development
   })
 }
 

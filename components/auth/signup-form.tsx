@@ -100,6 +100,9 @@ export function SignUpForm() {
     setError("")
     setLoading(true)
     
+    // Track specific email signup attempt
+    track.signupAttemptedUsingEmail(email)
+    
     // Track signup initiation
     track.userSignupInitiated('email', undefined, !!email)
 
@@ -159,6 +162,10 @@ export function SignUpForm() {
   const handleGoogleSignUp = async () => {
     setError("")
     setLoading(true)
+    
+    // Track specific Google signup attempt
+    track.signupAttemptedUsingGoogle()
+    
     // Track signup initiation
     track.userSignupInitiated('google', 'google', true)
     
@@ -238,6 +245,11 @@ export function SignUpForm() {
   const handleMicrosoftSignUp = async () => {
     setError("")
     setLoading(true)
+    
+    // Track specific Microsoft signup attempt
+    track.signupAttemptedUsingMicrosoft()
+    
+    // Track general signup attempt
     track.signUpAttempted('microsoft', 'microsoft')
     
     try {
