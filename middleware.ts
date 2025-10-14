@@ -183,6 +183,7 @@ export async function middleware(request: NextRequest) {
     path === "/forgot-password" || 
     path.startsWith("/reset-password") ||
     path.startsWith("/dashboard/public/") || // Allow access to public shared chats
+    path.startsWith("/public/visual-abstract/") || // Allow access to public visual abstracts
     path.startsWith("/not-signed-in") || // Allow access to not-signed-in route
     path.startsWith("/_next") ||
     path.startsWith("/api") ||

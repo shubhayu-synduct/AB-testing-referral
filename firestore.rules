@@ -1,39 +1,46 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow users to read and write only their own data
+    // Users can read and write only their own user document
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    
-    // Allow users to read guidelines data
-    match /guidelines/{documentId} {
-      allow read: if request.auth != null;
+ 
+    // Users can access conversations they own
+    match /conversations/{conversationId} {
+      // Allow read if user is the owner
+      allow read: if request.auth != null && resource.data.metadata.userId == request.auth.uid;
+ 
+      // Allow write if:
+      // - resource doesn't exist (i.e., creating a new one) and user is the owner in request data
+      // - OR if resource exists and the user is the owner in existing and incoming data
+      allow write: if request.auth != null &&
+                   ((resource == null && request.resource.data.metadata.userId == request.auth.uid) ||
+                   (resource != null && resource.data.metadata.userId == request.auth.uid &&
+                    request.resource.data.metadata.userId == request.auth.uid));
+ 
+      // Subcollection: threads inside a conversation
+      match /threads/{threadId} {
+        allow read, write: if request.auth != null &&
+          get(/databases/$(database)/documents/conversations/$(conversationId)).data.metadata.userId == request.auth.uid;
+      }
     }
-    
-    // Allow users to read drug data
-    match /drugs/{drugId} {
-      allow read: if request.auth != null;
+ 
+    // Public chats: anyone can read, only authenticated users can write
+    match /public_chats/{chatId} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
-    
-    // Allow users to read clinical trials data
-    match /clinical_trials/{trialId} {
-      allow read: if request.auth != null;
+ 
+    // Public visual abstracts: anyone can read, only authenticated users can write
+    match /public_visual_abstracts/{visualAbstractId} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
-    
-    // Allow users to read and write their own history
-    match /users/{userId}/history/{documentId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // Allow users to read and write their own projects
-    match /users/{userId}/projects/{projectId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // Deny all other access
+ 
+    // 🔒 REMOVED: Overly permissive testing rule
     match /{document=**} {
-      allow read, write: if false;
-    }
+     allow read, write: if request.auth != null;
+     }
   }
-} 
+}

@@ -1768,6 +1768,21 @@ export const track = {
     })
   },
 
+  visualAbstractShared: (userId: string, page: string) => {
+    if (!shouldTrack()) return;
+
+    trackEngagement('visual_abstract_shared', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+    
+    trackGA4Event('visual_abstract_shared', {
+      user_id: userId,
+      page
+    })
+  },
+
   // ===== DRUG INFORMATION EVENTS =====
   drugInformationPageViewed: (userId: string, page: string) => {
     if (!shouldTrack()) return;

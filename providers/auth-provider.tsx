@@ -292,6 +292,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isPublicRoute = ['/login', '/signup', '/', '/forgot-password'].includes(pathname) || 
       pathname.startsWith('/reset-password') ||
       pathname.startsWith('/dashboard/public/') || // Allow access to public shared chats
+      pathname.startsWith('/public/visual-abstract/') || // Allow access to public visual abstracts
       pathname.startsWith('/not-signed-in') // Allow access to not-signed-in route
 
     // If not authenticated and trying to access protected route

@@ -191,6 +191,46 @@ export function PublicSidebar({ isOpen, setIsOpen }: PublicSidebarProps) {
                 <img src="/drugs.svg" alt="Drug Information" className="h-5 w-5" />
                 {isOpen && <span className="ml-3">Drug Information</span>}
               </Link>
+
+              <Link 
+                href="/image-generator"
+                onClick={() => {
+                  if (window.innerWidth < 768) {
+                    setIsOpen(false);
+                  }
+                }}
+                className={`flex items-center px-3 py-2 rounded-lg ${
+                  isActive('/image-generator') 
+                    ? 'text-[#223258] bg-blue-50 font-medium' 
+                    : 'text-[#223258] hover:bg-gray-100'
+                }`}
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                {isOpen && <span className="ml-3">Visual Abstract</span>}
+              </Link>
+
+              <Link 
+                href="/library"
+                onClick={() => {
+                  if (window.innerWidth < 768) {
+                    setIsOpen(false);
+                  }
+                }}
+                className={`flex items-center px-3 py-2 rounded-lg ${
+                  isActive('/library') 
+                    ? 'text-[#223258] bg-blue-50 font-medium' 
+                    : 'text-[#223258] hover:bg-gray-100'
+                }`}
+              >
+                <svg width="20" height="20" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-5 w-5">
+                  <path d="M8.16406 8.16406H17.4974M8.16406 12.8307H12.8307" stroke="#223258" strokeWidth="1.75" strokeLinecap="square" strokeLinejoin="round"/>
+                  <path d="M21 21.5807L19.25 20.9391V18.0807M14 20.4141C14 23.3136 16.3505 25.6641 19.25 25.6641C22.1495 25.6641 24.5 23.3136 24.5 20.4141C24.5 17.5145 22.1495 15.1641 19.25 15.1641C16.3505 15.1641 14 17.5145 14 20.4141Z" stroke="#223258" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M13 25.5H3.5V2.5H22V13.5" stroke="#223258" strokeWidth="1.75"/>
+                </svg>
+                {isOpen && <span className="ml-3">Library</span>}
+              </Link>
             </nav>
           </div>
         </div>
