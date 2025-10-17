@@ -1862,10 +1862,36 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     setBannerDismissed(true);
   };
 
-  const handleBannerShare = () => {
+  const handleBannerShare = async () => {
     setShowShareBanner(false);
     setBannerDismissed(true);
-    handleShare(); // Use existing share function
+    
+    const shareData = {
+      title: 'DR. INFO - AI-Powered Medical Insights',
+      text: 'Check out DR. INFO for trusted, evidence-based medical insights powered by AI.',
+      url: 'https://app.drinfo.ai'
+    };
+
+    try {
+      // Check if Web Share API is supported
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        // Fallback: copy URL to clipboard
+        await navigator.clipboard.writeText('https://app.drinfo.ai');
+        // You could also show a toast notification here
+        console.log('URL copied to clipboard');
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      // Fallback: copy URL to clipboard
+      try {
+        await navigator.clipboard.writeText('https://app.drinfo.ai');
+        console.log('URL copied to clipboard as fallback');
+      } catch (clipboardError) {
+        console.error('Failed to copy to clipboard:', clipboardError);
+      }
+    }
   };
 
   const handleBannerShareWhatsApp = () => {

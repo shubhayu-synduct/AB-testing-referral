@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { getFirebaseFirestore } from '@/lib/firebase'
 import { doc, getDoc } from 'firebase/firestore'
-import { Download, Calendar } from 'lucide-react'
+import { Download, Calendar, X } from 'lucide-react'
 import { PublicLayout } from '@/components/dashboard/public-layout'
 import { logger } from '@/lib/logger'
 
@@ -24,6 +24,7 @@ export default function PublicVisualAbstractPage({ params }: { params: Promise<{
   const [visualAbstract, setVisualAbstract] = useState<PublicVisualAbstractData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showModal, setShowModal] = useState(false)
 
   useEffect(() => {
     const loadPublicVisualAbstract = async () => {
@@ -172,58 +173,180 @@ export default function PublicVisualAbstractPage({ params }: { params: Promise<{
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-center items-center mb-0 md:mb-[20px]">
             <div className="text-center mb-4 md:mb-0">
-              <h1 className="hidden md:block text-[36px] font-semibold text-[#214498] mb-[4px] mt-0 font-['DM_Sans']">Shared Visual Abstract</h1>
-              <p className="hidden md:block text-gray-600 text-[16px] mt-0">A visual abstract shared from DR. INFO</p>
+              <h1 
+                className="hidden md:block text-black mb-[4px] mt-0"
+                style={{ 
+                  fontFamily: 'DM Sans', 
+                  fontWeight: '600', 
+                  fontSize: '20px', 
+                  lineHeight: '24px', 
+                  letterSpacing: '0%' 
+                }}
+              >
+                Shared Visual Abstract from DR. INFO
+              </h1>
             </div>
           </div>
 
           {/* Visual Abstract Content */}
-          <div className="bg-white rounded-lg shadow-lg p-6 md:p-8">
-            {/* Visual Abstract Image */}
-            <div className="relative w-full max-w-[800px] mx-auto mb-6">
-              <div 
-                className="svg-content max-w-full"
-                dangerouslySetInnerHTML={{ __html: visualAbstract?.svg.svg_data || '' }}
-              />
-              
-              {/* Download Button */}
-              <button
-                onClick={() => downloadAsPNG(visualAbstract?.svg.svg_data || '', `visual-abstract-${visualAbstract?.id || 'shared'}`)}
-                className="absolute top-2 md:top-4 right-2 md:right-4 p-2 md:p-3 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full shadow-md transition-all duration-200 hover:scale-110"
-                title="Download as PNG"
-              >
-                <Download className="w-4 h-4 text-[#223258]" />
-              </button>
-            </div>
+          {/* Visual Abstract Image */}
+          <div className="relative w-full max-w-[1000px] mx-auto">
+            <div 
+              className="svg-content max-w-full"
+              dangerouslySetInnerHTML={{ __html: visualAbstract?.svg.svg_data || '' }}
+            />
+            
+            {/* Download Button */}
+            <button
+              onClick={() => downloadAsPNG(visualAbstract?.svg.svg_data || '', `visual-abstract-${visualAbstract?.id || 'shared'}`)}
+              className="absolute top-2 md:top-4 right-2 md:right-4 p-2 md:p-3 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full shadow-md transition-all duration-200 hover:scale-110"
+              title="Download as PNG"
+            >
+              <Download className="w-4 h-4 text-[#223258]" />
+            </button>
+          </div>
 
-            {/* Metadata */}
-            <div className="border-t border-gray-200 pt-6">
-              <div className="flex items-center text-sm text-gray-600">
-                <Calendar className="w-4 h-4 mr-2" />
-                <span>Created: {formatTimestamp(visualAbstract?.svg.timestamp)}</span>
-              </div>
+          {/* Metadata */}
+          <div className="w-full max-w-[1000px] mx-auto mt-4">
+            <div className="flex items-center">
+              <Calendar className="w-4 h-4 mr-2" style={{ color: '#919191' }} />
+              <span 
+                style={{ 
+                  fontFamily: 'DM Sans', 
+                  fontWeight: '400', 
+                  fontSize: '14px', 
+                  lineHeight: '24px', 
+                  letterSpacing: '0%',
+                  color: '#919191'
+                }}
+              >
+                Created: {formatTimestamp(visualAbstract?.svg.timestamp)}
+              </span>
             </div>
           </div>
 
           {/* Call to Action */}
-          <div className="text-center mt-8">
-            <div className="bg-[#E4ECFF] rounded-lg p-6 max-w-2xl mx-auto">
-              <h3 className="text-lg font-semibold text-[#214498] mb-2 font-['DM_Sans']">
+          <div className="text-center mt-8 px-4">
+            <div className="bg-white rounded-lg p-4 md:p-6 w-full max-w-[1000px] mx-auto">
+              <h3 
+                className="mb-2"
+                style={{ 
+                  fontFamily: 'Inter', 
+                  fontWeight: '600', 
+                  fontSize: '18px',
+                  lineHeight: '26px', 
+                  letterSpacing: '-0.75px',
+                  textAlign: 'center',
+                  verticalAlign: 'middle',
+                  color: '#0F172A'
+                }}
+              >
                 Create Your Own Visual Abstracts
               </h3>
-              <p className="text-gray-600 mb-4 font-['DM_Sans']">
-                Join DR. INFO to convert your medical text into professional visual posters and abstracts.
-              </p>
-              <a
-                href="/dashboard"
-                className="inline-flex items-center px-6 py-3 bg-[#3771FE] text-white rounded-lg hover:bg-[#214498] transition-colors duration-200 font-['DM_Sans'] font-medium"
+              <p 
+                className="mb-4 md:mb-6"
+                style={{ 
+                  fontFamily: 'Inter', 
+                  fontWeight: '400', 
+                  fontSize: '14px',
+                  lineHeight: '22px', 
+                  letterSpacing: '0%',
+                  textAlign: 'center',
+                  verticalAlign: 'middle',
+                  color: '#64748B'
+                }}
               >
-                Get Started
-              </a>
+                Use DR.INFO to create clear, evidence-based visuals at no cost.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="px-4 md:px-6 py-3 rounded-lg transition-colors duration-200 w-full sm:w-auto"
+                  style={{ 
+                    backgroundColor: '#E7E7E7', 
+                    fontFamily: 'DM Sans', 
+                    fontWeight: '400', 
+                    fontSize: '14px',
+                    lineHeight: '22px', 
+                    letterSpacing: '0%',
+                    color: '#475569'
+                  }}
+                >
+                  Learn More
+                </button>
+                <button
+                  onClick={() => window.open('https://app.drinfo.ai/signup', '_blank')}
+                  className="px-4 md:px-6 py-3 rounded-lg transition-colors duration-200 text-white w-full sm:w-auto"
+                  style={{ 
+                    backgroundColor: '#3771FE',
+                    fontFamily: 'DM Sans', 
+                    fontWeight: '600', 
+                    fontSize: '14px',
+                    lineHeight: '22px', 
+                    letterSpacing: '0%'
+                  }}
+                >
+                  Create for Free
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Learn More Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg p-8 max-w-md mx-4 relative">
+            {/* Close Button */}
+            <button
+              onClick={() => setShowModal(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 transition-colors duration-200"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            {/* Modal Content */}
+            <div className="text-center">
+              <h2 
+                className="text-2xl font-semibold mb-4"
+                style={{ 
+                  fontFamily: 'DM Sans', 
+                  fontWeight: '600', 
+                  color: '#0F172A'
+                }}
+              >
+                What is DR.INFO?
+              </h2>
+              
+              <p 
+                className="text-lg mb-6"
+                style={{ 
+                  fontFamily: 'DM Sans', 
+                  fontWeight: '400', 
+                  color: '#64748B',
+                  lineHeight: '28px'
+                }}
+              >
+                Tools that deliver clear, evidence-based answers when you need them.
+              </p>
+              
+              <button
+                onClick={() => window.open('https://app.drinfo.ai', '_blank')}
+                className="px-8 py-3 rounded-lg font-medium transition-colors duration-200 text-white"
+                style={{ 
+                  backgroundColor: '#3771FE',
+                  fontFamily: 'DM Sans', 
+                  fontWeight: '600', 
+                  fontSize: '16px'
+                }}
+              >
+                VISIT NOW
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PublicLayout>
   )
 }
