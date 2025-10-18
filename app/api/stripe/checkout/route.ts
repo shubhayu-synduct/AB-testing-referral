@@ -55,22 +55,23 @@ export async function POST(req: NextRequest) {
             firebaseUID: uid 
           },
         });
-        console.log(`Updated existing customer ${customer.id} with Firebase UID: ${uid}`);
+        // console.log(`Updated existing customer ${customer.id} with Firebase UID: ${uid}`);
       }
     } else {
       customer = await stripe.customers.create({
         email,
         metadata: { firebaseUID: uid },
       });
-      console.log(`Created new customer ${customer.id} with Firebase UID: ${uid}`);
+      // console.log(`Created new customer ${customer.id} with Firebase UID: ${uid}`);
     }
 
-    // Create checkout session
+    // Create checkout session with tax configuration
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
-      payment_method_types: ['card', 'paypal'],
+      payment_method_types: ['card'],
       customer: customer.id,
       line_items: [{ price: priceId, quantity: 1 }],
+      allow_promotion_codes: true,
       success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/profile?tab=subscription&status=cancelled`,
       metadata: {
@@ -78,42 +79,32 @@ export async function POST(req: NextRequest) {
         plan,
         interval,
       },
+      // Enable automatic tax calculation
+      automatic_tax: {
+        enabled: true,
+      },
+      // Set customer's tax exempt status (if applicable)
+      customer_update: {
+        address: 'auto',
+        name: 'auto',
+      },
+      // Enable tax ID collection for business customers
+      tax_id_collection: {
+        enabled: true,
+      },
+      // Configure billing address collection
+      billing_address_collection: 'required',
     });
 
-    // Calculate expiry date based on interval
-    const now = new Date();
-    let expiryDate = null;
+    // SECURITY FIX: Do NOT update Firebase database here!
+    // The subscription tier should ONLY be updated by the webhook after successful payment.
+    // Updating it here allows users to get premium access without paying.
     
-    if (interval === 'monthly') {
-      expiryDate = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate()).getTime();
-    } else if (interval === 'yearly') {
-      expiryDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).getTime();
-    } else if (interval === 'biyearly') {
-      expiryDate = new Date(now.getFullYear() + 2, now.getMonth(), now.getDate()).getTime();
-    }
-    
-    // Update Firebase with pending subscription status
-    try {
-      await db.collection('users').doc(uid).set({
-        subscriptionTier: plan,
-        subscription: {
-          checkoutSessionId: session.id,
-          createdAt: new Date().toISOString(),
-          currentPeriodEnd: expiryDate,
-          priceId: priceId
-        },
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
-      
-      console.log(`[Checkout] Updated Firebase for user ${uid} with pending ${plan} subscription, expires: ${expiryDate ? new Date(expiryDate).toISOString() : 'null'}`);
-    } catch (firebaseError) {
-      console.error('[Checkout] Firebase update error:', firebaseError);
-      // Don't fail the checkout if Firebase update fails
-    }
+    // console.log(`[Checkout] Created checkout session ${session.id} for user ${uid}. Database will only be updated after successful payment via webhook.`);
 
     return NextResponse.json({ url: session.url });
   } catch (error: any) {
-    console.error('Stripe checkout error:', error);
+    // console.error('Stripe checkout error:', error);
     return NextResponse.json(
       { error: 'Failed to create checkout session' },
       { status: 500 }

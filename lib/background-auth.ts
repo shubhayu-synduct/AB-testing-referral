@@ -38,8 +38,10 @@ export async function verifyAuthenticationBackground(timeoutMs: number = 60000):
         // Get ID token
         const idToken = await user.getIdToken();
         
-        // Make request to backend to get user status
-        const response = await fetch('http://localhost:8002/api/user-status', {
+        // Make request to backend to get user status from EMA service
+        // const EMA_API_URL = process.env.NEXT_PUBLIC_EMA_API_URL || 'http://localhost:8002';
+const EMA_API_URL = process.env.NEXT_PUBLIC_EMA_API_URL || 'https://synduct-drugsummary.drinfo.ai';
+        const response = await fetch(`${EMA_API_URL}/api/user-status`, {
           headers: {
             'Authorization': `Bearer ${idToken}`,
             'Content-Type': 'application/json'

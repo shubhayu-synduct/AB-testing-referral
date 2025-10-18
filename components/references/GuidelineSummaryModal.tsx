@@ -107,7 +107,7 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
         const data = await response.json()
         // Decode unicode in summary before using it
         const decodedSummary = decodeUnicode(data.summary)
-        logger.debug('Summary API response:', decodedSummary)
+        // logger.debug('Summary API response:', decodedSummary)
         setSummary({ ...data, summary: decodedSummary })
         
         // Add the initial summary to the chat history
@@ -213,8 +213,8 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
 
   const handleReferenceClick = useCallback((refNumber: string, occurrenceIndex?: number, messageData?: { sources: Record<string, string>, page_references: Record<string, Array<{ start_word: string; end_word: string }>> }) => {
     // Console log for verification
-    console.log(`Citation clicked: [${refNumber}] at occurrence index: ${occurrenceIndex}`);
-    console.log(`Available page_references for [${refNumber}]:`, messageData?.page_references?.[refNumber] || summary?.page_references?.[refNumber]);
+    // console.log(`Citation clicked: [${refNumber}] at occurrence index: ${occurrenceIndex}`);
+    // console.log(`Available page_references for [${refNumber}]:`, messageData?.page_references?.[refNumber] || summary?.page_references?.[refNumber]);
     
     // Always ensure the citation panel is open - both immediately and after any other state updates
     setIsCitationPanelOpen(true);
@@ -297,7 +297,7 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
       }
       
       const data = await response.json()
-      console.log('Followup API response:', data);
+      // console.log('Followup API response:', data);
       
       setChatHistory(prev => {
         const updated = [...prev]
@@ -437,12 +437,17 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
           className="absolute left-6 top-4 font-medium rounded text-base flex items-center gap-1 shadow z-50"
           onClick={onClose}
         >
-          <Image
-            src="/double_back.svg"
-            alt="Back"
+          <svg
             width={32}
             height={32}
-          />
+            viewBox="0 0 34 35"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <rect y="0.5" width="34" height="34" rx="2.5" fill="#01257C"/>
+            <path d="M16.5781 22.5L11.5781 17.5L16.5781 12.5" stroke="white"/>
+            <path d="M22.4218 22.5L17.4219 17.5L22.4219 12.5" stroke="white"/>
+          </svg>
         </button>
 
         {/* Blue padding area wraps both panels */}
@@ -639,7 +644,11 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
                     {isAskingFollowup ? (
                       <div className="h-6 w-6 border-t-2 border-b-2 border-[#3771FE] rounded-full animate-spin"></div>
                     ) : (
-                      <Image src="/search.svg" alt="Search" width={40} height={40} />
+                      <svg width="40" height="40" viewBox="0 0 46 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="46" height="46" rx="6.57143" fill="#3771FE"/>
+                        <path d="M29.8594 16.5703L13.3594 33.0703" stroke="white" strokeWidth="2.25" strokeLinecap="round"/>
+                        <path d="M20.4297 14.6406H31.6426V24.9263" stroke="white" strokeWidth="2.25" strokeLinecap="round"/>
+                      </svg>
                     )}
                   </div>
                 </div>
@@ -659,12 +668,19 @@ export const GuidelineSummaryModal: React.FC<GuidelineSummaryModalProps> = ({ op
                 className={`rounded-md hover:bg-gray-100 transition-colors ${isCitationPanelOpen ? 'mr-2' : 'mx-auto'}`}
                 title={isCitationPanelOpen ? "Collapse" : "Expand"}
               >
-                <Image
-                  src="/source-collapsible.png"
-                  alt="Toggle Source Panel"
+                <svg
                   width={32}
                   height={32}
-                />
+                  viewBox="0 0 36 36"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path d="M33 18C33 12.3754 33 9.5631 31.5676 7.5916C31.105 6.9549 30.5451 6.39497 29.9083 5.93237C27.9369 4.5 25.1246 4.5 19.5 4.5H16.5C10.8754 4.5 8.0631 4.5 6.0916 5.93237C5.4549 6.39497 4.89497 6.9549 4.43237 7.5916C3 9.5631 3 12.3754 3 18C3 23.6246 3 26.4369 4.43237 28.4083C4.89497 29.0451 5.4549 29.605 6.0916 30.0676C8.0631 31.5 10.8754 31.5 16.5 31.5H19.5C25.1246 31.5 27.9369 31.5 29.9083 30.0676C30.5451 29.605 31.105 29.0451 31.5676 28.4083C33 26.4369 33 23.6246 33 18Z" stroke="#223258" strokeWidth="2.25" strokeLinejoin="round"/>
+                  <path d="M21.75 5.25V30.75" stroke="#223258" strokeWidth="2.25" strokeLinejoin="round"/>
+                  <path d="M28.5 10.5H26.25" stroke="#223258" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M28.5 16.5H26.25" stroke="#223258" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M12 15L13.8398 16.5858C14.6133 17.2524 15 17.5858 15 18C15 18.4142 14.6133 18.7476 13.8398 19.4142L12 21" stroke="#223258" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
               </button>
               {isCitationPanelOpen && (
                 <span className="font-medium text-gray-900" style={{ fontSize: '28px' }}>Original Source</span>

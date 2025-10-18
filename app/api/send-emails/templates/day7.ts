@@ -22,12 +22,11 @@ export const day7Template = {
         .section-title { font-size: 18px; font-weight: 600; margin-bottom: 12px; color: #223258; }
         .section-text { font-size: 16px; color: #000000; margin-bottom: 16px; line-height: 1.6; }
         .highlight-box { 
-          background: linear-gradient(135deg, #F4F7FF 0%, #E8F0FF 100%); 
-          border: 2px solid #3771FE; 
+          background: white; 
+          border: none; 
           border-radius: 16px; 
           padding: 24px; 
           margin: 24px 0; 
-          box-shadow: 0 4px 12px rgba(55, 113, 254, 0.1);
         }
         .highlight-content h3 { 
           color: #3771FE; 
@@ -215,7 +214,7 @@ export const day7Template = {
               <div class="feature-item">
                 <div class="feature-text">
                   <h4>Full Feature Access</h4>
-                  <p>Acute Mode, follow-ups, EMA drug info, global guideline search, and transparent references</p>
+                  <p>Follow-ups, EMA drug info, global guideline search, and transparent references</p>
                 </div>
               </div>
               

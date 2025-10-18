@@ -52,7 +52,7 @@ export function CookieConsentBanner({ onConsentUpdate, forceShow }: CookieConsen
         
         setShowBanner(false) // Don't show banner if already consented
       } catch (error) {
-        console.error('Error parsing cookie consent:', error)
+        // console.error('Error parsing cookie consent:', error)
         // If there's an error parsing, show the banner
         setShowBanner(true)
       }
@@ -88,6 +88,11 @@ export function CookieConsentBanner({ onConsentUpdate, forceShow }: CookieConsen
       onConsentUpdate(consent)
     }
     
+    // Dispatch event to notify dashboard about consent update
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('cookie-consent-updated'));
+    }
+    
     setShowBanner(false)
   }
 
@@ -105,6 +110,11 @@ export function CookieConsentBanner({ onConsentUpdate, forceShow }: CookieConsen
     // Call the callback to update Firebase
     if (onConsentUpdate) {
       onConsentUpdate(consent)
+    }
+    
+    // Dispatch event to notify dashboard about consent update
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('cookie-consent-updated'));
     }
     
     setShowBanner(false)

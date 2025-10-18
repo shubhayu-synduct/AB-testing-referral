@@ -13,7 +13,8 @@ import { doc, setDoc } from "firebase/firestore"
 import { VerificationModal } from "./verification-modal"
 import { logger } from "@/lib/logger"
 import { handleUserSignup, handleFirebaseAuthSignup } from "@/lib/signup-integration"
-import { track } from '@vercel/analytics'
+import { validateEmailForSignup } from "@/lib/email-validation"
+import { track } from '@/lib/analytics'
 
 // Google Icon SVG component
 const GoogleIcon = () => (
@@ -98,12 +99,21 @@ export function SignUpForm() {
     e.preventDefault()
     setError("")
     setLoading(true)
-    track('SignUpAttempted', {
-      method: 'email',
-      email: email ? 'provided' : 'not_provided'
-    })
+    
+    // Track specific email signup attempt
+    track.signupAttemptedUsingEmail(email)
+    
+    // Track signup initiation
+    track.userSignupInitiated('email', undefined, !!email)
 
     try {
+      // Check if email already exists before attempting to create account
+      const emailValidation = await validateEmailForSignup(email)
+      if (!emailValidation.allowed) {
+        setError(emailValidation.error || "An account with this email already exists. Please sign in instead.")
+        return
+      }
+
       const { getFirebaseAuth } = await import("@/lib/firebase")
       const { createUserWithEmailAndPassword, sendEmailVerification } = await import("firebase/auth")
 
@@ -113,6 +123,9 @@ export function SignUpForm() {
       }
 
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      
+      // Track email verification sent
+      track.userEmailVerificationSent(email, 'email')
       
       // Send email verification
       await sendEmailVerification(userCredential.user, {
@@ -133,6 +146,9 @@ export function SignUpForm() {
         // Don't fail the signup if email automation fails
       }
       
+      // Track signup completion
+      track.userSignupCompleted('email', undefined, userCredential.user.uid)
+      
       // Show verification modal instead of redirecting
       setShowVerificationModal(true)
     } catch (err: any) {
@@ -146,10 +162,12 @@ export function SignUpForm() {
   const handleGoogleSignUp = async () => {
     setError("")
     setLoading(true)
-    track('SignUpAttempted', {
-      method: 'google',
-      provider: 'google'
-    })
+    
+    // Track specific Google signup attempt
+    track.signupAttemptedUsingGoogle()
+    
+    // Track signup initiation
+    track.userSignupInitiated('google', 'google', true)
     
     try {
       const { signInWithPopup } = await import("firebase/auth")
@@ -165,6 +183,17 @@ export function SignUpForm() {
       }
 
       const result = await signInWithPopup(auth, googleProvider)
+      
+      // Check if email already exists before creating user document
+      if (result.user.email) {
+        const emailValidation = await validateEmailForSignup(result.user.email)
+        if (!emailValidation.allowed) {
+          // Sign out the user since they shouldn't be signed in
+          await auth.signOut()
+          setError(emailValidation.error || "An account with this email already exists. Please sign in instead.")
+          return
+        }
+      }
       
       const userDocRef = doc(db, "users", result.user.uid)
       const userDoc = await getDoc(userDocRef)
@@ -191,7 +220,13 @@ export function SignUpForm() {
           // Don't fail the signup if email automation fails
         }
         
+        // Track signup completion
+        track.userSignupCompleted('google', 'google', result.user.uid)
+        
         // AuthProvider will handle the redirect to onboarding
+      } else {
+        // User already exists, track as login
+        track.userLoginSuccessful('google', 'google', result.user.uid)
       }
     } catch (err: any) {
       logger.error("Google sign up error:", err)
@@ -210,10 +245,12 @@ export function SignUpForm() {
   const handleMicrosoftSignUp = async () => {
     setError("")
     setLoading(true)
-    track('SignUpAttempted', {
-      method: 'microsoft',
-      provider: 'microsoft'
-    })
+    
+    // Track specific Microsoft signup attempt
+    track.signupAttemptedUsingMicrosoft()
+    
+    // Track general signup attempt
+    track.signUpAttempted('microsoft', 'microsoft')
     
     try {
       const { signInWithPopup } = await import("firebase/auth")
@@ -229,6 +266,17 @@ export function SignUpForm() {
       }
 
       const result = await signInWithPopup(auth, microsoftProvider)
+      
+      // Check if email already exists before creating user document
+      if (result.user.email) {
+        const emailValidation = await validateEmailForSignup(result.user.email)
+        if (!emailValidation.allowed) {
+          // Sign out the user since they shouldn't be signed in
+          await auth.signOut()
+          setError(emailValidation.error || "An account with this email already exists. Please sign in instead.")
+          return
+        }
+      }
       
       const userDocRef = doc(db, "users", result.user.uid)
       const userDoc = await getDoc(userDocRef)

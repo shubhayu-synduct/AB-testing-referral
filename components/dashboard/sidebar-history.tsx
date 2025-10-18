@@ -107,7 +107,7 @@ export function SidebarHistory() {
       await deleteDoc(doc(db, "conversations", sessionId))
       setChatSessions(prev => prev.filter(session => session.id !== sessionId))
     } catch (err) {
-      console.error("Error deleting chat session:", err)
+      // console.error("Error deleting chat session:", err)
     }
   }
 
@@ -120,21 +120,21 @@ export function SidebarHistory() {
       if (!session) return
       
       const newPinnedState = !session.pinned
-      console.log('Toggling pin for session:', sessionId, 'from', session.pinned, 'to', newPinnedState)
+      // console.log('Toggling pin for session:', sessionId, 'from', session.pinned, 'to', newPinnedState)
       
       await updateDoc(doc(db, "conversations", sessionId), {
         pinned: newPinnedState
       })
       
-      console.log('Successfully updated Firebase, updating local state...')
+      // console.log('Successfully updated Firebase, updating local state...')
       
       setChatSessions(prev => prev.map(s => 
         s.id === sessionId ? { ...s, pinned: newPinnedState } : s
       ))
       
-      console.log('Local state updated')
+      // console.log('Local state updated')
     } catch (err) {
-      console.error("Error toggling pin:", err)
+      // console.error("Error toggling pin:", err)
     }
   }
 

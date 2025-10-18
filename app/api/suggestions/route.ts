@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     // Return the response from Gemini handler
     return geminiResponse;
   } catch (error) {
-    console.error('Error in suggestions route:', error);
+    // console.error('Error in suggestions route:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

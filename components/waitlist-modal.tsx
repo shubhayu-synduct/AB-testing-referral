@@ -17,7 +17,7 @@ export default function WaitlistModal({ isOpen }: WaitlistModalProps) {
   // Auto signout after 30 seconds with countdown
   useEffect(() => {
     if (isOpen) {
-      setCountdown(30)
+      setCountdown(10)
       
       const countdownTimer = setInterval(() => {
         setCountdown(prev => {
@@ -31,7 +31,7 @@ export default function WaitlistModal({ isOpen }: WaitlistModalProps) {
 
       const signoutTimer = setTimeout(async () => {
         try {
-          console.log('Auto signing out non-medical user after 30 seconds')
+          // console.log('Auto signing out non-medical user after 30 seconds')
           
           // Sign out from Firebase
           const { getFirebaseAuth } = await import("@/lib/firebase")
@@ -45,7 +45,7 @@ export default function WaitlistModal({ isOpen }: WaitlistModalProps) {
           // Redirect to login
           router.push('/login')
         } catch (error) {
-          console.error('Error during auto signout:', error)
+          // console.error('Error during auto signout:', error)
           // Fallback: just redirect to login
           router.push('/login')
         }
@@ -84,7 +84,7 @@ export default function WaitlistModal({ isOpen }: WaitlistModalProps) {
               You're on the Waitlist!
             </h3>
             <p className="text-[#223258] mb-6 leading-relaxed" style={{ fontFamily: 'DM Sans', fontWeight: 400, fontSize: 14 }}>
-              Thank you for your interest in DR. INFO. Our service is currently available only to Physicians, Medical Fellows, Medical Consultants, Medical Interns/Residents, Medical Students, and Dentists. We've added you to our waitlist and will get back to you soon when we expand access.
+              Thank you for your interest in DR. INFO. Our service is currently available only to Physicians, Medical Fellows, Medical Consultants, Medical Interns/Residents, Pharmacists, Advanced Practice Nurses, Clinical Researchers, and Dentists. We've added you to our waitlist and will get back to you soon when we expand access.
             </p>
             <div className="text-[#223258] text-sm" style={{ fontFamily: 'DM Sans', fontWeight: 400 }}>
               Signing out in <span className="font-semibold text-[#3771FE]">{countdown}</span> seconds

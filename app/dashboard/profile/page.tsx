@@ -1,15 +1,17 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { unstable_noStore as noStore } from 'next/cache';
 import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { getFirebaseAuth, getFirebaseFirestore } from "@/lib/firebase";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useSearchParams, useRouter } from "next/navigation";
+import { CleanupService } from "@/lib/cleanup-service";
+import { track } from "@/lib/analytics";
 
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   noStore(); // Disable static generation/prerendering
   
   const { user, loading: authLoading } = useAuth();
@@ -17,13 +19,17 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'subscription' | 'feedback'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'subscription' | 'feedback'>('profile');
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('yearly');
   const [currentSubscription, setCurrentSubscription] = useState<any>(null);
+  const [planLoading, setPlanLoading] = useState(false);
   const [showSpecialtiesDropdown, setShowSpecialtiesDropdown] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [showCancelSubscriptionModal, setShowCancelSubscriptionModal] = useState(false);
+  const [cancelConfirmation, setCancelConfirmation] = useState('');
+  const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState('');
   const specialtiesRef = useRef<HTMLDivElement>(null);
   const placeOfWorkRef = useRef<HTMLDivElement>(null);
@@ -36,6 +42,18 @@ export default function ProfilePage() {
   const [countrySearchTerm, setCountrySearchTerm] = useState('');
   const [occupationSearchTerm, setOccupationSearchTerm] = useState('');
   const [placeOfWorkSearchTerm, setPlaceOfWorkSearchTerm] = useState('');
+  const [cookiePreferences, setCookiePreferences] = useState({
+    analytics: false,
+    marketing: false,
+    functional: false
+  });
+  const [originalCookiePreferences, setOriginalCookiePreferences] = useState({
+    analytics: false,
+    marketing: false,
+    functional: false
+  });
+  const [preferencesSaving, setPreferencesSaving] = useState(false);
+  const [preferencesSuccess, setPreferencesSuccess] = useState(false);
 
   // Occupation and Specialties options
   const occupationOptions = [
@@ -94,6 +112,10 @@ export default function ProfilePage() {
     // Check if tab parameter is set in URL
     const tabParam = searchParams.get('tab');
     if (tabParam === 'subscription') {
+      setActiveTab('subscription');
+    } else if (tabParam === 'preferences') {
+      setActiveTab('preferences');
+    } else if (tabParam === 'profile') {
       setActiveTab('profile');
     }
     
@@ -113,28 +135,68 @@ export default function ProfilePage() {
     if (authLoading) return; // Wait for auth to finish
     if (!user) return; // Optionally redirect to login here
 
-    const fetchProfile = async () => {
-      const db = getFirebaseFirestore();
-      const docRef = doc(db, "users", user.uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        // Convert country value to match dropdown format if needed
-        const country = docSnap.data().country || docSnap.data().profile || docSnap.data().profile?.country || 'united-states';
-        const formattedCountry = country.toLowerCase().replace(/\s+/g, '-');
-        
-        setProfile({
-          ...docSnap.data().profile || {},
-          email: docSnap.data().email || user.email,
-          country: formattedCountry
-        });
+    // Track profile page view
+    track.profilePageViewed(user.uid, 'profile');
 
-        // Set current subscription data
-        setCurrentSubscription({
-          tier: docSnap.data().subscriptionTier || 'free',
-          subscription: docSnap.data().subscription || null
+    const fetchProfile = async () => {
+      try {
+        const db = getFirebaseFirestore();
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          // Convert country value to match dropdown format if needed
+          const country = docSnap.data().country || docSnap.data().profile || docSnap.data().profile?.country || 'united-states';
+          const formattedCountry = country.toLowerCase().replace(/\s+/g, '-');
+          
+          setProfile({
+            ...docSnap.data().profile || {},
+            email: docSnap.data().email || user.email,
+            country: formattedCountry
+          });
+
+          // Set current subscription data
+          const subscriptionData = {
+            tier: docSnap.data().subscriptionTier || 'free',
+            subscription: docSnap.data().subscription || null
+          };
+          setCurrentSubscription(subscriptionData);
+
+          // Set cookie preferences from Firebase
+          const cookieConsent = docSnap.data().cookieConsent;
+          if (cookieConsent) {
+            const preferences = {
+              analytics: cookieConsent.analytics || false,
+              marketing: cookieConsent.marketing || false,
+              functional: cookieConsent.functional || false
+            };
+            setCookiePreferences(preferences);
+            setOriginalCookiePreferences(preferences);
+          }
+        } else {
+          // User document doesn't exist, set default values
+          setProfile({
+            email: user.email,
+            country: 'united-states'
+          });
+          setCurrentSubscription({
+            tier: 'free',
+            subscription: null
+          });
+        }
+      } catch (error) {
+        // console.error('Error fetching profile:', error);
+        // Set default values on error
+        setProfile({
+          email: user.email,
+          country: 'united-states'
         });
+        setCurrentSubscription({
+          tier: 'free',
+          subscription: null
+        });
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     fetchProfile();
   }, [user, authLoading]);
@@ -145,6 +207,13 @@ export default function ProfilePage() {
       return () => clearTimeout(timer);
     }
   }, [success]);
+
+  useEffect(() => {
+    if (preferencesSuccess) {
+      const timer = setTimeout(() => setPreferencesSuccess(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [preferencesSuccess]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -172,6 +241,7 @@ export default function ProfilePage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setProfile((prev: any) => ({ ...prev, [name]: value }));
+    
   };
 
   const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -181,6 +251,74 @@ export default function ProfilePage() {
 
   const handleSpecialtiesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setProfile((prev: any) => ({ ...prev, specialties: e.target.value.split(",").map((s) => s.trim()) }));
+  };
+
+  const toggleCookie = (type: 'analytics' | 'marketing' | 'functional') => {
+    const newValue = !cookiePreferences[type];
+    setCookiePreferences(prev => ({
+      ...prev,
+      [type]: newValue
+    }));
+    
+    // Track cookie preference toggle
+    if (user) {
+      track.cookiePreferenceToggled(type, newValue, user.uid, 'profile');
+    }
+  };
+
+  const handlePreferencesSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPreferencesSaving(true);
+    setPreferencesSuccess(false);
+    
+    // Track preferences form submission
+    if (user) {
+      track.preferencesFormSubmitted(user.uid, 'profile');
+    }
+    
+    const auth = await getFirebaseAuth();
+    const user = auth.currentUser;
+    if (user) {
+      const db = getFirebaseFirestore();
+      const docRef = doc(db, "users", user.uid);
+      
+      const consent: any = {
+        necessary: true, // Always true
+        analytics: cookiePreferences.analytics,
+        marketing: cookiePreferences.marketing,
+        functional: cookiePreferences.functional,
+        consentedAt: new Date().toISOString(),
+        consentType: 'custom'
+      };
+      
+      // Update Firebase with new cookie preferences
+      await updateDoc(docRef, {
+        "cookieConsent": consent
+      });
+      
+      // Also update localStorage
+      localStorage.setItem('drinfo-cookie-consent', JSON.stringify(consent));
+      
+      // Dispatch event to notify other components about consent update
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('cookie-consent-updated'));
+      }
+      
+      // Update original preferences to match current
+      setOriginalCookiePreferences(cookiePreferences);
+      setPreferencesSuccess(true);
+      
+    }
+    setPreferencesSaving(false);
+  };
+
+  // Check if preferences have changed
+  const hasPreferencesChanged = () => {
+    return (
+      cookiePreferences.analytics !== originalCookiePreferences.analytics ||
+      cookiePreferences.marketing !== originalCookiePreferences.marketing ||
+      cookiePreferences.functional !== originalCookiePreferences.functional
+    );
   };
 
   const getCurrentPlanDisplay = () => {
@@ -195,18 +333,22 @@ export default function ProfilePage() {
     return 'Free';
   };
 
-  // Debug logging for subscription data
+
+  // Sync billing interval with current subscription
   useEffect(() => {
-    if (currentSubscription) {
-      console.log('🔍 Current Subscription Data:', {
-        tier: currentSubscription.tier,
-        status: currentSubscription.subscription?.status,
-        cancelAtPeriodEnd: currentSubscription.subscription?.cancelAtPeriodEnd,
-        currentPeriodEnd: currentSubscription.subscription?.currentPeriodEnd,
-        interval: currentSubscription.subscription?.interval
-      });
+    if (currentSubscription?.subscription?.interval) {
+      const subscriptionInterval = currentSubscription.subscription.interval;
+      
+      // Map subscription interval to billing interval state
+      if (subscriptionInterval === 'monthly' || subscriptionInterval === 'yearly' || subscriptionInterval === 'biyearly') {
+        const newInterval = subscriptionInterval === 'monthly' ? 'monthly' : 'yearly';
+        // Only update if different to prevent unnecessary re-renders
+        if (newInterval !== billingInterval) {
+          setBillingInterval(newInterval);
+        }
+      }
     }
-  }, [currentSubscription]);
+  }, [currentSubscription, billingInterval]);
 
   const isCurrentPlan = (plan: string) => {
     if (!currentSubscription) return plan === 'free';
@@ -218,9 +360,65 @@ export default function ProfilePage() {
     return currentSubscription.subscription.interval === interval;
   };
 
-  const handleTabChange = (tab: 'profile' | 'subscription' | 'feedback') => {
+  // Helper function to check if a plan should be highlighted
+  const shouldHighlightPlan = (plan: string) => {
+    if (!currentSubscription) return plan === 'free';
+    
+    if (plan === 'free') {
+      return currentSubscription.tier === 'free' || !currentSubscription.subscription;
+    }
+    
+    // For paid plans, highlight if it's the current tier regardless of billing interval
+    // This allows users to see their current plan highlighted in both monthly and yearly views
+    return currentSubscription.tier === plan;
+  };
+
+  // Helper function to get button text and state for plan selection
+  const getPlanButtonState = (plan: string) => {
+    // Handle edge cases
+    if (!plan || (plan !== 'student' && plan !== 'clinician' && plan !== 'free')) {
+      return {
+        text: 'Invalid Plan',
+        disabled: true,
+        className: 'bg-gray-400 text-white cursor-not-allowed'
+      };
+    }
+
+    const isCurrentPlan = shouldHighlightPlan(plan);
+    const isCurrentInterval = isCurrentBillingInterval(billingInterval);
+    const isExactCurrentPlan = isCurrentPlan && isCurrentInterval;
+    
+    if (isExactCurrentPlan) {
+      return {
+        text: 'Current Plan',
+        disabled: true,
+        className: 'border border-[#3771FE] text-[#3771FE] bg-white cursor-not-allowed'
+      };
+    }
+    
+    if (planLoading) {
+      return {
+        text: 'Processing...',
+        disabled: true,
+        className: 'bg-[#3771FE] text-white hover:bg-[#2A5CDB]'
+      };
+    }
+    
+    return {
+      text: plan === 'student' ? 'Get Pro Student' : 'Get Pro Physician',
+      disabled: false,
+      className: 'bg-[#3771FE] text-white hover:bg-[#2A5CDB]'
+    };
+  };
+
+  const handleTabChange = (tab: 'profile' | 'preferences' | 'subscription' | 'feedback') => {
     setActiveTab(tab);
     router.push(`/dashboard/profile?tab=${tab}`);
+    
+    // Track tab click
+    if (user) {
+      track.profileTabClicked(tab, user.uid, 'profile');
+    }
   };
 
   const handlePlanSelect = async (plan: string, interval: string) => {
@@ -234,7 +432,8 @@ export default function ProfilePage() {
       return;
     }
 
-    setLoading(true);
+
+    setPlanLoading(true);
     setError('');
 
     try {
@@ -262,14 +461,25 @@ export default function ProfilePage() {
       // Redirect to Stripe Checkout
       window.location.href = data.url;
     } catch (err: any) {
-      console.error('Payment error:', err);
+      // console.error('Payment error:', err);
       setError(err.message || 'Failed to process payment');
     } finally {
-      setLoading(false);
+      setPlanLoading(false);
     }
   };
 
-  const handleCancelSubscription = async () => {
+  const handleCancelSubscription = () => {
+    setShowCancelSubscriptionModal(true);
+    
+    // Track cancel subscription click
+    if (user) {
+      track.cancelSubscriptionClicked(user.uid, 'profile');
+    }
+  };
+
+  const confirmCancelSubscription = async () => {
+    if (cancelConfirmation !== 'CANCEL') return;
+    
     if (!user) {
       setError('Please sign in to continue');
       return;
@@ -280,7 +490,10 @@ export default function ProfilePage() {
       return;
     }
 
-    setLoading(true);
+    // Track cancel subscription confirmation
+    track.cancelSubscriptionConfirmed(user.uid, 'profile');
+
+    setCancelling(true);
     setError('');
 
     try {
@@ -315,11 +528,13 @@ export default function ProfilePage() {
       }));
 
       setSuccess(true);
+      setShowCancelSubscriptionModal(false);
+      setCancelConfirmation('');
     } catch (err: any) {
-      console.error('Cancellation error:', err);
+      // console.error('Cancellation error:', err);
       setError(err.message || 'Failed to cancel subscription');
     } finally {
-      setLoading(false);
+      setCancelling(false);
     }
   };
 
@@ -327,6 +542,12 @@ export default function ProfilePage() {
     e.preventDefault();
     setSaving(true);
     setSuccess(false);
+    
+    // Track form submission
+    if (user) {
+      track.profileFormSubmitted(user.uid, 'profile');
+    }
+    
     const auth = await getFirebaseAuth();
     const user = auth.currentUser;
     if (user) {
@@ -352,6 +573,7 @@ export default function ProfilePage() {
       
       await updateDoc(docRef, updateData);
       setSuccess(true);
+      
     }
     setSaving(false);
   };
@@ -359,11 +581,19 @@ export default function ProfilePage() {
   const deleteProfile = async () => {
     if (deleteConfirmation !== 'DELETE') return;
     
+    // Track delete profile confirmation
+    if (user) {
+      track.deleteProfileConfirmed(user.uid, 'profile');
+    }
+    
     setDeleting(true);
     try {
       const auth = await getFirebaseAuth();
       const user = auth.currentUser;
       if (user) {
+        const userUid = user.uid;
+        const userEmail = user.email || 'unknown@example.com';
+        
         // Send delete confirmation email first
         try {
           await fetch('/api/send-delete-email', {
@@ -378,34 +608,71 @@ export default function ProfilePage() {
             }),
           });
         } catch (emailError) {
-          console.warn('Failed to send delete email:', emailError);
+          // console.warn('Failed to send delete email:', emailError);
           // Don't fail the deletion if email fails
         }
 
-        const db = getFirebaseFirestore();
-        const docRef = doc(db, "users", user.uid);
+        // Use server-side API for deletion (handles Firebase Admin SDK)
+        // console.log('Calling server-side delete API...');
+        const deleteResponse = await fetch('/api/delete-profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userUid: userUid,
+            userEmail: userEmail
+          }),
+        });
+
+        const deleteResult = await deleteResponse.json();
         
-        // Delete the user document from Firestore
-        await deleteDoc(docRef);
+        if (!deleteResponse.ok) {
+          throw new Error(deleteResult.error || 'Failed to delete profile');
+        }
+
+        // console.log('Server-side deletion successful:', deleteResult);
+        // console.log(`Deleted ${deleteResult.deletedUserCount} user document(s) with email ${userEmail}`);
+        // console.log(`Deleted ${deleteResult.deletedAuthUserCount} Firebase Auth user(s) with email ${userEmail}`);
+        // console.log(`Total accounts deleted: ${deleteResult.totalAccountsDeleted}`);
         
-        // Delete the user's authentication account
-        await user.delete();
-        
-        // Sign out to clear authentication cookies
-        await auth.signOut();
-        
-        // Reset local state
+        // Reset local state immediately
         setProfile(null);
         setShowDeleteModal(false);
         setDeleteConfirmation('');
         
-        // Redirect to signup page
-        window.location.href = '/signup';
+        // Perform comprehensive cleanup (without redirect)
+        await CleanupService.performCompleteCleanup(userUid, userEmail);
+        
+        // Verify cleanup was successful
+        const cleanupSuccessful = CleanupService.verifyCleanup();
+        // console.log('Cleanup verification:', cleanupSuccessful);
+        
+        // Redirect to signup page (sign out will be handled there)
+        // console.log('Redirecting to signup page...');
+        window.location.replace('/signup?deleted=true');
+        
       }
     } catch (error) {
-      console.error('Error deleting profile:', error);
-      // If there's an error, it might be because the user needs to re-authenticate
-      // You might want to show a message asking them to sign in again
+      // console.error('Error deleting profile:', error);
+      
+      // Show error message to user
+      alert('There was an error deleting your account. Please try again or contact support if the problem persists.');
+      
+      // Redirect to signup page even on error (before cleanup)
+      // console.log('Redirecting to signup page after error...');
+      window.location.replace('/signup?deleted=true');
+      
+      // Even if there's an error, try to perform cleanup after redirect
+      try {
+        const auth = await getFirebaseAuth();
+        const user = auth.currentUser;
+        if (user) {
+          await CleanupService.performCompleteCleanup(user.uid, user.email || 'unknown@example.com');
+        }
+      } catch (cleanupError) {
+        // console.error('Error during cleanup after deletion failure:', cleanupError);
+      }
     } finally {
       setDeleting(false);
     }
@@ -433,14 +700,20 @@ export default function ProfilePage() {
           >
             Profile
           </button>
-          {/* Tempory comment out subscription tab */}
-          {/* <button
+          <button
+            className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
+              ${activeTab === 'preferences' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
+            onClick={() => handleTabChange('preferences')}
+          >
+            Preferences
+          </button>
+          <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'subscription' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
             onClick={() => handleTabChange('subscription')}
           >
             Subscription
-          </button> */}
+          </button>
           {/* <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'feedback' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
@@ -475,7 +748,9 @@ export default function ProfilePage() {
                     <div
                       className={`w-full min-h-[40px] px-2 py-1 border border-[#B5C9FC] rounded-[8px] bg-white flex items-center justify-between gap-1 focus-within:ring-2 focus-within:ring-[#B5C9FC] focus-within:border-transparent`}
                       tabIndex={0}
-                      onClick={() => setShowCountryDropdown(true)}
+                      onClick={() => {
+                        setShowCountryDropdown(true);
+                      }}
                       style={{ cursor: 'text', position: 'relative' }}
                     >
                       {!profile?.country && (
@@ -714,6 +989,9 @@ export default function ProfilePage() {
                               setProfile((prev: any) => ({ ...prev, country: value }));
                               setShowCountryDropdown(false);
                               setCountrySearchTerm('');
+                              if (user) {
+                                track.profileCountrySelected(value, user.uid, 'profile');
+                              }
                             }}
                           >
                             {label}
@@ -737,7 +1015,9 @@ export default function ProfilePage() {
                     <div
                       className={`w-full min-h-[40px] px-2 py-1 border border-[#B5C9FC] rounded-[8px] bg-white flex items-center justify-between gap-1 focus-within:ring-2 focus-within:ring-[#B5C9FC] focus-within:border-transparent`}
                       tabIndex={0}
-                      onClick={() => setShowPlaceOfWorkDropdown(true)}
+                      onClick={() => {
+                        setShowPlaceOfWorkDropdown(true);
+                      }}
                       style={{ cursor: 'text', position: 'relative' }}
                     >
                       {!profile?.placeOfWork && (
@@ -792,6 +1072,9 @@ export default function ProfilePage() {
                               }));
                               setShowPlaceOfWorkDropdown(false);
                               setPlaceOfWorkSearchTerm('');
+                              if (user) {
+                                track.profilePlaceOfWorkSelected(opt.value, user.uid, 'profile');
+                              }
                             }}
                           >
                             {opt.label}
@@ -808,7 +1091,9 @@ export default function ProfilePage() {
                         name="otherPlaceOfWork"
                         placeholder="Please specify your place of work"
                         value={profile.otherPlaceOfWork || ""}
-                        onChange={e => setProfile((prev: any) => ({ ...prev, otherPlaceOfWork: e.target.value }))}
+                        onChange={e => {
+                          setProfile((prev: any) => ({ ...prev, otherPlaceOfWork: e.target.value }));
+                        }}
                         className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[8px] text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent text-sm bg-white"
                         style={{ fontSize: 14 }}
                       />
@@ -825,7 +1110,9 @@ export default function ProfilePage() {
                     <div
                       className={`w-full min-h-[40px] px-2 py-1 border border-[#B5C9FC] rounded-[8px] bg-white flex flex-wrap items-center gap-1 focus-within:ring-2 focus-within:ring-[#B5C9FC] focus-within:border-transparent`}
                       tabIndex={0}
-                      onClick={() => setShowSpecialtiesDropdown(true)}
+                      onClick={() => {
+                        setShowSpecialtiesDropdown(true);
+                      }}
                       style={{ cursor: 'text', position: 'relative' }}
                     >
                       {(!specialtiesArray || specialtiesArray.length === 0) && (
@@ -858,6 +1145,11 @@ export default function ProfilePage() {
                                   otherSpecialty: shouldClearOtherSpecialty ? "" : prev.otherSpecialty
                                 };
                               });
+                              
+                              // Track specialty removal
+                              if (user) {
+                                track.profileSpecialtyRemoved(specialty, user.uid, 'profile');
+                              }
                             }}
                             className="ml-1 text-[#3771FE] hover:text-[#223258]"
                           >
@@ -919,6 +1211,11 @@ export default function ProfilePage() {
                               });
                               setShowSpecialtiesDropdown(false);
                               setSpecialtiesSearchTerm('');
+                              
+                              // Track specialty addition
+                              if (user) {
+                                track.profileSpecialtyAdded(opt.value, user.uid, 'profile');
+                              }
                             }}
                           >
                             {opt.label}
@@ -935,7 +1232,9 @@ export default function ProfilePage() {
                         name="otherSpecialty"
                         placeholder="Please specify your specialty"
                         value={profile.otherSpecialty || ""}
-                        onChange={e => setProfile((prev: any) => ({ ...prev, otherSpecialty: e.target.value }))}
+                        onChange={e => {
+                          setProfile((prev: any) => ({ ...prev, otherSpecialty: e.target.value }));
+                        }}
                         className="w-full px-3 py-2 border border-[#B5C9FC] rounded-[8px] text-[#223258] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#B5C9FC] focus:border-transparent text-sm bg-white"
                         style={{ fontSize: 14 }}
                       />
@@ -958,11 +1257,210 @@ export default function ProfilePage() {
             <div className="flex justify-end mt-4 w-full mb-4 md:mb-0">
               <button
                 type="button"
-                onClick={() => setShowDeleteModal(true)}
+                onClick={() => {
+                  setShowDeleteModal(true);
+                  if (user) {
+                    track.deleteProfileClicked(user.uid, 'profile');
+                  }
+                }}
                 className="bg-[#F4F7FF] border border-[#B5C9FC] text-[#747474] font-regular px-8 py-2 rounded-[8px] transition-colors text-lg w-48 hover:bg-[#E8F0FF] hover:text-[#223258]"
               >
                 Delete Profile
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Preferences Tab Content */}
+        {activeTab === 'preferences' && (
+          <div>
+            <h2 className="text-xl font-regular text-[#000000] mb-1">Cookie Preferences</h2>
+            <p className="text-[#747474] text-sm mb-6">Manage your cookie preferences and privacy settings</p>
+            <div className="border border-[#B5C9FC] rounded-[10px] p-4 md:p-8 bg-[#F4F7FF] w-full">
+              <form onSubmit={handlePreferencesSubmit}>
+                <div className="space-y-4">
+                  {/* Necessary Cookies - Locked */}
+                  <div className="bg-[#E4ECFF] rounded-lg p-4 border border-[#B5C9FC]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center border border-[#223258]">
+                          <svg className="w-4 h-4 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-[#223258] font-['DM_Sans']">Necessary</h4>
+                          <p className="text-xs text-[#747474] font-['DM_Sans']">Authentication & security</p>
+                        </div>
+                      </div>
+                      <div className="relative w-12 h-6 rounded-full bg-[#223258]">
+                        <div className="absolute top-0.5 right-0.5 w-5 h-5 bg-white rounded-full flex items-center justify-center">
+                          <svg className="w-3 h-3 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Analytics Cookies */}
+                  <div className="bg-white rounded-lg p-4 border border-[#B5C9FC]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-[#E4ECFF] rounded-full flex items-center justify-center">
+                          <svg className="w-4 h-4 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-[#223258] font-['DM_Sans']">Analytics</h4>
+                          <p className="text-xs text-[#747474] font-['DM_Sans']">Website performance & usage</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleCookie('analytics')}
+                        className={`relative w-12 h-6 rounded-full transition-all duration-300 ease-in-out ${
+                          cookiePreferences.analytics ? 'bg-[#214498]' : 'bg-gray-300'
+                        }`}
+                      >
+                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all duration-300 ease-in-out flex items-center justify-center ${
+                          cookiePreferences.analytics ? 'left-6' : 'left-0.5'
+                        }`}>
+                          {cookiePreferences.analytics ? (
+                            <svg className="w-3 h-3 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Marketing Cookies */}
+                  <div className="bg-white rounded-lg p-4 border border-[#B5C9FC]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-[#E4ECFF] rounded-full flex items-center justify-center">
+                          <svg className="w-4 h-4 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-[#223258] font-['DM_Sans']">Marketing</h4>
+                          <p className="text-xs text-[#747474] font-['DM_Sans']">Personalized ads & content</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleCookie('marketing')}
+                        className={`relative w-12 h-6 rounded-full transition-all duration-300 ease-in-out ${
+                          cookiePreferences.marketing ? 'bg-[#214498]' : 'bg-gray-300'
+                        }`}
+                      >
+                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all duration-300 ease-in-out flex items-center justify-center ${
+                          cookiePreferences.marketing ? 'left-6' : 'left-0.5'
+                        }`}>
+                          {cookiePreferences.marketing ? (
+                            <svg className="w-3 h-3 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Functional Cookies */}
+                  <div className="bg-white rounded-lg p-4 border border-[#B5C9FC]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-[#E4ECFF] rounded-full flex items-center justify-center">
+                          <svg className="w-4 h-4 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-[#223258] font-['DM_Sans']">Functional</h4>
+                          <p className="text-xs text-[#747474] font-['DM_Sans']">User preferences & customization</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleCookie('functional')}
+                        className={`relative w-12 h-6 rounded-full transition-all duration-300 ease-in-out ${
+                          cookiePreferences.functional ? 'bg-[#214498]' : 'bg-gray-300'
+                        }`}
+                      >
+                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all duration-300 ease-in-out flex items-center justify-center ${
+                          cookiePreferences.functional ? 'left-6' : 'left-0.5'
+                        }`}>
+                          {cookiePreferences.functional ? (
+                            <svg className="w-3 h-3 text-[#223258]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <div className="flex items-top justify-between">
+                    <p className="text-xs text-[#747474] font-['DM_Sans']">
+                      Read our{' '}
+                      <a 
+                        href="https://drinfo.ai/privacy-policy/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-black underline hover:text-[#3771FE] transition-colors"
+                        onClick={() => user && track.privacyPolicyClicked(user.uid, 'profile')}
+                      >
+                        privacy policy
+                      </a>
+                      {' '}and{' '}
+                      <a 
+                        href="https://drinfo.ai/cookie-policy/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-black underline hover:text-[#3771FE] transition-colors"
+                        onClick={() => user && track.cookiePolicyClicked(user.uid, 'profile')}
+                      >
+                        cookie policy
+                      </a>
+                    </p>
+                    
+                    <button
+                      type="submit"
+                      disabled={preferencesSaving}
+                      className="bg-[#F4F7FF] border border-[#B5C9FC] text-[#747474] font-regular px-8 py-2 rounded-[8px] transition-colors text-lg w-56 hover:bg-[#E8F0FF] hover:text-[#223258]"
+                    >
+                      {preferencesSaving ? 'Saving...' : 'Save'}
+                    </button>
+                  </div>
+                  
+                  {preferencesSuccess && (
+                    <div className="mt-2 font-medium text-right" style={{ color: '#8991AA' }}>
+                      Preferences saved successfully!
+                    </div>
+                  )}
+                </div>
+              </form>
             </div>
           </div>
         )}
@@ -1009,7 +1507,9 @@ export default function ProfilePage() {
             <div className="flex justify-center mb-8">
               <div className="bg-white border border-[#B5C9FC] rounded-[10px] p-1 inline-flex">
                 <button
-                  onClick={() => setBillingInterval('monthly')}
+                  onClick={() => {
+                    setBillingInterval('monthly');
+                  }}
                   className={`px-6 py-2 rounded-[8px] font-medium transition-colors ${
                     billingInterval === 'monthly' 
                       ? 'bg-[#3771FE] text-white' 
@@ -1019,7 +1519,9 @@ export default function ProfilePage() {
                   Monthly
                 </button>
                 <button
-                  onClick={() => setBillingInterval('yearly')}
+                  onClick={() => {
+                    setBillingInterval('yearly');
+                  }}
                   className={`px-6 py-2 rounded-[8px] font-medium transition-colors ${
                     billingInterval === 'yearly' 
                       ? 'bg-[#3771FE] text-white' 
@@ -1035,8 +1537,8 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Free Plan */}
               <div className={`border rounded-[10px] p-6 ${
-                isCurrentPlan('free') 
-                  ? 'border-[#3771FE] bg-[#F4F7FF]' 
+                shouldHighlightPlan('free') 
+                  ? 'border-[#3771FE] bg-blue-50 ring-2 ring-blue-200' 
                   : 'border-[#B5C9FC] bg-white'
               }`}>
                 <h4 className="text-xl font-semibold text-[#000000] mb-2">Free</h4>
@@ -1045,7 +1547,7 @@ export default function ProfilePage() {
                 
                 {/* Button positioned above features */}
                 <div className="w-full py-3 px-4 rounded-[8px] font-medium border border-[#3771FE] text-[#3771FE] bg-white text-center mb-6">
-                  {isCurrentPlan('free') ? 'Current Plan' : 'Free Plan'}
+                  {shouldHighlightPlan('free') ? 'Current Plan' : 'Free Plan'}
                 </div>
                 
                 <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
@@ -1062,8 +1564,8 @@ export default function ProfilePage() {
 
               {/* Premium Student Plan */}
               <div className={`border rounded-[10px] p-6 relative ${
-                isCurrentPlan('student') && isCurrentBillingInterval(billingInterval)
-                  ? 'border-[#3771FE] bg-[#F4F7FF]' 
+                shouldHighlightPlan('student')
+                  ? 'border-[#3771FE] bg-blue-50 ring-2 ring-blue-200' 
                   : 'border-[#B5C9FC] bg-white'
               }`}>
                 {/* Save Badge for Yearly */}
@@ -1076,7 +1578,7 @@ export default function ProfilePage() {
                 <p className="text-sm text-[#747474] mb-4">Unlimited, guideline-backed answers with transparent citations</p>
                 <div className="flex items-baseline gap-1 mb-4 flex-nowrap justify-center">
                   <span className="text-2xl font-bold text-[#000000]">
-                    {billingInterval === 'monthly' ? '€12.50' : '€9.92'}
+                    {billingInterval === 'monthly' ? '€11.99' : '€9.92'}
                   </span>
                   <span className="text-sm text-[#000000] whitespace-nowrap">/ mo</span>
                   {billingInterval === 'yearly' && (
@@ -1085,17 +1587,18 @@ export default function ProfilePage() {
                 </div>
                 
                 {/* Button positioned above description */}
-                <button
-                  onClick={isCurrentPlan('student') && isCurrentBillingInterval(billingInterval) ? undefined : () => handlePlanSelect('student', billingInterval)}
-                  className={`w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-4 ${
-                    isCurrentPlan('student') && isCurrentBillingInterval(billingInterval)
-                      ? 'border border-[#3771FE] text-[#3771FE] bg-white cursor-not-allowed'
-                      : 'bg-[#3771FE] text-white hover:bg-[#2A5CDB]'
-                  }`}
-                  disabled={isCurrentPlan('student') && isCurrentBillingInterval(billingInterval)}
-                >
-                  {isCurrentPlan('student') && isCurrentBillingInterval(billingInterval) ? 'Current Plan' : 'Get Pro Student'}
-                </button>
+                {(() => {
+                  const buttonState = getPlanButtonState('student');
+                  return (
+                    <button
+                      onClick={buttonState.disabled ? undefined : () => handlePlanSelect('student', billingInterval)}
+                      className={`w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-4 ${buttonState.className}`}
+                      disabled={buttonState.disabled}
+                    >
+                      {buttonState.text}
+                    </button>
+                  );
+                })()}
                 
                 <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
                   <li>Unlimited Clinical Questions</li>
@@ -1107,8 +1610,8 @@ export default function ProfilePage() {
 
               {/* Premium Physician Plan */}
               <div className={`border rounded-[10px] p-6 relative ${
-                isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval)
-                  ? 'border-[#3771FE] bg-[#F4F7FF]' 
+                shouldHighlightPlan('clinician')
+                  ? 'border-[#3771FE] bg-blue-50 ring-2 ring-blue-200' 
                   : 'border-[#B5C9FC] bg-white'
               }`}>
                 {/* Save Badge for Yearly */}
@@ -1121,7 +1624,7 @@ export default function ProfilePage() {
                 <p className="text-sm text-[#747474] mb-4">Unlimited, guideline-backed answers with transparent citations</p>
                 <div className="flex items-baseline gap-1 mb-4 flex-nowrap justify-center">
                   <span className="text-2xl font-bold text-[#000000]">
-                    {billingInterval === 'monthly' ? '€19.90' : '€16.58'}
+                    {billingInterval === 'monthly' ? '€19.99' : '€16.58'}
                   </span>
                   <span className="text-sm text-[#000000] whitespace-nowrap">/ mo</span>
                   {billingInterval === 'yearly' && (
@@ -1130,17 +1633,18 @@ export default function ProfilePage() {
                 </div>
                 
                 {/* Button positioned above description */}
-                <button
-                  onClick={isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval) ? undefined : () => handlePlanSelect('clinician', billingInterval)}
-                  className={`w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-4 ${
-                    isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval)
-                      ? 'border border-[#3771FE] text-[#3771FE] bg-white cursor-not-allowed'
-                      : 'bg-[#3771FE] text-white hover:bg-[#2A5CDB]'
-                  }`}
-                  disabled={isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval)}
-                >
-                  {isCurrentPlan('clinician') && isCurrentBillingInterval(billingInterval) ? 'Current Plan' : 'Get Pro Physician'}
-                </button>
+                {(() => {
+                  const buttonState = getPlanButtonState('clinician');
+                  return (
+                    <button
+                      onClick={buttonState.disabled ? undefined : () => handlePlanSelect('clinician', billingInterval)}
+                      className={`w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-4 ${buttonState.className}`}
+                      disabled={buttonState.disabled}
+                    >
+                      {buttonState.text}
+                    </button>
+                  );
+                })()}
                 
                 <ul className="text-sm text-[#000000] space-y-2 list-disc pl-4">
                   <li>Unlimited Clinical Questions</li>
@@ -1161,7 +1665,12 @@ export default function ProfilePage() {
                 
                 {/* Button positioned above features */}
                 <button
-                  onClick={() => window.location.href = 'mailto:info@synduct.com?subject=Enterprise Plan Inquiry'}
+                  onClick={() => {
+                    if (user) {
+                      track.contactSalesClicked(user.uid, 'profile');
+                    }
+                    window.location.href = 'mailto:info@synduct.com?subject=Enterprise Plan Inquiry';
+                  }}
                   className="w-full py-3 px-4 rounded-[8px] font-medium transition-colors mb-6 bg-[#3771FE] text-white hover:bg-[#2A5CDB]"
                 >
                   Contact Sales
@@ -1176,15 +1685,7 @@ export default function ProfilePage() {
             {/* Cancel Subscription Button */}
             {(() => {
               const shouldShowCancel = currentSubscription?.subscription?.status === 'active' && 
-                                     !currentSubscription?.subscription?.cancelAtPeriodEnd && 
-                                     currentSubscription?.subscription?.status !== 'canceled';
-              
-              console.log('🔍 Cancel Button Debug:', {
-                status: currentSubscription?.subscription?.status,
-                cancelAtPeriodEnd: currentSubscription?.subscription?.cancelAtPeriodEnd,
-                shouldShowCancel,
-                subscription: currentSubscription?.subscription
-              });
+                                     !currentSubscription?.subscription?.cancelAtPeriodEnd;
               
               return shouldShowCancel ? (
                 <div className="flex justify-end mt-8 mb-4">
@@ -1226,6 +1727,24 @@ export default function ProfilePage() {
             )}
           </div>
         )}
+
+        {/* Feedback Tab Content */}
+        {/* {activeTab === 'feedback' && (
+          <div>
+            <h2 className="text-xl font-regular text-[#000000] mb-1">Feedback</h2>
+            <p className="text-[#747474] text-sm mb-6">Share your thoughts and suggestions with us</p>
+            
+            <div className="border border-[#B5C9FC] rounded-[10px] p-4 md:p-8 bg-[#F4F7FF] w-full">
+              <div className="text-center py-8">
+                <h3 className="text-lg font-medium text-[#223258] mb-2">Coming Soon</h3>
+                <p className="text-[#747474] text-sm">
+                  We're working on a feedback system to better serve you. 
+                  For now, you can reach us at <a href="mailto:info@synduct.com" className="text-[#3771FE] hover:underline">info@synduct.com</a>
+                </p>
+              </div>
+            </div>
+          </div>
+        )} */}
       </div>
 
       {/* Delete Profile Modal */}
@@ -1275,6 +1794,66 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+
+      {/* Cancel Subscription Modal */}
+      {showCancelSubscriptionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[10px] p-6 max-w-md w-full border border-[#B5C9FC]">
+            <div className="text-center mb-6">
+              <h3 className="text-xl font-medium text-[#000000] mb-2">Cancel Subscription</h3>
+              <p className="text-[#747474] text-sm leading-relaxed">
+                Are you sure you want to cancel your subscription? You will lose access to premium features at the end of your current billing period.
+              </p>
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-[#000000] mb-2 font-medium text-sm">
+                Type <span className="font-bold text-[#223258]">CANCEL</span> to confirm
+              </label>
+              <input
+                type="text"
+                value={cancelConfirmation}
+                onChange={(e) => setCancelConfirmation(e.target.value)}
+                placeholder="Type CANCEL to confirm"
+                className="w-full border border-[#B5C9FC] rounded-[8px] px-4 py-2 bg-white text-[#223258] font-medium outline-none focus:ring-2 focus:ring-[#B5C9FC] text-center"
+              />
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCancelSubscriptionModal(false);
+                  setCancelConfirmation('');
+                }}
+                className="flex-1 bg-gray-200 text-gray-700 font-medium px-4 py-2 rounded-[8px] transition-colors hover:bg-gray-300"
+              >
+                Keep Subscription
+              </button>
+              <button
+                type="button"
+                onClick={confirmCancelSubscription}
+                disabled={cancelConfirmation !== 'CANCEL' || cancelling}
+                className="flex-1 bg-red-50 border border-red-200 text-red-700 font-medium px-4 py-2 rounded-[8px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-red-100 disabled:hover:bg-red-50"
+              >
+                {cancelling ? 'Cancelling...' : 'Cancel Subscription'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
-} 
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    }>
+      <ProfilePageContent />
+    </Suspense>
+  );
+}

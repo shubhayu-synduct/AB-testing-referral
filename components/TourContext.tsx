@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import steps, { guidelineTourSteps, drugTourSteps, drinfoSummaryTourSteps } from "@/lib/tourSteps";
+import { track } from "@/lib/analytics";
 
 // Dynamically import Joyride to prevent SSR issues
 const Joyride = dynamic(() => import("react-joyride-next"), { ssr: false });
@@ -75,9 +76,16 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
   const startTour = useCallback(() => {
     // Check if user has already completed or skipped the tour
     if (checkTourPreference()) {
-      console.log('Tour already completed or skipped, not starting');
+      // console.log('Tour already completed or skipped, not starting');
       return;
     }
+    
+    // Track that user agreed to see the product tour
+    const currentPage = typeof window !== 'undefined' ? window.location.pathname : 'unknown';
+    const userId = typeof window !== 'undefined' ? 
+      (window as any).__authUser?.uid || 'anonymous' : 'anonymous';
+    
+    track.agreedToSeeProductTour(userId, currentPage);
     
     setStepIndex(0);
     setRun(true);
@@ -102,6 +110,14 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
     const { status, index, type, action } = data;
     
     if (status === "finished") {
+      // Track that user completed the product tour
+      const currentPage = typeof window !== 'undefined' ? window.location.pathname : 'unknown';
+      const userId = typeof window !== 'undefined' ? 
+        (window as any).__authUser?.uid || 'anonymous' : 'anonymous';
+      const totalSteps = getValidSteps().length;
+      
+      track.completedProductTour(userId, currentPage, totalSteps);
+      
       saveTourPreference('completed');
       setRun(false);
       // Close sidebar when tour is completed
@@ -210,7 +226,7 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
           }
         };
       } catch (error) {
-        console.warn('Error setting up scroll prevention:', error);
+        // console.warn('Error setting up scroll prevention:', error);
         // If scroll prevention fails, just return a no-op cleanup function
         return () => {};
       }
@@ -267,10 +283,29 @@ export const TourProvider = ({ children }: { children: React.ReactNode }) => {
     return run;
   }, [run]);
 
+  // Filter out steps with missing targets
+  const getValidSteps = useCallback(() => {
+    if (typeof window === 'undefined') return steps;
+    
+    return steps.filter((step: any) => {
+      if (!step.target) return true; // Keep steps without targets
+      
+      // Check if any of the target selectors exist
+      const selectors = step.target.split(',').map((s: string) => s.trim());
+      return selectors.some((selector: string) => {
+        try {
+          return document.querySelector(selector) !== null;
+        } catch (error) {
+          return false;
+        }
+      });
+    });
+  }, []);
+
   return (
     <TourContext.Provider value={{ startTour, stopTour, run, forceStartTour, checkTourPreference, resetTourPreference, shouldShowTour, saveTourPreference, isTourActive }}>
       <Joyride
-        steps={steps as any}
+        steps={getValidSteps() as any}
         run={run}
         stepIndex={stepIndex}
         continuous
@@ -537,6 +572,7 @@ const DrinfoSummaryTourContext = createContext<{
   startTour: () => void;
   stopTour: () => void;
   run: boolean;
+  stepIndex: number;
   setStepIndex: (index: number) => void;
   nextStep: () => void;
   prevStep: () => void;
@@ -576,9 +612,16 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
   const startTour = useCallback(() => {
     // Check if user has already completed or skipped the tour
     if (checkTourPreference()) {
-      console.log('DrinfoSummary tour already completed or skipped, not starting');
+      // console.log('DrinfoSummary tour already completed or skipped, not starting');
       return;
     }
+    
+    // Track that user agreed to see the drinfo summary product tour
+    const currentPage = typeof window !== 'undefined' ? window.location.pathname : 'unknown';
+    const userId = typeof window !== 'undefined' ? 
+      (window as any).__authUser?.uid || 'anonymous' : 'anonymous';
+    
+    track.agreedToSeeProductTour(userId, currentPage);
     
     setStepIndex(0);
     setRun(true);
@@ -606,9 +649,17 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
 
   const handleJoyrideCallback = (data: any) => {
     const { status, index, type, action } = data;
-    console.log('DrinfoSummaryTour callback:', { status, index, type, action });
+    // console.log('DrinfoSummaryTour callback:', { status, index, type, action });
     
     if (status === "finished") {
+      // Track that user completed the drinfo summary product tour
+      const currentPage = typeof window !== 'undefined' ? window.location.pathname : 'unknown';
+      const userId = typeof window !== 'undefined' ? 
+        (window as any).__authUser?.uid || 'anonymous' : 'anonymous';
+      const totalSteps = drinfoSummaryTourSteps.length;
+      
+      track.completedProductTour(userId, currentPage, totalSteps);
+      
       saveTourPreference('completed');
       setRun(false);
     } else if (status === "skipped") {
@@ -616,10 +667,10 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
       setRun(false);
     } else if (type === "step:after") {
       if (action === "prev") {
-        console.log('Back button clicked, going from step', index, 'to step', Math.max(0, index - 1));
+        // console.log('Back button clicked, going from step', index, 'to step', Math.max(0, index - 1));
         setStepIndex(Math.max(0, index - 1));
       } else if (action === "next") {
-        console.log('Next button clicked, going from step', index, 'to step', index + 1);
+        // console.log('Next button clicked, going from step', index, 'to step', index + 1);
         setStepIndex(index + 1);
       }
     }
@@ -627,7 +678,7 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
 
   // Custom back button handler
   const handleBackButton = useCallback(() => {
-    console.log('Custom back button handler, current step:', stepIndex, 'going to:', Math.max(0, stepIndex - 1));
+    // console.log('Custom back button handler, current step:', stepIndex, 'going to:', Math.max(0, stepIndex - 1));
     setStepIndex(Math.max(0, stepIndex - 1));
   }, [stepIndex]);
 
@@ -650,16 +701,24 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
     }
   }, [stepIndex, run]);
 
-  // Hard prevention of Joyride scrolling
+  // Hard prevention of Joyride scrolling (with exception for step 5)
   useEffect(() => {
     if (run) {
       try {
+        // Check if current step allows scrolling
+        const currentStep = drinfoSummaryTourSteps[stepIndex];
+        const allowScrolling = currentStep && !currentStep.disableScrolling;
+        
         // Prevent Joyride from scrolling by overriding scroll methods
         const originalScrollIntoView = Element.prototype.scrollIntoView;
         const originalScrollTo = window.scrollTo;
         
-        // Override scrollIntoView to prevent Joyride from using it
+        // Override scrollIntoView to prevent Joyride from using it (unless step allows scrolling)
         Element.prototype.scrollIntoView = function(options) {
+          // Allow scrolling if current step allows it
+          if (allowScrolling) {
+            return originalScrollIntoView.call(this, options);
+          }
           // Only allow scrolling if it's not Joyride trying to scroll
           if (!options || typeof options === 'object') {
             return; // Block Joyride's scrollIntoView calls
@@ -667,8 +726,12 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
           return originalScrollIntoView.call(this, options);
         };
         
-        // Override window.scrollTo to prevent Joyride from using it
+        // Override window.scrollTo to prevent Joyride from using it (unless step allows scrolling)
         window.scrollTo = function(options) {
+          // Allow scrolling if current step allows it
+          if (allowScrolling) {
+            return originalScrollTo.call(this, options);
+          }
           // Block Joyride's window.scrollTo calls
           return;
         };
@@ -684,6 +747,10 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
                 return originalScrollTop.get.call(this);
               },
               set: function(value) {
+                // Allow scrolling if current step allows it
+                if (allowScrolling) {
+                  return originalScrollTop.set.call(this, value);
+                }
                 // Only allow setting if it's not Joyride trying to scroll
                 if (run) {
                   return; // Block Joyride's scrollTop changes
@@ -703,12 +770,12 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
           }
         };
       } catch (error) {
-        console.warn('Error setting up scroll prevention:', error);
+        // console.warn('Error setting up scroll prevention:', error);
         // If scroll prevention fails, just return a no-op cleanup function
         return () => {};
       }
     }
-  }, [run]);
+  }, [run, stepIndex]);
 
   // Check if current step should disable scrolling
   const currentStep = drinfoSummaryTourSteps[stepIndex];
@@ -765,11 +832,31 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
     return run;
   }, [run]);
 
+  // Filter out steps with missing targets for DrinfoSummary tour
+  const getValidDrinfoSummarySteps = useCallback(() => {
+    if (typeof window === 'undefined') return drinfoSummaryTourSteps;
+    
+    return drinfoSummaryTourSteps.filter((step: any) => {
+      if (!step.target) return true; // Keep steps without targets
+      
+      // Check if any of the target selectors exist
+      const selectors = step.target.split(',').map((s: string) => s.trim());
+      return selectors.some((selector: string) => {
+        try {
+          return document.querySelector(selector) !== null;
+        } catch (error) {
+          return false;
+        }
+      });
+    });
+  }, []);
+
   return (
     <DrinfoSummaryTourContext.Provider value={{ 
       startTour, 
       stopTour, 
       run, 
+      stepIndex,
       setStepIndex, 
       nextStep, 
       prevStep, 
@@ -782,7 +869,7 @@ export const DrinfoSummaryTourProvider = ({ children }: { children: React.ReactN
       isTourActive
     }}>
       <Joyride
-        steps={drinfoSummaryTourSteps as any}
+        steps={getValidDrinfoSummarySteps() as any}
         run={run}
         stepIndex={stepIndex}
         continuous

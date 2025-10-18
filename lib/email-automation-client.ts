@@ -42,7 +42,7 @@ export interface UserSignupData {
   
       return result;
     } catch (error) {
-      console.error('Error adding user to email automation:', error);
+      // console.error('Error adding user to email automation:', error);
       throw error;
     }
   }
@@ -71,7 +71,7 @@ export interface UserSignupData {
   
       return result.status;
     } catch (error) {
-      console.error('Error getting user email status:', error);
+      // console.error('Error getting user email status:', error);
       throw error;
     }
   }
@@ -101,7 +101,7 @@ export interface UserSignupData {
   
       return result;
     } catch (error) {
-      console.error('Error updating user email day:', error);
+      // console.error('Error updating user email day:', error);
       throw error;
     }
   }
@@ -129,7 +129,7 @@ export interface UserSignupData {
   
       return result;
     } catch (error) {
-      console.error('Error removing user from email automation:', error);
+      // console.error('Error removing user from email automation:', error);
       throw error;
     }
   } 

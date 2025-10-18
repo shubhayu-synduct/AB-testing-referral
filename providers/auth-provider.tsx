@@ -7,6 +7,7 @@ import type { User } from "firebase/auth"
 import { getSessionCookie, setSessionCookie, clearSessionCookie } from "@/lib/auth-service"
 import { VerificationModal } from "@/components/auth/verification-modal"
 import { logger } from "@/lib/logger"
+import { CleanupService } from "@/lib/cleanup-service"
 
 type AuthContextType = {
   user: User | null
@@ -185,9 +186,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Protected routes and cross-tab sync remain the same
   // ... (keeping existing logic for protected routes and storage events) ...
   
+  // Listen for onboarding completion events
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const handleOnboardingCompleted = async (event: CustomEvent) => {
+      const { userId, isMedicalProfessional } = event.detail
+      const currentUser = userRef.current
+      
+      if (currentUser && currentUser.uid === userId) {
+        logger.authLog("Onboarding completion event received, re-checking user status")
+        // Force a re-check of the user's onboarding status
+        await checkUserOnboardingAndRedirect(currentUser)
+      }
+    }
+
+    window.addEventListener('onboarding-completed', handleOnboardingCompleted as EventListener)
+    
+    return () => {
+      window.removeEventListener('onboarding-completed', handleOnboardingCompleted as EventListener)
+    }
+  }, [])
+
   // Cross-tab auth sync effect
   useEffect(() => {
     if (typeof window === "undefined") return
+
+    // Set up BroadcastChannel for better cross-tab communication
+    let broadcastChannel: BroadcastChannel | null = null
+    if ('BroadcastChannel' in window) {
+      broadcastChannel = new BroadcastChannel('auth-sync')
+      broadcastChannel.onmessage = (event) => {
+        const data = event.data
+        const currentUser = userRef.current
+        
+        if (data.action === 'account-deleted' && currentUser && currentUser.email === data.email) {
+          logger.authLog("BroadcastChannel account deletion detected. Performing cleanup.")
+          CleanupService.performCompleteCleanup(data.uid, data.email)
+        }
+      }
+    }
 
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === "auth-sync" && e.newValue) {
@@ -217,10 +255,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           logger.error("Error handling cross-tab auth sync:", error)
         }
       }
+      
+      // Handle account deletion notification
+      if (e.key === "account-deleted" && e.newValue) {
+        try {
+          const data = JSON.parse(e.newValue)
+          const currentUser = userRef.current
+          
+          // If this tab has the deleted user (by email match), perform cleanup
+          if (currentUser && currentUser.email === data.email) {
+            logger.authLog("Cross-tab account deletion detected. Performing cleanup.")
+            CleanupService.performCompleteCleanup(data.uid, data.email)
+            return
+          }
+        } catch (error) {
+          logger.error("Error handling cross-tab account deletion:", error)
+        }
+      }
     }
 
     window.addEventListener("storage", handleStorageChange)
-    return () => window.removeEventListener("storage", handleStorageChange)
+    return () => {
+      window.removeEventListener("storage", handleStorageChange)
+      if (broadcastChannel) {
+        broadcastChannel.close()
+      }
+    }
   }, []) // Empty dependency array is now safe because we use a ref
 
   // Protected routes check

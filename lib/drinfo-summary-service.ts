@@ -4,8 +4,8 @@ import { logger } from './logger';
 
 // API base URL for DrInfo summary service
 const DRINFO_API_URL = "https://synduct-aisummary.drinfo.ai/chat/stream";
-//  const DRINFO_API_URL = "https://synduct-ai-summary-stage-images.drinfo.ai/chat/stream";
-//  const DRINFO_API_URL = "http://localhost:8000/chat/stream";
+// const DRINFO_API_URL = "https://synduct-ai-summary-stage-images.drinfo.ai/chat/stream";
+// const DRINFO_API_URL = "http://localhost:8000/chat/stream";
 // const DRINFO_API_URL = "https://synduct-ai-summary-stage.drinfo.ai/chat/stream";
 export interface Citation {
   title: string;
@@ -26,6 +26,7 @@ export interface DrInfoSummaryData {
   responseStatus?: number;
   apiResponse?: any;
   remaining_limit?: number | string;
+  questions_followed?: string[];
 }
 
 export interface StreamingResponse {
@@ -207,7 +208,7 @@ export async function fetchDrInfoSummary(
      }
   finally{
 
-    console.log("Request completed");
+    // console.log("Request completed");
   }
 }
 

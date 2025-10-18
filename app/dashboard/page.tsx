@@ -3,14 +3,14 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from 'next/link'
-import { collection, addDoc, query as firestoreQuery, where, orderBy, getDocs, doc, setDoc } from 'firebase/firestore'
+import { collection, addDoc, query as firestoreQuery, where, orderBy, getDocs, doc, setDoc, getDoc } from 'firebase/firestore'
 import { getSessionCookie } from '@/lib/auth-service'
 import { getFirebaseFirestore } from '@/lib/firebase'
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
 import { ArrowRight, X, Search } from "lucide-react"
 import { v4 as uuidv4 } from 'uuid'
 import { logger } from '@/lib/logger';
-import { track } from '@vercel/analytics';
+import { track } from '@/lib/analytics';
 import { useTour } from "@/components/TourContext"
 // Removed GoogleGenAI import - now using secure server-side API
 
@@ -44,20 +44,69 @@ export default function Dashboard() {
   const isRequestInProgressRef = useRef<boolean>(false)
 
 
-    // Track dashboard landing
-    // useEffect(() => {
-    //   track('DashboardLanded', {
-    //     user: user ? 'authenticated' : 'unauthenticated',
-    //     timestamp: new Date().toISOString()
-    //   });
-    // }, [user]);
+  // Track dashboard landing
+  useEffect(() => {
+    if (user) {
+    }
+  }, [user]);
   
   // Tour functionality
   const tourContext = useTour()
   const [showTourPrompt, setShowTourPrompt] = useState(false)
+  const [hasValidCookieConsent, setHasValidCookieConsent] = useState(false)
 
-  // Show tour prompt after 5 seconds, but only if user hasn't completed/skipped before
+  // Check cookie consent status from Firebase
   useEffect(() => {
+    if (!user) return;
+
+    const checkCookieConsent = async () => {
+      try {
+        const db = getFirebaseFirestore();
+        const userDocRef = doc(db, "users", user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const cookieConsent = userData.cookieConsent;
+          
+          // Check if user has given necessary or all consent
+          if (cookieConsent && (cookieConsent.consentType === 'necessary' || cookieConsent.consentType === 'all' || cookieConsent.consentType === 'custom')) {
+            setHasValidCookieConsent(true);
+          } else {
+            setHasValidCookieConsent(false);
+          }
+        } else {
+          setHasValidCookieConsent(false);
+        }
+      } catch (err) {
+        // console.error("Error checking cookie consent:", err);
+        setHasValidCookieConsent(false);
+      }
+    };
+
+    checkCookieConsent();
+
+    // Listen for cookie consent updates from the banner
+    const handleCookieConsentUpdate = () => {
+      checkCookieConsent();
+    };
+
+    window.addEventListener('cookie-consent-updated', handleCookieConsentUpdate);
+    
+    return () => {
+      window.removeEventListener('cookie-consent-updated', handleCookieConsentUpdate);
+    };
+  }, [user]);
+
+  // Show tour prompt after 5 seconds, but only if user has valid cookie consent and hasn't completed/skipped before
+  useEffect(() => {
+    // Don't show tour if no valid cookie consent
+    if (!hasValidCookieConsent) {
+      // console.log('cookie consent not valid, not showing tour',hasValidCookieConsent);
+      setShowTourPrompt(false);
+      return;
+    }
+
     // Check if tour should be shown based on saved preferences
     if (tourContext && tourContext.shouldShowTour) {
       const shouldShow = tourContext.shouldShowTour();
@@ -69,9 +118,13 @@ export default function Dashboard() {
 
     const timeout = setTimeout(() => {
       setShowTourPrompt(true);
+      // Track tour prompt shown
+      if (user) {
+        track.dashboardTourPromptShown(user.uid, 'dashboard')
+      }
     }, 5000);
     return () => clearTimeout(timeout);
-  }, [tourContext]);
+  }, [tourContext, hasValidCookieConsent]);
 
   // Check if there's a meaningful change in the query
   const hasMeaningfulChange = (newQuery: string) => {
@@ -302,12 +355,9 @@ export default function Dashboard() {
     }
     
     if (!query.trim() || !user) return
-        // Track search query
-    track('SearchQuerySubmitted', {
-      queryLength: query.length,
-      mode: activeMode,
-      hasUser: !!user
-    })
+    
+    // Track dashboard search performed
+    track.dashboardSearchPerformed(query, activeMode, user.uid, 'dashboard')
     
     // Immediately lock everything - no more interactions possible
     isRequestInProgressRef.current = true;
@@ -326,10 +376,18 @@ export default function Dashboard() {
     
     logger.debug("[DASHBOARD] Creating new chat session for query:", query);
     
-    try {
-      // Create a new session ID using uuidv4
-      const sessionId = uuidv4();
-      logger.debug("[DASHBOARD] Generated new sessionId:", sessionId);
+      // Track medical query submission
+      if (user) {
+      }
+      
+      try {
+        // Create a new session ID using uuidv4
+        const sessionId = uuidv4();
+        logger.debug("[DASHBOARD] Generated new sessionId:", sessionId);
+        
+        // Track chat session started
+        if (user) {
+        }
       
       // Create chat session in Firebase first
       const userMessage = {
@@ -381,6 +439,11 @@ export default function Dashboard() {
     setQuery(suggestion);
     setShowSuggestions(false);
     
+    // Track suggestion clicked
+    if (user) {
+      track.dashboardSuggestionClicked(suggestion, user.uid, 'dashboard')
+    }
+    
     // Force textarea to expand after state update
     const textarea = document.querySelector('textarea');
     if (textarea) {
@@ -397,6 +460,16 @@ export default function Dashboard() {
   const clearSearch = () => {
     setQuery('');
     setShowSuggestions(false);
+  };
+
+  const handleModeChange = (newMode: 'instant' | 'research') => {
+    const previousMode = activeMode;
+    setActiveMode(newMode);
+    
+    // Track mode change
+    if (user) {
+      track.dashboardModeChanged(previousMode, newMode, user.uid, 'dashboard')
+    }
   };
 
 
@@ -452,13 +525,13 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div className="flex justify-between items-center mt-2">
-                      {/* Toggle switch for Acute/Research mode */}
-                      <label className="flex items-center gap-2 cursor-pointer select-none dashboard-acute-toggle">
+                    <div className="flex justify-end items-center mt-2">
+                      {/* Toggle switch for Acute/Research mode - COMMENTED OUT */}
+                      {/* <label className="flex items-center gap-2 cursor-pointer select-none dashboard-acute-toggle">
                         <input
                           type="checkbox"
                           checked={activeMode === 'instant'}
-                          onChange={() => setActiveMode(activeMode === 'instant' ? 'research' : 'instant')}
+                          onChange={() => handleModeChange(activeMode === 'instant' ? 'research' : 'instant')}
                           className="toggle-checkbox hidden"
                         />
                         <span className={`w-10 h-6 flex items-center rounded-full p-1 duration-300 ease-in-out ${activeMode === 'instant' ? 'bg-[#3771FE]' : 'bg-gray-300'}`}
@@ -468,7 +541,7 @@ export default function Dashboard() {
                         <span className={`font-medium`} style={{ fontSize: '16px', color: activeMode === 'instant' ? '#3771FE' : '#6B7280', fontFamily: 'DM Sans, sans-serif' }}>
                           Acute
                         </span>
-                      </label>
+                      </label> */}
                       <button 
                         type="submit" 
                         disabled={isLoading}
@@ -481,7 +554,11 @@ export default function Dashboard() {
                             <div className="w-2 h-2 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                           </div>
                         ) : (
-                          <img src="search.svg" alt="Search" width={30} height={30} />
+                          <svg width="30" height="30" viewBox="0 0 46 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="46" height="46" rx="6.57143" fill="#3771FE"/>
+                            <path d="M29.8594 16.5703L13.3594 33.0703" stroke="white" strokeWidth="2.25" strokeLinecap="round"/>
+                            <path d="M20.4297 14.6406H31.6426V24.9263" stroke="white" strokeWidth="2.25" strokeLinecap="round"/>
+                          </svg>
                         )}
                       </button>
                     </div>
@@ -509,9 +586,10 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        <div className="w-full py-3 md:py-4 text-center text-xs md:text-sm text-gray-400 px-4">
+        <div className="w-full py-3 md:py-4 text-center text-xs text-gray-400 px-4">
+          <p>DR. INFO is an informational and educational tool.</p>
           <p>Do not insert protected health information or personal data.</p>
-          <Link href="https://synduct.com/terms-and-conditions/" className="text-black hover:text-[#3771FE] underline inline-block" target="_blank" rel="noopener noreferrer">
+          <Link href="https://www.drinfo.ai/termsofservice/" className="text-black hover:text-[#3771FE] underline inline-block" target="_blank" rel="noopener noreferrer">
             Terms and Conditions
           </Link>
         </div>
@@ -521,7 +599,7 @@ export default function Dashboard() {
       {showTourPrompt && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black bg-opacity-40">
           <div 
-            className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center border"
+            className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full text-center border mx-4"
             style={{
               borderRadius: "8px",
               border: "1px solid #E4ECFF",
@@ -553,6 +631,10 @@ export default function Dashboard() {
                 className="px-4 py-2 rounded transition-colors"
                 onClick={() => { 
                   setShowTourPrompt(false); 
+                  // Track tour accepted
+                  if (user) {
+                    track.dashboardTourAccepted(user.uid, 'dashboard')
+                  }
                   if (tourContext && tourContext.startTour) {
                     tourContext.startTour();
                   }
@@ -574,6 +656,10 @@ export default function Dashboard() {
                 className="px-4 py-2 rounded transition-colors"
                 onClick={() => { 
                   setShowTourPrompt(false); 
+                  // Track tour declined
+                  if (user) {
+                    track.dashboardTourDeclined(user.uid, 'dashboard')
+                  }
                   // Save preference as skipped when user clicks "No, thanks"
                   if (tourContext && tourContext.saveTourPreference) {
                     tourContext.saveTourPreference('skipped');
