@@ -18,7 +18,7 @@ export default function SignIn() {
       // Prefer Google Analytics (gtag) if present
       const gtag = (typeof window !== 'undefined' && (window as any).gtag) ? (window as any).gtag : null
       if (typeof gtag === 'function') {
-        gtag('event', 'app_signup_page', {
+        gtag('event', 'app_login_page', {
           page_location,
           page_path,
           page_title,
@@ -26,14 +26,14 @@ export default function SignIn() {
       } else if (typeof window !== 'undefined' && Array.isArray((window as any).dataLayer)) {
         // Fallback for GTM dataLayer if used
         ;(window as any).dataLayer.push({
-          event: 'app_signup_page',
+          event: 'app_login_page',
           page_location,
           page_path,
           page_title,
         })
       } else {
         // Final fallback to Vercel Analytics
-        track('app_signup_page', { page_location, page_path, page_title })
+        track('app_login_page', { page_location, page_path, page_title })
       }
     } catch (err) {
       // Silently ignore tracking errors
