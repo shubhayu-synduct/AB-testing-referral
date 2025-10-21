@@ -23,7 +23,7 @@ export function ShareBanner({
   if (!isVisible) return null
 
   return (
-    <div className="fixed top-[45%] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
       <div className="bg-white text-gray-800 rounded-lg shadow-xl p-6 w-[85vw] md:w-auto md:max-w-lg mx-1 md:mx-2 border border-gray-200">
         <div className="flex items-center justify-center mb-3 relative">
             <img src="/new-logo.svg" alt="DR. INFO Logo" className="h-[18px]" />

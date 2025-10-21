@@ -401,7 +401,16 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       !bannerDismissed &&
       messages.length > 0; // Only show if there are messages (not initial load)
     
-    setShowShareBanner(shouldShowBanner);
+    if (shouldShowBanner) {
+      // Add 2-second delay before showing the banner
+      const timer = setTimeout(() => {
+        setShowShareBanner(true);
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    } else {
+      setShowShareBanner(false);
+    }
   }, [isLoading, status, bannerDismissed, messages.length]);
 
   // Add useEffect to fetch user's country when component mounts
@@ -2440,15 +2449,6 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
 
   return (
     <div className="p-2 sm:p-4 md:p-6 h-[100dvh] flex flex-col relative overflow-hidden">
-      {/* Share Banner */}
-      <ShareBanner
-        isVisible={showShareBanner}
-        onClose={handleBannerClose}
-        onShare={handleBannerShare}
-        onShareWhatsApp={handleBannerShareWhatsApp}
-        onShareLinkedIn={handleBannerShareLinkedIn}
-        onShareEmail={handleBannerShareEmail}
-      />
       
       {showTourPrompt && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black bg-opacity-40">
@@ -2554,7 +2554,16 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
               <div className="flex-1 flex flex-col items-center justify-center">
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto mb-4 max-w-4xl mx-auto w-full font-sans px-2 sm:px-4" ref={contentRef}>
+              <div className="flex-1 overflow-y-auto mb-4 max-w-4xl mx-auto w-full font-sans px-2 sm:px-4 relative" ref={contentRef}>
+                {/* Share Banner positioned in center of content area */}
+                <ShareBanner
+                  isVisible={showShareBanner}
+                  onClose={handleBannerClose}
+                  onShare={handleBannerShare}
+                  onShareWhatsApp={handleBannerShareWhatsApp}
+                  onShareLinkedIn={handleBannerShareLinkedIn}
+                  onShareEmail={handleBannerShareEmail}
+                />
                 {error && (
                   <div className="bg-red-50 text-red-600 p-3 sm:p-4 rounded-lg mb-4">
                     {error}
