@@ -392,17 +392,11 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }
   }, [isChatLoading, chatHistory]);
 
-  // Share banner logic - show during answer generation, hide when citations appear
+  // Share banner logic
   useEffect(() => {
-    const shouldShowBanner = 
-      isLoading && 
-      status !== 'complete' && 
-      status !== 'complete_image' && 
-      !bannerDismissed &&
-      messages.length > 0; // Only show if there are messages (not initial load)
-    
-    if (shouldShowBanner) {
-      // Add 2-second delay before showing the banner
+    // Show banner when AI is generating answer and user hasn't dismissed it
+    if (isLoading && (status === 'processing' || status === 'searching' || status === 'summarizing' || status === 'formatting') && !bannerDismissed && messages.length > 0) {
+      // Add a 2-second delay before showing the banner
       const timer = setTimeout(() => {
         setShowShareBanner(true);
       }, 2000);
@@ -2832,10 +2826,12 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                   conversationId={sessionId || ''}
                                   threadId={msg.threadId}
                                   answerText={msg.content || ''}
+                                  citations={msg.answer?.citations || activeCitations || {}}
                                   // Always pass onReload for the last assistant message
                                   onReload={idx === messages.length - 1 ? () => handleReload(msg.id) : undefined}
                                   isReloading={reloadingMessageId === msg.id}
                                   messageId={msg.id}
+                                  user={user}
                                 />
                                 
                                 {/* Show follow-up questions if available - ONLY for the latest question */}

@@ -3,19 +3,32 @@
 import { useState, useRef, useEffect } from 'react'
 import { Copy, Check, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react'
 import { getFirebaseFirestore } from '@/lib/firebase'
-import { doc, setDoc } from 'firebase/firestore'
+import { doc, setDoc, addDoc, collection, getDoc, getDocs, query as firestoreQuery, orderBy, serverTimestamp } from 'firebase/firestore'
 import { MovingBorder } from "@/components/ui/moving-border";
 import { cn } from "@/lib/utils";
 import { logger } from '@/lib/logger';
 import { track } from '@/lib/analytics';
 
+interface Citation {
+  title: string;
+  url?: string;
+  authors?: string[];
+  year?: string | number;
+  journal?: string;
+  doi?: string;
+  source_type?: string;
+  drug_citation_type?: string;
+}
+
 interface AnswerFeedbackProps {
   conversationId: string;
   threadId: string;
   answerText?: string;
+  citations?: Record<string, Citation>;
   onReload?: () => void;
   isReloading?: boolean;
   messageId?: string;
+  user?: any; // Add user prop for sharing functionality
 }
 
 const FEEDBACK_OPTIONS_HELPFUL = [
@@ -30,15 +43,18 @@ export default function AnswerFeedback({
   conversationId, 
   threadId, 
   answerText = '',
+  citations = {},
   onReload,
   isReloading,
-  messageId
+  messageId,
+  user
 }: AnswerFeedbackProps) {
   const [selectedFeedback, setSelectedFeedback] = useState<string[]>([]);
   const [contextOfUse, setContextOfUse] = useState<string[]>([]);
   const [feedbackText, setFeedbackText] = useState('');
   const [copied, setCopied] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCopying, setIsCopying] = useState(false);
   const [showForm, setShowForm] = useState<null | 'helpful' | 'not_helpful'>(null);
   const [thankYou, setThankYou] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
@@ -161,16 +177,117 @@ export default function AnswerFeedback({
     }
   };
 
+  // Function to format citations for copy
+  const formatCitationsForCopy = (citations: Record<string, Citation>): string => {
+    // Filter out implicit drug citations (same logic as ReferenceGrid)
+    const filteredCitations = Object.entries(citations).filter(([key, citation]) => {
+      if (citation.source_type === 'drug_database' && citation.drug_citation_type === 'implicit') {
+        return false;
+      }
+      return true;
+    });
+
+    if (filteredCitations.length === 0) {
+      return '';
+    }
+
+    let citationsText = 'The Citations\n';
+    
+    filteredCitations.forEach(([key, citation], index) => {
+      const citationNumber = index + 1;
+      
+      // Source type
+      let sourceType = 'Journals';
+      if (citation.source_type === 'guidelines_database') {
+        sourceType = 'Guidelines';
+      } else if (citation.source_type === 'drug_database') {
+        sourceType = 'Drugs';
+      }
+      
+      // Authors
+      let authorsText = '';
+      if (citation.authors) {
+        authorsText = Array.isArray(citation.authors) 
+          ? citation.authors.join(', ')
+          : citation.authors;
+      }
+      
+      // Journal and year
+      let journalText = '';
+      if (citation.journal) {
+        const showYear = citation.source_type !== 'drug_database' && citation.year;
+        journalText = showYear ? `${citation.journal} (${citation.year})` : citation.journal;
+      }
+      
+      // DOI
+      let doiText = '';
+      if (citation.doi) {
+        doiText = `DOI: ${citation.doi}`;
+      }
+      
+      // Build citation entry
+      citationsText += `${citationNumber}. `;
+      
+      // Add title
+      if (citation.title) {
+        citationsText += citation.title;
+      }
+      
+      // Add authors
+      if (authorsText) {
+        citationsText += `\n   ${authorsText}`;
+      }
+      
+      // Add journal and year
+      if (journalText) {
+        citationsText += `\n   ${journalText}`;
+      }
+      
+      // Add DOI
+      if (doiText) {
+        citationsText += `\n   ${doiText}`;
+      }
+      
+      // Add source type
+      citationsText += `\n   [${sourceType}]`;
+      
+      // Add URL if available
+      if (citation.url && citation.url !== '#') {
+        citationsText += `\n   ${citation.url}`;
+      }
+      
+      // Add spacing between citations
+      if (index < filteredCitations.length - 1) {
+        citationsText += '\n\n';
+      }
+    });
+    
+    return citationsText;
+  };
+
   const handleCopyText = async () => {
     if (!answerText) return;
+    
+    setIsCopying(true);
+    
     try {
 
-      // Function to convert markdown to clean text
+      // Function to convert markdown to clean text while preserving citation numbers as superscript
       const convertMarkdownToCleanText = (markdown: string): string => {
         let cleanText = markdown;
         
-        // Remove citation markers like [1], [2], etc.
-        cleanText = cleanText.replace(/\[\d+(?:,\s*\d+)*\]/g, '');
+        // Convert citation markers like [1], [2], [1,2,3] to superscript numbers
+        cleanText = cleanText.replace(/\[(\d+(?:,\s*\d+)*)\]/g, (match, group) => {
+          const numbers = group.split(/\s*,\s*/).map((n: string) => n.trim());
+          // Convert numbers to superscript: 1->¹, 2->², 3->³, etc.
+          const superscriptMap: { [key: string]: string } = {
+            '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵',
+            '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'
+          };
+          return numbers.map(num => 
+            num.split('').map(digit => superscriptMap[digit] || digit).join('')
+          ).join('');
+        });
         
         // Convert headers to plain text while preserving structure
         cleanText = cleanText.replace(/^#{1,6}\s+(.+)$/gm, '\n$1\n');
@@ -201,11 +318,95 @@ export default function AnswerFeedback({
       };
       
       const cleanText = convertMarkdownToCleanText(answerText);
-      await navigator.clipboard.writeText(cleanText);
+      
+      // Add citations if available
+      let answerWithCitations = cleanText;
+      if (citations && Object.keys(citations).length > 0) {
+        const citationsList = formatCitationsForCopy(citations);
+        answerWithCitations = cleanText + '\n\n' + citationsList;
+      }
+      
+      // Generate public link if user is available
+      let publicLink = '';
+      if (user && conversationId) {
+        try {
+          const db = getFirebaseFirestore();
+          const userId = user.uid || user.id;
+
+          // Get the current chat session data
+          const sessionDocRef = doc(db, "conversations", conversationId);
+          const sessionDoc = await getDoc(sessionDocRef);
+          
+          if (sessionDoc.exists()) {
+            const sessionData = sessionDoc.data();
+            
+            // Get all threads for this session
+            const threadsRef = collection(db, "conversations", conversationId, "threads");
+            const threadsQueryRef = firestoreQuery(threadsRef, orderBy("user_message.timestamp"));
+            const threadsSnapshot = await getDocs(threadsQueryRef);
+            
+            const threads: any[] = [];
+            threadsSnapshot.forEach((threadDoc) => {
+              const threadData = threadDoc.data();
+              // Clean the data to remove any undefined or null values
+              const cleanThread = {
+                user_message: {
+                  content: threadData.user_message?.content || '',
+                  timestamp: threadData.user_message?.timestamp || Date.now()
+                },
+                bot_response: {
+                  content: threadData.bot_response?.content || '',
+                  citations: threadData.bot_response?.citations || {},
+                  search_data: threadData.bot_response?.search_data || {},
+                  svg_content: threadData.bot_response?.svg_content || []
+                },
+                context: {
+                  parent_thread_id: threadData.context?.parent_thread_id || null
+                }
+              };
+              threads.push(cleanThread);
+            });
+
+            // Create public chat document
+            const publicChatData = {
+              original_session_id: conversationId,
+              user_id: userId,
+              user_email: user.email || '',
+              title: sessionData.title || 'Shared Chat',
+              created_at: serverTimestamp(),
+              updated_at: serverTimestamp(),
+              threads: threads,
+              is_public: true
+            };
+
+            const publicChatRef = await addDoc(collection(db, "public_chats"), publicChatData);
+            
+            // Generate shareable link
+            publicLink = `${window.location.origin}/dashboard/public/${publicChatRef.id}`;
+            
+            logger.debug('Public link generated for copy:', publicChatRef.id);
+          }
+        } catch (error) {
+          logger.error('Error generating public link for copy:', error);
+          // Continue without the link if there's an error
+        }
+      }
+      
+      // Format the final text with link and answer
+      let finalText = '';
+      if (publicLink) {
+        finalText = `Link to the answer in DR. INFO: ${publicLink}\n\n${answerWithCitations}`;
+      } else {
+        finalText = answerWithCitations;
+      }
+      
+      await navigator.clipboard.writeText(finalText);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       logger.error('Failed to copy:', error);
+    } finally {
+      setIsCopying(false);
     }
   };
 
@@ -299,11 +500,17 @@ export default function AnswerFeedback({
 
         <button
           onClick={handleCopyText}
-          className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg border transition-all flex items-center gap-1 sm:gap-2 ${copied ? 'text-[#3771FE] border-[#3771FE]' : 'text-[#223258] border-[#223258]'} bg-white`}
+          disabled={isCopying}
+          className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg border transition-all flex items-center gap-1 sm:gap-2 ${copied ? 'text-[#3771FE] border-[#3771FE]' : 'text-[#223258] border-[#223258]'} bg-white disabled:opacity-50 disabled:cursor-not-allowed`}
           aria-label="Copy text"
           title="Copy answer text"
         >
-          {copied ? (
+          {isCopying ? (
+            <>
+              <div className="animate-spin rounded-full h-3.5 w-3.5 sm:h-4 sm:w-4 border-b-2 border-[#223258]"></div>
+              <span className="text-xs sm:text-sm">Copying...</span>
+            </>
+          ) : copied ? (
             <>
               <Check size={14} className="text-[#3771FE] sm:w-4 sm:h-4" />
               <span className="text-xs sm:text-sm">Copied</span>
