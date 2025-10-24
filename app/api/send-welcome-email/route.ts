@@ -59,13 +59,35 @@ export async function POST(request: Request) {
       
       if (!userSnapshot.empty) {
         const userDoc = userSnapshot.docs[0]
-        await db.collection("users").doc(userDoc.id).update({
+        const userData = userDoc.data()
+        
+        // Check if user already has email automation fields to avoid overwriting
+        const hasEmailAutomation = userData.emailAutomationStatus !== undefined
+        
+        const updateData = {
           emailDay: 1,
           lastEmailSent: admin.firestore.Timestamp.fromDate(new Date()),
           totalEmailsSent: 1,
           updatedAt: admin.firestore.Timestamp.fromDate(new Date())
-        })
-        logger.apiLog("Updated user emailDay to 1 for:", userEmail)
+        }
+        
+        // Only add email automation fields if they don't exist
+        if (!hasEmailAutomation) {
+          updateData.emailAutomationStatus = 'active'
+          updateData.emailAutomationSignupDate = admin.firestore.Timestamp.fromDate(new Date())
+          updateData.emailPreferences = {
+            marketing: true,
+            transactional: true
+          }
+          logger.apiLog("Added missing email automation fields for:", userEmail)
+        } else {
+          // If automation fields exist, just update the status to ensure it's active
+          updateData.emailAutomationStatus = 'active'
+          logger.apiLog("Updated existing email automation status to active for:", userEmail)
+        }
+        
+        await db.collection("users").doc(userDoc.id).update(updateData)
+        logger.apiLog("Updated user emailDay to 1 and email automation fields for:", userEmail)
       } else {
         logger.error("User not found in database for email:", userEmail)
       }

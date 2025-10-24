@@ -39,20 +39,29 @@ export const checkUserCookieConsent = async (userId: string) => {
   }
 }
 
-// Function that automatically uses the current authenticated user
+// Function that checks localStorage first, then Firebase for authenticated users
 export const checkCurrentUserCookieConsent = async () => {
   try {
-    // Import Firebase Auth to get current user
+    // First, check localStorage for consent (works for both authenticated and unauthenticated users)
+    if (typeof window !== 'undefined') {
+      const savedConsent = localStorage.getItem('drinfo-cookie-consent');
+      if (savedConsent) {
+        try {
+          const parsed = JSON.parse(savedConsent);
+          return { analytics: parsed.analytics || false };
+        } catch (error) {
+          // If localStorage parsing fails, continue to Firebase check
+        }
+      }
+    }
+
+    // If no localStorage consent, check Firebase for authenticated users
     const { getFirebaseAuth } = await import('./firebase');
-    const { onAuthStateChanged } = await import('firebase/auth');
-    
     const auth = await getFirebaseAuth();
     if (!auth) {
-      // console.log('Auth not available');
       return { analytics: false };
     }
 
-    // Get current user
     const currentUser = auth.currentUser;
     if (!currentUser) {
       return { analytics: false };
@@ -88,15 +97,36 @@ updateGlobalConsent().then(() => {
   // console.log("Global analytics consent:", globalAnalyticsConsent);
 });
 
+// Listen for localStorage changes to update consent in real-time
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'drinfo-cookie-consent') {
+      updateGlobalConsent();
+    }
+  });
+  
+  // Also listen for custom events when consent is updated
+  window.addEventListener('cookie-consent-updated', () => {
+    updateGlobalConsent();
+  });
+}
+
 // Helper function to check if analytics should be tracked
 const shouldTrack = () => globalAnalyticsConsent;
+
+// Helper function to check if we should track essential events (even without explicit consent)
+const shouldTrackEssential = () => {
+  // For essential events like signup/login, we can track them even without explicit consent
+  // as they are necessary for the service to function
+  return true;
+};
 
 // Clean analytics tracking - only real user behavior events
 export const track = {
 
   // ===== AUTHENTICATION EVENTS =====
   signUpAttempted: (method: string, provider?: string, emailProvided?: boolean) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     // Vercel Analytics
     vercelTrack('SignUpAttempted', {
@@ -115,7 +145,7 @@ export const track = {
   },
 
   signInAttempted: (method: string, provider?: string, emailProvided?: boolean) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     vercelTrack('SignInAttempted', {
       method,
       ...(provider && { provider }),
@@ -132,7 +162,7 @@ export const track = {
   },
 
   userSignupInitiated: (method: string, provider?: string, emailProvided?: boolean) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     // Vercel Analytics
     vercelTrack('UserSignupInitiated', {
@@ -150,7 +180,7 @@ export const track = {
   },
 
   userSignupCompleted: (method: string, userId: string, provider?: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     // Vercel Analytics
     vercelTrack('UserSignupCompleted', {
@@ -168,7 +198,7 @@ export const track = {
   },
 
   userEmailVerificationSent: (email: string, method: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     // Vercel Analytics
     vercelTrack('UserEmailVerificationSent', {
@@ -184,7 +214,7 @@ export const track = {
   },
 
   userEmailVerified: (email: string, method: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     // Vercel Analytics
     vercelTrack('UserEmailVerified', {
@@ -200,7 +230,7 @@ export const track = {
   },
 
   userLoginSuccessful: (method: string, userId: string, provider?: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     // Vercel Analytics
     vercelTrack('UserLoginSuccessful', {
@@ -218,7 +248,7 @@ export const track = {
   },
 
   userLogout: (method: string, userId: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     // Vercel Analytics
     vercelTrack('UserLogout', {
@@ -234,7 +264,7 @@ export const track = {
   },
 
   userPasswordResetRequested: (email: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     // Vercel Analytics
     vercelTrack('UserPasswordResetRequested', {
@@ -248,7 +278,7 @@ export const track = {
   },
 
   userPasswordResetCompleted: (email: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     // Vercel Analytics
     vercelTrack('UserPasswordResetCompleted', {
@@ -258,6 +288,86 @@ export const track = {
     // Google Analytics
     trackEngagement('user_password_reset_completed', {
       email
+    })
+  },
+
+  // ===== SPECIFIC SIGNUP METHOD EVENTS =====
+  signupAttemptedUsingEmail: (email: string) => {
+    if (!shouldTrackEssential()) return;
+    
+    // Vercel Analytics
+    vercelTrack('SignupAttemptedUsingEmail', {
+      email
+    })
+    
+    // Google Analytics
+    trackEngagement('signup_attempted_using_email', {
+      email
+    })
+  },
+
+  signupAttemptedUsingGoogle: () => {
+    if (!shouldTrackEssential()) return;
+    
+    // Vercel Analytics
+    vercelTrack('SignupAttemptedUsingGoogle', {
+      provider: 'google'
+    })
+    
+    // Google Analytics
+    trackEngagement('signup_attempted_using_google', {
+      provider: 'google'
+    })
+  },
+
+  signupAttemptedUsingMicrosoft: () => {
+    if (!shouldTrackEssential()) return;
+    
+    // Vercel Analytics
+    vercelTrack('SignupAttemptedUsingMicrosoft', {
+      provider: 'microsoft'
+    })
+    
+    // Google Analytics
+    trackEngagement('signup_attempted_using_microsoft', {
+      provider: 'microsoft'
+    })
+  },
+
+  // ===== PRODUCT TOUR EVENTS =====
+  agreedToSeeProductTour: (userId: string, page: string) => {
+    if (!shouldTrackEssential()) return;
+    
+    // Vercel Analytics
+    vercelTrack('AgreedToSeeProductTour', {
+      userId,
+      page
+    })
+    
+    // Google Analytics
+    trackEngagement('agreed_to_see_product_tour', {
+      user_id: userId,
+      page,
+      timestamp: new Date().toISOString()
+    })
+  },
+
+  completedProductTour: (userId: string, page: string, stepsCompleted: number) => {
+    if (!shouldTrackEssential()) return;
+    
+    // Vercel Analytics
+    vercelTrack('CompletedProductTour', {
+      userId,
+      page,
+      stepsCompleted
+    })
+    
+    // Google Analytics
+    trackEngagement('completed_product_tour', {
+      user_id: userId,
+      page,
+      steps_completed: stepsCompleted,
+      timestamp: new Date().toISOString()
     })
   },
 
@@ -300,7 +410,7 @@ export const track = {
   },
 
   dashboardTourPromptShown: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('dashboard_tour_prompt_shown', {
       user_id: userId,
@@ -315,7 +425,7 @@ export const track = {
   },
 
   dashboardTourAccepted: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('dashboard_tour_accepted', {
       user_id: userId,
@@ -330,7 +440,7 @@ export const track = {
   },
 
   dashboardTourDeclined: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('dashboard_tour_declined', {
       user_id: userId,
@@ -345,7 +455,7 @@ export const track = {
   },
 
   dashboardModeChanged: (fromMode: string, toMode: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('dashboard_mode_changed', {
       from_mode: fromMode,
@@ -365,7 +475,7 @@ export const track = {
 
   // ===== DRINFO SUMMARY EVENTS =====
   drinfoSummaryPageViewed: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('drinfo_summary_page_viewed', {
       user_id: userId,
@@ -380,7 +490,7 @@ export const track = {
   },
 
   drinfoSummaryQuerySubmitted: (query: string, mode: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('drinfo_summary_query_submitted', {
       query,
@@ -399,7 +509,7 @@ export const track = {
   },
 
   drinfoSummaryFollowUpAsked: (followUpQuestion: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('drinfo_summary_follow_up_asked', {
       follow_up_question: followUpQuestion,
@@ -416,7 +526,7 @@ export const track = {
   },
 
   drinfoSummaryCitationClicked: (citationId: string, citationTitle: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('drinfo_summary_citation_clicked', {
       citation_id: citationId,
@@ -435,7 +545,7 @@ export const track = {
   },
 
   drinfoSummaryImageGenerated: (imageCount: number, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('drinfo_summary_image_generated', {
       image_count: imageCount,
@@ -452,7 +562,7 @@ export const track = {
   },
 
   drinfoSummaryFeedbackSubmitted: (feedbackType: 'positive' | 'negative', userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('drinfo_summary_feedback_submitted', {
       feedback_type: feedbackType,
@@ -469,7 +579,7 @@ export const track = {
   },
 
   drinfoSummaryLikedAnswer: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('drinfo_summary_liked_answer', {
       user_id: userId,
@@ -484,7 +594,7 @@ export const track = {
   },
 
   drinfoSummaryDislikedAnswer: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('drinfo_summary_disliked_answer', {
       user_id: userId,
@@ -499,7 +609,7 @@ export const track = {
   },
 
   drinfoSummaryClickedRetry: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('drinfo_summary_clicked_retry', {
       user_id: userId,
@@ -514,7 +624,7 @@ export const track = {
   },
 
   drinfoSummaryShared: (shareMethod: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('drinfo_summary_shared', {
       share_method: shareMethod,
@@ -532,7 +642,7 @@ export const track = {
 
   // ===== ONBOARDING EVENTS =====
   onboardingStarted: (userId: string, method: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     // Vercel Analytics
     vercelTrack('OnboardingStarted', {
@@ -549,7 +659,7 @@ export const track = {
 
   // ===== SPECIFIC FORM FIELD EVENTS =====
   onboardingFirstNameEntered: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     trackEngagement('onboarding_first_name_entered', {
       user_id: userId,
@@ -564,7 +674,7 @@ export const track = {
   },
 
   onboardingLastNameEntered: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     trackEngagement('onboarding_last_name_entered', {
       user_id: userId,
@@ -579,7 +689,7 @@ export const track = {
   },
 
   onboardingInstitutionEntered: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_institution_entered', {
       user_id: userId,
@@ -594,7 +704,7 @@ export const track = {
   },
 
   onboardingOtherProfessionEntered: (profession: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_other_profession_entered', {
       profession,
@@ -611,7 +721,7 @@ export const track = {
   },
 
   onboardingOtherPlaceOfWorkEntered: (placeOfWork: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_other_place_of_work_entered', {
       place_of_work: placeOfWork,
@@ -628,7 +738,7 @@ export const track = {
   },
 
   onboardingOtherSpecialtyEntered: (specialty: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_other_specialty_entered', {
       specialty,
@@ -646,7 +756,7 @@ export const track = {
 
   // ===== DROPDOWN EVENTS =====
   onboardingProfessionDropdownOpened: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_profession_dropdown_opened', {
       user_id: userId,
@@ -661,7 +771,7 @@ export const track = {
   },
 
   onboardingProfessionSelected: (profession: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_profession_selected', {
       profession,
@@ -678,7 +788,7 @@ export const track = {
   },
 
   onboardingExperienceDropdownOpened: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_experience_dropdown_opened', {
       user_id: userId,
@@ -693,7 +803,7 @@ export const track = {
   },
 
   onboardingExperienceSelected: (experience: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_experience_selected', {
       experience,
@@ -710,7 +820,7 @@ export const track = {
   },
 
   onboardingPlaceOfWorkDropdownOpened: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_place_of_work_dropdown_opened', {
       user_id: userId,
@@ -725,7 +835,7 @@ export const track = {
   },
 
   onboardingPlaceOfWorkSelected: (placeOfWork: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_place_of_work_selected', {
       place_of_work: placeOfWork,
@@ -742,7 +852,7 @@ export const track = {
   },
 
   onboardingSpecialtiesDropdownOpened: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_specialties_dropdown_opened', {
       user_id: userId,
@@ -757,7 +867,7 @@ export const track = {
   },
 
   onboardingSpecialtySearched: (searchTerm: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_specialty_searched', {
       search_term: searchTerm,
@@ -774,7 +884,7 @@ export const track = {
   },
 
   onboardingSpecialtyAdded: (specialty: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_specialty_added', {
       specialty,
@@ -791,7 +901,7 @@ export const track = {
   },
 
   onboardingSpecialtyRemoved: (specialty: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_specialty_removed', {
       specialty,
@@ -808,7 +918,7 @@ export const track = {
   },
 
   onboardingCountryDropdownOpened: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_country_dropdown_opened', {
       user_id: userId,
@@ -823,7 +933,7 @@ export const track = {
   },
 
   onboardingCountrySearched: (searchTerm: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_country_searched', {
       search_term: searchTerm,
@@ -840,7 +950,7 @@ export const track = {
   },
 
   onboardingCountrySelected: (country: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_country_selected', {
       country,
@@ -858,7 +968,7 @@ export const track = {
 
   // ===== CHECKBOX EVENTS =====
   onboardingHealthcareProfessionalChecked: (isChecked: boolean, profession: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_healthcare_professional_checked', {
       is_checked: isChecked,
@@ -877,7 +987,7 @@ export const track = {
   },
 
   onboardingTermsAccepted: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_terms_accepted', {
       user_id: userId,
@@ -893,7 +1003,7 @@ export const track = {
 
   // ===== VALIDATION EVENTS =====
   onboardingValidationError: (fieldName: string, errorMessage: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('onboarding_validation_error', {
       field_name: fieldName,
@@ -913,7 +1023,7 @@ export const track = {
 
   // ===== COMPLETION EVENTS =====
   onboardingCompleted: (userId: string, specialties?: string[], timeSpent?: number) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     // Vercel Analytics
     vercelTrack('OnboardingCompleted', {
@@ -932,7 +1042,7 @@ export const track = {
 
   // ===== PROFILE EVENTS =====
   profilePageViewed: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     trackEngagement('profile_page_viewed', {
       user_id: userId,
@@ -947,7 +1057,7 @@ export const track = {
   },
 
   profileTabClicked: (tab: 'profile' | 'preferences' | 'subscription', userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('profile_tab_clicked', {
       tab,
@@ -968,7 +1078,7 @@ export const track = {
 
 
   profileCountrySelected: (country: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     trackEngagement('profile_country_selected', {
       country,
@@ -987,7 +1097,7 @@ export const track = {
 
 
   profilePlaceOfWorkSelected: (placeOfWork: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('profile_place_of_work_selected', {
       place_of_work: placeOfWork,
@@ -1007,7 +1117,7 @@ export const track = {
 
 
   profileSpecialtyAdded: (specialty: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('profile_specialty_added', {
       specialty,
@@ -1024,7 +1134,7 @@ export const track = {
   },
 
   profileSpecialtyRemoved: (specialty: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('profile_specialty_removed', {
       specialty,
@@ -1042,7 +1152,7 @@ export const track = {
 
 
   profileFormSubmitted: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('profile_form_submitted', {
       user_id: userId,
@@ -1059,7 +1169,7 @@ export const track = {
 
   // ===== PREFERENCES EVENTS =====
   cookiePreferenceToggled: (preferenceType: 'analytics' | 'marketing' | 'functional', isEnabled: boolean, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('cookie_preference_toggled', {
       preference_type: preferenceType,
@@ -1078,7 +1188,7 @@ export const track = {
   },
 
   preferencesFormSubmitted: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('preferences_form_submitted', {
       user_id: userId,
@@ -1094,7 +1204,7 @@ export const track = {
 
 
   privacyPolicyClicked: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('privacy_policy_clicked', {
       user_id: userId,
@@ -1109,7 +1219,7 @@ export const track = {
   },
 
   cookiePolicyClicked: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('cookie_policy_clicked', {
       user_id: userId,
@@ -1128,7 +1238,7 @@ export const track = {
 
 
   contactSalesClicked: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('contact_sales_clicked', {
       user_id: userId,
@@ -1144,7 +1254,7 @@ export const track = {
 
   // ===== SPECIFIC SUBSCRIPTION PLAN EVENTS =====
   studentMonthlyClicked: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('student_monthly_clicked', {
       user_id: userId,
@@ -1159,7 +1269,7 @@ export const track = {
   },
 
   studentYearlyClicked: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('student_yearly_clicked', {
       user_id: userId,
@@ -1174,7 +1284,7 @@ export const track = {
   },
 
   clinicianMonthlyClicked: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('clinician_monthly_clicked', {
       user_id: userId,
@@ -1189,7 +1299,7 @@ export const track = {
   },
 
   clinicianYearlyClicked: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('clinician_yearly_clicked', {
       user_id: userId,
@@ -1204,7 +1314,7 @@ export const track = {
   },
 
   enterpriseMonthlyClicked: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('enterprise_monthly_clicked', {
       user_id: userId,
@@ -1219,7 +1329,7 @@ export const track = {
   },
 
   enterpriseYearlyClicked: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('enterprise_yearly_clicked', {
       user_id: userId,
@@ -1234,7 +1344,7 @@ export const track = {
   },
 
   cancelSubscriptionClicked: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('cancel_subscription_clicked', {
       user_id: userId,
@@ -1249,7 +1359,7 @@ export const track = {
   },
 
   cancelSubscriptionConfirmed: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('cancel_subscription_confirmed', {
       user_id: userId,
@@ -1265,7 +1375,7 @@ export const track = {
 
   // ===== DELETE PROFILE EVENTS =====
   deleteProfileClicked: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('delete_profile_clicked', {
       user_id: userId,
@@ -1280,7 +1390,7 @@ export const track = {
   },
 
   deleteProfileConfirmed: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('delete_profile_confirmed', {
       user_id: userId,
@@ -1296,7 +1406,7 @@ export const track = {
 
   // ===== LIBRARY EVENTS =====
   libraryPageViewed: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('library_page_viewed', {
       user_id: userId,
@@ -1311,7 +1421,7 @@ export const track = {
   },
 
   libraryTabClicked: (tab: 'visual-abstracts' | 'conversations' | 'saved-guidelines', userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('library_tab_clicked', {
       tab,
@@ -1329,7 +1439,7 @@ export const track = {
 
   // ===== VISUAL ABSTRACTS EVENTS =====
   visualAbstractViewed: (abstractId: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('visual_abstract_viewed', {
       abstract_id: abstractId,
@@ -1346,7 +1456,7 @@ export const track = {
   },
 
   visualAbstractDownloaded: (abstractId: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('visual_abstract_downloaded', {
       abstract_id: abstractId,
@@ -1363,7 +1473,7 @@ export const track = {
   },
 
   visualAbstractDeleted: (abstractId: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('visual_abstract_deleted', {
       abstract_id: abstractId,
@@ -1380,7 +1490,7 @@ export const track = {
   },
 
   visualAbstractSelectionModeToggled: (isEnabled: boolean, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('visual_abstract_selection_mode_toggled', {
       is_enabled: isEnabled,
@@ -1397,7 +1507,7 @@ export const track = {
   },
 
   visualAbstractSelected: (abstractId: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('visual_abstract_selected', {
       abstract_id: abstractId,
@@ -1414,7 +1524,7 @@ export const track = {
   },
 
   visualAbstractDeselected: (abstractId: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('visual_abstract_deselected', {
       abstract_id: abstractId,
@@ -1431,7 +1541,7 @@ export const track = {
   },
 
   visualAbstractSelectAllToggled: (isSelected: boolean, count: number, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('visual_abstract_select_all_toggled', {
       is_selected: isSelected,
@@ -1450,7 +1560,7 @@ export const track = {
   },
 
   visualAbstractBulkDownloaded: (count: number, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('visual_abstract_bulk_downloaded', {
       count,
@@ -1467,7 +1577,7 @@ export const track = {
   },
 
   visualAbstractBulkDeleted: (count: number, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('visual_abstract_bulk_deleted', {
       count,
@@ -1484,7 +1594,7 @@ export const track = {
   },
 
   createVisualAbstractClicked: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('create_visual_abstract_clicked', {
       user_id: userId,
@@ -1500,7 +1610,7 @@ export const track = {
 
   // ===== CONVERSATIONS EVENTS =====
   conversationSearched: (searchTerm: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('conversation_searched', {
       search_term: searchTerm,
@@ -1517,7 +1627,7 @@ export const track = {
   },
 
   conversationSearchSuggestionClicked: (suggestion: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('conversation_search_suggestion_clicked', {
       suggestion,
@@ -1534,7 +1644,7 @@ export const track = {
   },
 
   conversationSearchCleared: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('conversation_search_cleared', {
       user_id: userId,
@@ -1549,7 +1659,7 @@ export const track = {
   },
 
   conversationSortChanged: (sortOption: 'newest' | 'oldest' | 'alphabetical', userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('conversation_sort_changed', {
       sort_option: sortOption,
@@ -1566,7 +1676,7 @@ export const track = {
   },
 
   conversationClicked: (conversationId: string, title: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('conversation_clicked', {
       conversation_id: conversationId,
@@ -1585,7 +1695,7 @@ export const track = {
   },
 
   conversationDeleted: (conversationId: string, title: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('conversation_deleted', {
       conversation_id: conversationId,
@@ -1605,7 +1715,7 @@ export const track = {
 
   // ===== SAVED GUIDELINES EVENTS =====
   savedGuidelineViewed: (guidelineId: number, title: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('saved_guideline_viewed', {
       guideline_id: guidelineId,
@@ -1624,7 +1734,7 @@ export const track = {
   },
 
   savedGuidelineClicked: (guidelineId: number, title: string, url: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('saved_guideline_clicked', {
       guideline_id: guidelineId,
@@ -1645,7 +1755,7 @@ export const track = {
   },
 
   savedGuidelineRemoved: (guidelineId: number, title: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('saved_guideline_removed', {
       guideline_id: guidelineId,
@@ -1664,7 +1774,7 @@ export const track = {
   },
 
   savedGuidelineAISummaryClicked: (guidelineId: number, title: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('saved_guideline_ai_summary_clicked', {
       guideline_id: guidelineId,
@@ -1683,7 +1793,7 @@ export const track = {
   },
 
   browseGuidelinesClicked: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('browse_guidelines_clicked', {
       user_id: userId,
@@ -1699,7 +1809,7 @@ export const track = {
 
   // ===== MODAL EVENTS =====
   visualAbstractModalOpened: (abstractId: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('visual_abstract_modal_opened', {
       abstract_id: abstractId,
@@ -1716,7 +1826,7 @@ export const track = {
   },
 
   visualAbstractModalClosed: (abstractId: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('visual_abstract_modal_closed', {
       abstract_id: abstractId,
@@ -1735,7 +1845,7 @@ export const track = {
 
   // ===== VISUAL ABSTRACT GENERATOR EVENTS =====
   visualAbstractPageViewed: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('visual_abstract_page_viewed', {
       user_id: userId,
@@ -1750,7 +1860,7 @@ export const track = {
   },
 
   visualAbstractGenerateClicked: (textLength: number, wordCount: number, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('visual_abstract_generate_clicked', {
       text_length: textLength,
@@ -1770,7 +1880,7 @@ export const track = {
 
   // ===== DRUG INFORMATION EVENTS =====
   drugInformationPageViewed: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('drug_information_page_viewed', {
       user_id: userId,
@@ -1786,7 +1896,7 @@ export const track = {
 
 
   drugInformationAISearchPerformed: (searchTerm: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('drug_information_ai_search_performed', {
       search_term: searchTerm,
@@ -1803,7 +1913,7 @@ export const track = {
   },
 
   drugInformationEMASearchPerformed: (searchTerm: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('drug_information_ema_search_performed', {
       search_term: searchTerm,
@@ -1820,7 +1930,7 @@ export const track = {
   },
 
   drugInformationSearchButtonClicked: (searchTerm: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('drug_information_search_button_clicked', {
       search_term: searchTerm,
@@ -1837,7 +1947,7 @@ export const track = {
   },
 
   drugInformationSuggestionClicked: (drugName: string, searchType: 'ai_suggestion' | 'ai_search' | 'direct_brand' | 'brand_option', userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('drug_information_suggestion_clicked', {
       drug_name: drugName,
@@ -1859,7 +1969,7 @@ export const track = {
 
   // ===== DICTIONARY/ALPHABET NAVIGATION EVENTS =====
   drugInformationDictionaryUsed: (letter: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     trackEngagement('drug_information_dictionary_used', {
       letter,
@@ -1877,7 +1987,7 @@ export const track = {
 
 
   drugInformationAlphabetLetterClicked: (letter: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     trackEngagement('drug_information_alphabet_letter_clicked', {
       letter,
@@ -1895,7 +2005,7 @@ export const track = {
 
   // ===== DRUG TABLE EVENTS =====
   drugInformationDrugClicked: (drugName: string, activeSubstances: string[], userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     trackEngagement('drug_information_drug_clicked', {
       drug_name: drugName,
@@ -1925,7 +2035,7 @@ export const track = {
 
   // ===== GUIDELINES EVENTS =====
   guidelinesPageViewed: (userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('guidelines_page_viewed', {
       user_id: userId,
@@ -1941,7 +2051,7 @@ export const track = {
 
 
   guidelinesSearchPerformed: (searchTerm: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
     
     trackEngagement('guidelines_search_performed', {
       search_term: searchTerm,
@@ -1959,7 +2069,7 @@ export const track = {
 
 
   guidelinesPopularSearchClicked: (searchTerm: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('guidelines_popular_search_clicked', {
       search_term: searchTerm,
@@ -1978,7 +2088,7 @@ export const track = {
   // ===== CATEGORY EVENTS =====
 
   guidelinesNationalCategoryViewed: (guidelineCount: number, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('guidelines_national_category_viewed', {
       guideline_count: guidelineCount,
@@ -1995,7 +2105,7 @@ export const track = {
   },
 
   guidelinesEuropeCategoryViewed: (guidelineCount: number, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('guidelines_europe_category_viewed', {
       guideline_count: guidelineCount,
@@ -2012,7 +2122,7 @@ export const track = {
   },
 
   guidelinesInternationalCategoryViewed: (guidelineCount: number, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('guidelines_international_category_viewed', {
       guideline_count: guidelineCount,
@@ -2029,7 +2139,7 @@ export const track = {
   },
 
   guidelinesUSACategoryViewed: (guidelineCount: number, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('guidelines_usa_category_viewed', {
       guideline_count: guidelineCount,
@@ -2048,7 +2158,7 @@ export const track = {
   // ===== GUIDELINE EVENTS =====
 
   guidelinesGuidelineViewed: (guidelineId: number, guidelineTitle: string, category: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('guidelines_guideline_viewed', {
       guideline_id: guidelineId,
@@ -2070,7 +2180,7 @@ export const track = {
 
 
   guidelinesGuidelineLinkClicked: (guidelineId: number, guidelineTitle: string, url: string, category: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('guidelines_guideline_link_clicked', {
       guideline_id: guidelineId,
@@ -2094,7 +2204,7 @@ export const track = {
 
   // ===== BOOKMARK EVENTS =====
   guidelinesBookmarkToggled: (guidelineId: number, guidelineTitle: string, isBookmarked: boolean, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('guidelines_bookmark_toggled', {
       guideline_id: guidelineId,
@@ -2115,7 +2225,7 @@ export const track = {
   },
 
   guidelinesBookmarkSaved: (guidelineId: number, guidelineTitle: string, category: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('guidelines_bookmark_saved', {
       guideline_id: guidelineId,
@@ -2136,7 +2246,7 @@ export const track = {
   },
 
   guidelinesBookmarkRemoved: (guidelineId: number, guidelineTitle: string, category: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('guidelines_bookmark_removed', {
       guideline_id: guidelineId,
@@ -2159,7 +2269,7 @@ export const track = {
 
   // ===== AI SUMMARY EVENTS =====
   guidelinesAISummaryClicked: (guidelineId: number, guidelineTitle: string, category: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('guidelines_ai_summary_clicked', {
       guideline_id: guidelineId,
@@ -2180,7 +2290,7 @@ export const track = {
   },
 
   guidelinesAISummaryModalOpened: (guidelineId: number, guidelineTitle: string, category: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('guidelines_ai_summary_modal_opened', {
       guideline_id: guidelineId,
@@ -2201,7 +2311,7 @@ export const track = {
   },
 
   guidelinesAISummaryModalClosed: (guidelineId: number, guidelineTitle: string, category: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('guidelines_ai_summary_modal_closed', {
       guideline_id: guidelineId,
@@ -2222,7 +2332,7 @@ export const track = {
   },
 
   guidelinesAISummaryCitationClicked: (citationNumber: string, guidelineId: number, guidelineTitle: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('guidelines_ai_summary_citation_clicked', {
       citation_number: citationNumber,
@@ -2243,7 +2353,7 @@ export const track = {
   },
 
   guidelinesAISummaryFollowupAsked: (question: string, guidelineId: number, guidelineTitle: string, userId: string, page: string) => {
-    if (!shouldTrack()) return;
+    if (!shouldTrackEssential()) return;
 
     trackEngagement('guidelines_ai_summary_followup_asked', {
       question,

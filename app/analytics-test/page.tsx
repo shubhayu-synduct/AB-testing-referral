@@ -20,6 +20,14 @@ export default function AnalyticsTestPage() {
     addResult('✅ Sign up event sent')
   }
 
+  const testSpecificSignupEvents = () => {
+    track.signupAttemptedUsingEmail('test@example.com')
+    track.signupAttemptedUsingGoogle()
+    track.signupAttemptedUsingMicrosoft()
+    addResult('✅ Specific signup events sent (email, google, microsoft)')
+  }
+
+
   const testSignInEvent = () => {
     track.signInAttempted('google', 'google')
     addResult('✅ Sign in event sent')
@@ -143,6 +151,15 @@ export default function AnalyticsTestPage() {
     // Legacy events
     track.signUpAttempted('email', undefined, true)
     track.signInAttempted('google', 'google')
+    
+    // Specific signup method events
+    track.signupAttemptedUsingEmail('test@example.com')
+    track.signupAttemptedUsingGoogle()
+    track.signupAttemptedUsingMicrosoft()
+    
+    // Product tour events
+    track.agreedToSeeProductTour('test-user-123', '/dashboard')
+    track.completedProductTour('test-user-123', '/dashboard', 7)
     track.userInteraction('click', 'test_button', 'analytics_test', {
       button_text: 'Test Interaction',
       test_type: 'manual'
@@ -256,7 +273,7 @@ export default function AnalyticsTestPage() {
             {/* Auth Events */}
             <div className="border rounded-lg p-4">
               <h3 className="font-medium mb-2">2. Authentication Events</h3>
-              <div className="flex gap-2">
+              <div className="flex gap-2 mb-2">
                 <button
                   onClick={testSignUpEvent}
                   className="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm"
@@ -268,6 +285,14 @@ export default function AnalyticsTestPage() {
                   className="px-3 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 text-sm"
                 >
                   Test Sign In
+                </button>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={testSpecificSignupEvents}
+                  className="px-3 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
+                >
+                  Test Specific Signup Methods
                 </button>
               </div>
             </div>
