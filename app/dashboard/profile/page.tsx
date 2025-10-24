@@ -74,12 +74,15 @@ function ProfilePageContent() {
     { value: "cardiology", label: "Cardiology" },
     { value: "critical-care", label: "Critical Care" },
     { value: "dermatology", label: "Dermatology" },
+    { value: "dentistry", label: "Dentistry" },
     { value: "emergency-medicine", label: "Emergency Medicine" },
     { value: "endocrinology", label: "Endocrinology" },
+    { value: "endodontics", label: "Endodontics" },
     { value: "family-medicine", label: "Family Medicine" },
     { value: "gastroenterology", label: "Gastroenterology" },
     { value: "geriatrics", label: "Geriatrics" },
     { value: "hematology", label: "Hematology" },
+    { value: "imunohemotherapy", label: "Imunohemotherapy" },
     { value: "infectious-disease", label: "Infectious Disease" },
     { value: "internal-medicine", label: "Internal Medicine" },
     { value: "microbiology", label: "Microbiology" },
@@ -97,6 +100,7 @@ function ProfilePageContent() {
     { value: "psychiatry", label: "Psychiatry" },
     { value: "pulmonology", label: "Pulmonology" },
     { value: "radiology", label: "Radiology" },
+    { value: "rehabilitation-medicine", label: "Rehabilitation Medicine" },
     { value: "reproductive-endocrinology", label: "Reproductive Endocrinology & Infertility" },
     { value: "rheumatology", label: "Rheumatology" },
     { value: "sports-medicine", label: "Sports Medicine" },
@@ -277,10 +281,10 @@ function ProfilePageContent() {
     }
     
     const auth = await getFirebaseAuth();
-    const user = auth.currentUser;
-    if (user) {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
       const db = getFirebaseFirestore();
-      const docRef = doc(db, "users", user.uid);
+      const docRef = doc(db, "users", currentUser.uid);
       
       const consent: any = {
         necessary: true, // Always true
@@ -414,9 +418,9 @@ function ProfilePageContent() {
   const handleTabChange = (tab: 'profile' | 'preferences' | 'subscription' | 'feedback') => {
     setActiveTab(tab);
     router.push(`/dashboard/profile?tab=${tab}`);
-    
-    // Track tab click
-    if (user) {
+
+    // Track tab click (only for supported tabs)
+    if (user && tab !== 'feedback') {
       track.profileTabClicked(tab, user.uid, 'profile');
     }
   };
@@ -549,10 +553,10 @@ function ProfilePageContent() {
     }
     
     const auth = await getFirebaseAuth();
-    const user = auth.currentUser;
-    if (user) {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
       const db = getFirebaseFirestore();
-      const docRef = doc(db, "users", user.uid);
+      const docRef = doc(db, "users", currentUser.uid);
       // Update only the specified fields inside the 'profile' object using dot notation
       const { firstName, lastName, occupation, institution, specialties, placeOfWork, country, otherSpecialty, otherOccupation, otherPlaceOfWork } = profile;
       
@@ -666,9 +670,9 @@ function ProfilePageContent() {
       // Even if there's an error, try to perform cleanup after redirect
       try {
         const auth = await getFirebaseAuth();
-        const user = auth.currentUser;
-        if (user) {
-          await CleanupService.performCompleteCleanup(user.uid, user.email || 'unknown@example.com');
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          await CleanupService.performCompleteCleanup(currentUser.uid, currentUser.email || 'unknown@example.com');
         }
       } catch (cleanupError) {
         // console.error('Error during cleanup after deletion failure:', cleanupError);
