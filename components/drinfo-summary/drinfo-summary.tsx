@@ -394,8 +394,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
 
   // Share banner logic
   useEffect(() => {
-    // Show banner when AI is generating answer and user hasn't dismissed it
-    if (isLoading && (status === 'processing' || status === 'searching' || status === 'summarizing' || status === 'formatting') && !bannerDismissed && messages.length > 0) {
+    // Show banner only during 'summarizing' phase (Generating Precision Answer) and user hasn't dismissed it
+    if (isLoading && status === 'summarizing' && !bannerDismissed && messages.length > 0) {
       // Add a 2-second delay before showing the banner
       const timer = setTimeout(() => {
         setShowShareBanner(true);
@@ -406,6 +406,14 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       setShowShareBanner(false);
     }
   }, [isLoading, status, bannerDismissed, messages.length]);
+
+  // Hide banner when content starts appearing
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.type === 'assistant' && lastMessage.content && lastMessage.content.length > 50) {
+      setShowShareBanner(false);
+    }
+  }, [messages]);
 
   // Add useEffect to fetch user's country when component mounts
   useEffect(() => {
@@ -2549,15 +2557,6 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
               </div>
             ) : (
               <div className="flex-1 overflow-y-auto mb-4 max-w-4xl mx-auto w-full font-sans px-2 sm:px-4 relative" ref={contentRef}>
-                {/* Share Banner positioned in center of content area */}
-                <ShareBanner
-                  isVisible={showShareBanner}
-                  onClose={handleBannerClose}
-                  onShare={handleBannerShare}
-                  onShareWhatsApp={handleBannerShareWhatsApp}
-                  onShareLinkedIn={handleBannerShareLinkedIn}
-                  onShareEmail={handleBannerShareEmail}
-                />
                 {error && (
                   <div className="bg-red-50 text-red-600 p-3 sm:p-4 rounded-lg mb-4">
                     {error}
@@ -2613,6 +2612,21 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                               )}
                             </div>
                           </div>
+                          
+                          {/* Share Banner - shown during summarizing phase for the last message, above the streaming content */}
+                          {idx === messages.length - 1 && showShareBanner && (
+                            <div className="mb-4 sm:mb-6">
+                              <ShareBanner
+                                isVisible={showShareBanner}
+                                onClose={handleBannerClose}
+                                onShare={handleBannerShare}
+                                onShareWhatsApp={handleBannerShareWhatsApp}
+                                onShareLinkedIn={handleBannerShareLinkedIn}
+                                onShareEmail={handleBannerShareEmail}
+                              />
+                            </div>
+                          )}
+                          
                           {/* Show content during streaming or when complete */}
                           {(msg.content || (idx === messages.length - 1 && isStreaming)) && (
                             <div className="mb-4 sm:mb-6">
