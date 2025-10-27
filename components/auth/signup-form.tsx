@@ -12,7 +12,7 @@ import { getFirebaseFirestore } from "@/lib/firebase"
 import { doc, setDoc } from "firebase/firestore"
 import { VerificationModal } from "./verification-modal"
 import { logger } from "@/lib/logger"
-import { handleUserSignup, handleFirebaseAuthSignup } from "@/lib/signup-integration"
+import { handleUserSignup, handleFirebaseAuthSignup, trackReferral } from "@/lib/signup-integration"
 import { validateEmailForSignup } from "@/lib/email-validation"
 import { track } from '@/lib/analytics'
 
@@ -43,7 +43,11 @@ const AppleIcon = () => (
   </svg>
 )
 
-export function SignUpForm() {
+interface SignUpFormProps {
+  referralCode?: string | null;
+}
+
+export function SignUpForm({ referralCode }: SignUpFormProps) {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -143,6 +147,21 @@ export function SignUpForm() {
         // Don't fail the signup if email automation fails
       }
       
+      // Track referral if code exists
+      if (referralCode) {
+        try {
+          const referralResult = await trackReferral(referralCode, userCredential.user.uid)
+          if (referralResult.success) {
+            logger.info("Referral tracked successfully:", referralResult)
+          } else {
+            logger.warn("Failed to track referral:", referralResult.error)
+          }
+        } catch (referralError) {
+          logger.error("Error tracking referral:", referralError)
+          // Don't fail signup if referral tracking fails
+        }
+      }
+      
       // Track signup completion
       track.userSignupCompleted('email', undefined, userCredential.user.uid)
       
@@ -211,6 +230,21 @@ export function SignUpForm() {
         } catch (automationError) {
           logger.error("Failed to add Google user to email automation:", automationError)
           // Don't fail the signup if email automation fails
+        }
+        
+        // Track referral if code exists
+        if (referralCode) {
+          try {
+            const referralResult = await trackReferral(referralCode, result.user.uid)
+            if (referralResult.success) {
+              logger.info("Referral tracked successfully:", referralResult)
+            } else {
+              logger.warn("Failed to track referral:", referralResult.error)
+            }
+          } catch (referralError) {
+            logger.error("Error tracking referral:", referralError)
+            // Don't fail signup if referral tracking fails
+          }
         }
         
         // Track signup completion
@@ -289,6 +323,21 @@ export function SignUpForm() {
         } catch (automationError) {
           logger.error("Failed to add Microsoft user to email automation:", automationError)
           // Don't fail the signup if email automation fails
+        }
+        
+        // Track referral if code exists
+        if (referralCode) {
+          try {
+            const referralResult = await trackReferral(referralCode, result.user.uid)
+            if (referralResult.success) {
+              logger.info("Referral tracked successfully:", referralResult)
+            } else {
+              logger.warn("Failed to track referral:", referralResult.error)
+            }
+          } catch (referralError) {
+            logger.error("Error tracking referral:", referralError)
+            // Don't fail signup if referral tracking fails
+          }
         }
         
         // AuthProvider will handle the redirect to onboarding

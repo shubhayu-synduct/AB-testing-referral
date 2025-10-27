@@ -9,6 +9,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { useSearchParams, useRouter } from "next/navigation";
 import { CleanupService } from "@/lib/cleanup-service";
 import { track } from "@/lib/analytics";
+import { Copy, Check } from "lucide-react";
+import { isQualifiedForIncentive } from "@/lib/signup-integration";
+import { logger } from "@/lib/logger";
 
 
 function ProfilePageContent() {
@@ -19,7 +22,7 @@ function ProfilePageContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'subscription' | 'feedback'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'subscription' | 'feedback' | 'referral'>('profile');
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('yearly');
   const [currentSubscription, setCurrentSubscription] = useState<any>(null);
   const [planLoading, setPlanLoading] = useState(false);
@@ -54,6 +57,18 @@ function ProfilePageContent() {
   });
   const [preferencesSaving, setPreferencesSaving] = useState(false);
   const [preferencesSuccess, setPreferencesSuccess] = useState(false);
+  
+  // Referral state
+  const [referralCode, setReferralCode] = useState('');
+  const [referralLink, setReferralLink] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [referralStats, setReferralStats] = useState({
+    totalReferred: 0,
+    activeUsers: 0,
+    qualified: false
+  });
+  const [referralLoading, setReferralLoading] = useState(false);
+  const [generatingCode, setGeneratingCode] = useState(false);
 
   // Occupation and Specialties options
   const occupationOptions = [
@@ -117,6 +132,8 @@ function ProfilePageContent() {
       setActiveTab('preferences');
     } else if (tabParam === 'profile') {
       setActiveTab('profile');
+    } else if (tabParam === 'referral') {
+      setActiveTab('referral');
     }
     
     // Check if payment was cancelled
@@ -172,6 +189,23 @@ function ProfilePageContent() {
             setCookiePreferences(preferences);
             setOriginalCookiePreferences(preferences);
           }
+          
+          // Set referral data from Firebase
+          const userData = docSnap.data();
+          if (userData.referralCode) {
+            const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+            const fullLink = `${baseUrl}/signup?ref=${userData.referralCode}`;
+            setReferralCode(userData.referralCode);
+            setReferralLink(fullLink);
+            setReferralStats({
+              totalReferred: userData.referralTotalReferred || 0,
+              activeUsers: userData.referralActiveUsers || 0,
+              qualified: userData.referralQualified || false
+            });
+            console.log('Referral data loaded:', { code: userData.referralCode, link: fullLink, stats: referralStats });
+          } else {
+            console.log('No referral code found in Firebase');
+          }
         } else {
           // User document doesn't exist, set default values
           setProfile({
@@ -214,6 +248,39 @@ function ProfilePageContent() {
       return () => clearTimeout(timer);
     }
   }, [preferencesSuccess]);
+
+  // Check referral qualification when referral tab is opened
+  useEffect(() => {
+    const checkReferralQualification = async () => {
+      if (!user || !activeTab || activeTab !== 'referral') return;
+      
+      setReferralLoading(true);
+      
+      try {
+        const userId = user.uid || user.id;
+        const result = await isQualifiedForIncentive(userId);
+        
+        setReferralStats({
+          totalReferred: result.totalReferred,
+          activeUsers: result.activeUsers,
+          qualified: result.isQualified
+        });
+        
+        logger.info('Referral qualification checked:', result);
+      } catch (error) {
+        logger.error('Error checking referral qualification:', error);
+        setReferralStats({
+          totalReferred: 0,
+          activeUsers: 0,
+          qualified: false
+        });
+      } finally {
+        setReferralLoading(false);
+      }
+    };
+
+    checkReferralQualification();
+  }, [activeTab, user]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -411,7 +478,7 @@ function ProfilePageContent() {
     };
   };
 
-  const handleTabChange = (tab: 'profile' | 'preferences' | 'subscription' | 'feedback') => {
+  const handleTabChange = (tab: 'profile' | 'preferences' | 'subscription' | 'feedback' | 'referral') => {
     setActiveTab(tab);
     router.push(`/dashboard/profile?tab=${tab}`);
     
@@ -713,6 +780,13 @@ function ProfilePageContent() {
             onClick={() => handleTabChange('subscription')}
           >
             Subscription
+          </button>
+          <button
+            className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
+              ${activeTab === 'referral' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
+            onClick={() => handleTabChange('referral')}
+          >
+            Referral
           </button>
           {/* <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
@@ -1721,6 +1795,184 @@ function ProfilePageContent() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Referral Tab Content */}
+        {activeTab === 'referral' && (
+          <div>
+            <h2 className="text-xl font-regular text-[#000000] mb-1">Referral Program</h2>
+            <p className="text-[#747474] text-sm mb-6">Share DR. INFO with your peers and earn rewards</p>
+            
+            {/* Incentive Banner */}
+            <div className="mb-6 p-6 bg-gradient-to-r from-[#3771FE] to-[#2A5CDB] rounded-[10px] text-white">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-white mb-2">Earn 1 Month Premium Free!</h3>
+                  <p className="text-white/90 text-sm mb-4">
+                    Refer 5 people to DR. INFO and get a free month of premium subscription as a thank you for spreading the word.
+                  </p>
+                  {/* Progress Bar */}
+                  <div className="mb-2">
+                    <div className="flex justify-between text-xs text-white/80 mb-1">
+                      <span>{referralStats.activeUsers} of 5 active users</span>
+                      <span>{Math.min(100, (referralStats.activeUsers / 5) * 100).toFixed(0)}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-white rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min(100, (referralStats.activeUsers / 5) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Generate Link Section */}
+            <div className="border border-[#B5C9FC] rounded-[10px] p-6 bg-[#F4F7FF] mb-6">
+              <h3 className="text-lg font-medium text-[#223258] mb-4">Your Referral Link</h3>
+              
+              {!referralLink ? (
+                <div>
+                  <p className="text-[#747474] text-sm mb-4">
+                    Generate your referral link to share with your peers and colleagues.
+                  </p>
+                  <button
+                    onClick={async () => {
+                      if (!user || !profile) return;
+                      
+                      setGeneratingCode(true);
+                      
+                      // Get user's first name from profile
+                      const firstName = profile.firstName || user.displayName?.split(' ')[0] || 'user';
+                      const first4Letters = firstName.substring(0, 4).toLowerCase().replace(/[^a-z]/g, '').padStart(4, 'user');
+                      
+                      // Generate unique random string (6 characters)
+                      const randomString = Math.random().toString(36).substr(2, 6);
+                      
+                      // Create referral code: first 4 letters of name + random string
+                      const newCode = `${first4Letters}${randomString}`;
+                      
+                      // Create full referral link
+                      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+                      const fullLink = `${baseUrl}/signup?ref=${newCode}`;
+                      
+                      try {
+                        // Save to Firebase
+                        const db = getFirebaseFirestore();
+                        const userRef = doc(db, "users", user.uid);
+                        await updateDoc(userRef, {
+                          referralCode: newCode,
+                          referralQualified: false,
+                          referralActiveUsers: 0,
+                          referralTotalReferred: 0
+                        });
+                        
+                        setReferralCode(newCode);
+                        setReferralLink(fullLink);
+                        setCopied(false);
+                      } catch (error) {
+                        console.error('Error generating referral code:', error);
+                        setError('Failed to generate referral code');
+                      } finally {
+                        setGeneratingCode(false);
+                      }
+                    }}
+                    disabled={generatingCode}
+                    className="px-6 py-3 bg-[#3771FE] text-white rounded-[8px] font-medium hover:bg-[#2A5CDB] transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {generatingCode ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Generating...</span>
+                      </>
+                    ) : (
+                      'Generate Referral Link'
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div className="mb-4">
+                    <label className="block text-[#000000] mb-2 font-medium text-sm">Your Referral Link</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={referralLink}
+                        readOnly
+                        className="flex-1 border border-[#B5C9FC] rounded-[8px] px-4 py-2 bg-white text-[#223258] font-medium outline-none"
+                      />
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(referralLink);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                        className="px-4 py-2 bg-[#3771FE] text-white rounded-[8px] font-medium hover:bg-[#2A5CDB] transition-colors flex items-center gap-2"
+                      >
+                        {copied ? (
+                          <>
+                            <Check className="w-4 h-4" />
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-4 h-4" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-[#747474] text-xs">
+                    Share this link with your peers. When they sign up using your link, they'll become part of your referral network.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Stats Section */}
+            {referralLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3771FE]"></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="border border-[#B5C9FC] rounded-[10px] p-6 bg-[#F4F7FF]">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 bg-[#3771FE]/10 rounded-full flex items-center justify-center">
+                      <svg className="w-6 h-6 text-[#3771FE]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm text-[#747474]">People Referred</p>
+                      <p className="text-2xl font-semibold text-[#223258]">{referralStats.totalReferred}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border border-[#B5C9FC] rounded-[10px] p-6 bg-[#F4F7FF]">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 bg-[#17B26A]/10 rounded-full flex items-center justify-center">
+                      <svg className="w-6 h-6 text-[#17B26A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm text-[#747474]">Active Users</p>
+                      <p className="text-2xl font-semibold text-[#223258]">{referralStats.activeUsers}</p>
+                    </div>
                   </div>
                 </div>
               </div>

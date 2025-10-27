@@ -11,6 +11,15 @@ import { CookieConsentBanner } from "@/components/CookieConsentBanner"
 function SignUpContent() {
   const searchParams = useSearchParams()
   const [showDeletedMessage, setShowDeletedMessage] = useState(false)
+  const [referralCode, setReferralCode] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Get referral code from URL if present
+    const ref = searchParams.get('ref')
+    if (ref) {
+      setReferralCode(ref)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     const deletedParam = searchParams.get('deleted')
@@ -88,7 +97,7 @@ function SignUpContent() {
         {/* Sign Up Form */}
         <div className="w-full max-w-[95%] sm:max-w-[85%] md:max-w-md flex flex-col items-center">
           <div className="bg-[#F4F7FF] rounded-[5px] shadow-sm border-[#3771FE]/50 border-2 p-3 sm:p-5 md:p-6 lg:p-8 w-full">
-            <SignUpForm />
+            <SignUpForm referralCode={referralCode} />
           </div>
 
           {/* Terms and Privacy */}
