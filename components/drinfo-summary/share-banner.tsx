@@ -46,7 +46,7 @@ export function ShareBanner({
             <img src="/banner.svg" alt="Banner" className="w-full h-auto object-cover rounded-2xl" />
         </div>
         
-        <p className="font-['DM_Sans'] text-center max-w-md lg:max-w-lg mx-auto text-base md:text-lg lg:text-2xl leading-6 lg:leading-8" style={{ letterSpacing: '0%', fontWeight: '500', color: '#181D27' }}>
+        <p className="font-['DM_Sans'] text-center max-w-[90%] mx-auto text-base md:text-lg lg:text-2xl leading-6 lg:leading-8" style={{ letterSpacing: '0%', fontWeight: '500', color: '#181D27' }}>
           Empower your peers with trusted, evidence-based insights from DR. INFO.
         </p>
         
