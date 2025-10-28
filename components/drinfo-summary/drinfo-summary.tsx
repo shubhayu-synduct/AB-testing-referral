@@ -394,8 +394,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
 
   // Share banner logic
   useEffect(() => {
-    // Show banner only during 'summarizing' phase (Generating Precision Answer) and user hasn't dismissed it
-    if (isLoading && status === 'summarizing' && !bannerDismissed && messages.length > 0) {
+    // Show banner as soon as loading starts (when question is asked) assist doesn't dismissed it
+    if (isLoading && !bannerDismissed && messages.length > 0) {
       // Add a 2-second delay before showing the banner
       const timer = setTimeout(() => {
         setShowShareBanner(true);
@@ -405,7 +405,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     } else {
       setShowShareBanner(false);
     }
-  }, [isLoading, status, bannerDismissed, messages.length]);
+  }, [isLoading, bannerDismissed, messages.length]);
 
   // Hide banner when content starts appearing
   useEffect(() => {

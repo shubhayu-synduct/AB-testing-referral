@@ -36,22 +36,23 @@ export function ShareBanner({
   return (
     <div className="w-full flex justify-center">
       <div 
-        className="text-gray-800 shadow-xl border border-gray-200 flex flex-col w-full max-w-[90%] sm:max-w-[615px] h-auto rounded-[24px] p-5 gap-3 md:gap-6 relative"
+        className="text-gray-800 shadow-xl border border-gray-200 flex flex-col w-full max-w-[90%] sm:max-w-[615px] h-auto rounded-[24px] p-3 lg:p-4 gap-2 md:gap-3 relative"
         style={{
           background: 'linear-gradient(358.48deg, #FFFFFF -1.72%, #E2EAFF 103.93%)'
         }}
       >
         {/* Banner Image */}
         <div className="flex justify-center">
-            <img src="/banner.svg" alt="Banner" className="w-full h-auto object-cover rounded-2xl" />
+            <img src="/banner.svg" alt="Banner" className="w-full h-auto object-cover rounded-2xl max-h-[150px] sm:max-h-[180px] lg:hidden" />
+            <img src="/share-banner-image.svg" alt="Banner" className="w-full h-auto object-cover rounded-2xl max-h-[150px] sm:max-h-[180px] hidden lg:block" />
         </div>
         
-        <p className="font-['DM_Sans'] text-center max-w-[90%] mx-auto text-base md:text-lg lg:text-2xl leading-6 lg:leading-8" style={{ letterSpacing: '0%', fontWeight: '500', color: '#181D27' }}>
+        <p className="font-['DM_Sans'] text-center max-w-[90%] mx-auto text-lg lg:text-xl leading-6 lg:leading-7" style={{ letterSpacing: '0%', fontWeight: '500', color: '#181D27' }}>
           Empower your peers with trusted, evidence-based insights from DR. INFO.
         </p>
         
         {/* Share Link Section */}
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <h3 className="text-left font-['DM_Sans'] text-sm md:text-base" style={{ fontWeight: '500', color: '#475569' }}>
             Share app link
           </h3>
@@ -84,7 +85,7 @@ export function ShareBanner({
           </div>
         </div>
         
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <h3 className="text-left font-['DM_Sans'] text-sm md:text-base" style={{ fontWeight: '500', color: '#475569' }}>
             Share to
           </h3>
@@ -121,16 +122,10 @@ export function ShareBanner({
         <div>
           <button
             onClick={onShare}
-            className="w-full transition-colors duration-200 flex items-center justify-center text-sm md:text-base"
+            className="w-full transition-colors duration-200 flex items-center justify-center text-sm md:text-base underline"
             style={{
               fontFamily: 'Inter',
               fontWeight: '400',
-              lineHeight: '24px',
-              letterSpacing: '0%',
-              textDecoration: 'underline',
-              textDecorationStyle: 'solid',
-              textDecorationOffset: '0%',
-              textDecorationThickness: '0%',
               color: '#214398'
             }}
           >
