@@ -1870,18 +1870,18 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     return wordCount > 200 && isLastMessage && isStreamingComplete && isNotInstantMode;
   };
 
-  // Function to download SVG as PNG
+  // Function to download SVG as PNG at high resolution (400 DPI)
   const downloadSvgAsPng = (svgContent: string, filename: string = 'generated-image') => {
     try {
       // Create a temporary container for the SVG
       const container = document.createElement('div');
       container.innerHTML = svgContent;
       const svgElement = container.querySelector('svg');
-      
-          if (!svgElement) {
-      // console.error('No SVG element found in content');
-      return;
-    }
+
+      if (!svgElement) {
+        // console.error('No SVG element found in content');
+        return;
+      }
 
       // Set SVG dimensions if not already set
       if (!svgElement.getAttribute('width') || !svgElement.getAttribute('height')) {
@@ -1900,17 +1900,27 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       const img = new Image();
 
       img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        
+        // Calculate dimensions for 400 DPI (assuming 96 DPI screen)
+        const dpiScale = 400 / 96;
+        const scaledWidth = img.width * dpiScale;
+        const scaledHeight = img.height * dpiScale;
+
+        // Set canvas dimensions for high DPI
+        canvas.width = scaledWidth;
+        canvas.height = scaledHeight;
+
         if (ctx) {
+          // Enable high quality rendering
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+
           // Draw white background
           ctx.fillStyle = 'white';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          
-          // Draw the image
-          ctx.drawImage(img, 0, 0);
-          
+          ctx.fillRect(0, 0, scaledWidth, scaledHeight);
+
+          // Draw the image scaled for 400 DPI
+          ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+
           // Convert to PNG and download
           canvas.toBlob((blob) => {
             if (blob) {
@@ -1925,7 +1935,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
             }
           }, 'image/png');
         }
-        
+
         URL.revokeObjectURL(svgUrl);
       };
 
