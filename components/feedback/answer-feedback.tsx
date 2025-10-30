@@ -8,6 +8,7 @@ import { MovingBorder } from "@/components/ui/moving-border";
 import { cn } from "@/lib/utils";
 import { logger } from '@/lib/logger';
 import { track } from '@/lib/analytics';
+import { convert } from 'html-to-text';
 
 interface Citation {
   title: string;
@@ -266,14 +267,76 @@ export default function AnswerFeedback({
   };
 
   const handleCopyText = async () => {
-    if (!answerText) return;
+    if (!answerText || !messageId) return;
     
     setIsCopying(true);
     
     try {
-
-      // Function to convert markdown to clean text while preserving citation numbers as superscript
+      // Extract HTML directly from the rendered DOM element
+      const answerElement = document.getElementById(`answer-content-${messageId}`);
+      
+      let extractedText = '';
+      
+      if (answerElement) {
+        // Clone to avoid modifying original
+        const cloned = answerElement.cloneNode(true) as HTMLElement;
+        const htmlContent = cloned.innerHTML;
+        
+        // Convert HTML to formatted text using html-to-text (formatters API not available in v9)
+        try {
+          extractedText = convert(htmlContent, {
+            wordwrap: false,
+            preserveNewlines: true,
+            selectors: [
+            {
+              selector: 'h1, h2, h3, h4, h5, h6',
+              options: {
+                uppercase: false,
+                trailingLineBreaks: 2,
+                leadingLineBreaks: 2
+              }
+            },
+            {
+              selector: 'ul, ol',
+              options: {
+                itemPrefix: '',
+                leadingLineBreaks: 1,
+                trailingLineBreaks: 1
+              }
+            },
+            {
+              selector: 'li',
+              options: {
+                itemPrefix: '• ',
+                leadingLineBreaks: 1,
+                trailingLineBreaks: 1
+              }
+            },
+            {
+              selector: 'p',
+              options: {
+                leadingLineBreaks: 1,
+                trailingLineBreaks: 1
+              }
+            }
+          ]
+          });
+          
+          // Clean up excessive line breaks
+          extractedText = extractedText.replace(/\n{3,}/g, '\n\n');
+        } catch (convertError) {
+          logger.error('Error converting HTML to text:', convertError);
+          extractedText = answerText || '';
+        }
+      } else {
+        // Fallback: use original markdown approach if DOM element not found
+        logger.warn('Answer content DOM element not found, using fallback');
+        extractedText = answerText;
+      }
+      
+      // Legacy function (kept as fallback but simplified)
       const convertMarkdownToCleanText = (markdown: string): string => {
+        if (!markdown) return '';
         let cleanText = markdown;
         
         // Convert citation markers like [1], [2], [1,2,3] to superscript numbers
@@ -289,9 +352,6 @@ export default function AnswerFeedback({
           ).join('');
         });
         
-        // Convert headers to plain text while preserving structure
-        cleanText = cleanText.replace(/^#{1,6}\s+(.+)$/gm, '\n$1\n');
-        
         // Convert bold text (**text** or __text__) - preserve the emphasis with formatting
         cleanText = cleanText.replace(/\*\*(.*?)\*\*/g, '$1');
         cleanText = cleanText.replace(/__(.*?)__/g, '$1');
@@ -300,24 +360,154 @@ export default function AnswerFeedback({
         cleanText = cleanText.replace(/\*(.*?)\*/g, '$1');
         cleanText = cleanText.replace(/_(.*?)_/g, '$1');
         
-        // Convert bullet points while preserving indentation
-        cleanText = cleanText.replace(/^(\s*)[\*\-\+]\s+/gm, '$1• ');
+        // Process content with heading tracking and proper indentation
+        const lines = cleanText.split('\n');
+        const processedLines: string[] = [];
+        let currentHeadingLevel = -1; // Track if we're inside a heading section (-1 = no heading)
+        let currentListIndentation = ''; // Track current list item indentation for continuation lines
+        let previousWasListItem = false; // Track if previous processed line was a list item
         
-        // Convert numbered lists while preserving indentation and numbers
-        cleanText = cleanText.replace(/^(\s*)(\d+)\.\s+/gm, '$1$2. ');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const trimmedLine = line.trim();
+          
+          // Check for headings
+          const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+          if (headingMatch) {
+            const headingLevel = headingMatch[1].length; // Number of # symbols
+            const headingText = headingMatch[2];
+            currentHeadingLevel = headingLevel;
+            currentListIndentation = '';
+            previousWasListItem = false;
+            processedLines.push(`\n${headingText}\n`);
+            continue;
+          }
+          
+          // Check for bullet points: * - or +
+          const bulletMatch = line.match(/^(\s*)([\*\-\+])\s+(.+)$/);
+          if (bulletMatch) {
+            const leadingSpaces = bulletMatch[1];
+            const content = bulletMatch[3];
+            // Calculate list hierarchy level: every 2 spaces = 1 level, minimum 0
+            const listLevel = Math.floor(leadingSpaces.length / 2);
+            
+            // When under a heading, first-level items (listLevel 0 or 1) should get 1 tab total
+            // Nested items (listLevel > 1) should get 1 tab for heading + (listLevel - 1) tabs for nesting
+            let tabs = '';
+            if (currentHeadingLevel >= 0) {
+              // Under heading: first level gets 1 tab, nested gets additional tabs
+              if (listLevel <= 1) {
+                tabs = '\t'; // Just 1 tab for first-level items under heading
+              } else {
+                tabs = '\t' + '\t'.repeat(listLevel - 1); // 1 heading tab + (listLevel - 1) nesting tabs
+              }
+            } else {
+              // No heading: use list level directly
+              tabs = '\t'.repeat(listLevel);
+            }
+            
+            currentListIndentation = tabs;
+            previousWasListItem = true;
+            processedLines.push(`${tabs}• ${content}`);
+            continue;
+          }
+          
+          // Check for numbered lists: 1. 2. 3. etc.
+          const numberedMatch = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
+          if (numberedMatch) {
+            const leadingSpaces = numberedMatch[1];
+            const number = numberedMatch[2];
+            const content = numberedMatch[3];
+            // Calculate list hierarchy level: every 2 spaces = 1 level
+            const listLevel = Math.floor(leadingSpaces.length / 2);
+            
+            // When under a heading, first-level items (listLevel 0 or 1) should get 1 tab total
+            // Nested items (listLevel > 1) should get 1 tab for heading + (listLevel - 1) tabs for nesting
+            let tabs = '';
+            if (currentHeadingLevel >= 0) {
+              // Under heading: first level gets 1 tab, nested gets additional tabs
+              if (listLevel <= 1) {
+                tabs = '\t'; // Just 1 tab for first-level items under heading
+              } else {
+                tabs = '\t' + '\t'.repeat(listLevel - 1); // 1 heading tab + (listLevel - 1) nesting tabs
+              }
+            } else {
+              // No heading: use list level directly
+              tabs = '\t'.repeat(listLevel);
+            }
+            
+            currentListIndentation = tabs;
+            previousWasListItem = true;
+            processedLines.push(`${tabs}${number}. ${content}`);
+            continue;
+          }
+          
+          // Check for empty lines
+          if (trimmedLine.length === 0) {
+            if (processedLines.length > 0 && processedLines[processedLines.length - 1].trim() !== '') {
+              processedLines.push('');
+            }
+            // Don't reset previousWasListItem on empty lines - they might be paragraph breaks
+            continue;
+          }
+          
+          // Handle continuation lines and regular text
+          let processedLine = trimmedLine.replace(/[ ]{2,}/g, ' '); // Clean up multiple spaces
+          
+          // Primary check: If we have list context (previous was list item), treat as continuation
+          const shouldIndentAsContinuation = previousWasListItem && currentListIndentation;
+          
+          if (shouldIndentAsContinuation && trimmedLine.length > 0) {
+            // This is a continuation line of a list item - use the same indentation level
+            // Align with the content of the list item (list indentation + tab for bullet/number space)
+            processedLine = currentListIndentation + '\t' + processedLine;
+            // CRITICAL: Keep previousWasListItem true so ALL subsequent continuation lines also get indented
+            // This ensures multi-line wrapped text maintains proper indentation
+            previousWasListItem = true; // Maintain continuation chain
+            // Also keep currentListIndentation for nested continuations
+          } else if (currentHeadingLevel >= 0 && !previousWasListItem && trimmedLine.length > 0) {
+            // Regular text line after a heading (not in a list), indent it
+            processedLine = '\t' + processedLine;
+            previousWasListItem = false;
+            currentListIndentation = '';
+          } else if (trimmedLine.length > 0) {
+            // Check if this is a clear new section (would break continuation)
+            const previousLine = processedLines.length > 0 ? processedLines[processedLines.length - 1] : '';
+            const looksLikeNewSection = /^[A-Z][^a-z]*:/.test(trimmedLine) && previousLine.trim() === '';
+            
+            if (looksLikeNewSection) {
+              // Clear break - reset context
+              previousWasListItem = false;
+              currentListIndentation = '';
+            } else if (previousWasListItem && currentListIndentation) {
+              // Still in continuation context (e.g., after empty line) - apply indentation
+              processedLine = currentListIndentation + '\t' + processedLine;
+              previousWasListItem = true; // Keep chain alive
+            } else {
+              // Not a continuation - reset context
+              previousWasListItem = false;
+              currentListIndentation = '';
+            }
+          }
+          
+          processedLines.push(processedLine);
+        }
+        
+        cleanText = processedLines.join('\n');
         
         // Clean up excessive line breaks but preserve paragraph separation
         cleanText = cleanText.replace(/\n{4,}/g, '\n\n\n'); // Limit to max 3 line breaks
         cleanText = cleanText.replace(/\n\s*\n\s*\n\s*\n/g, '\n\n\n'); // Clean up spacing
         
-        // Clean up multiple spaces but preserve intentional spacing
-        cleanText = cleanText.replace(/[ \t]{2,}/g, ' '); // Only reduce multiple spaces/tabs to single space
+        // Clean up multiple spaces but preserve tabs (don't replace tabs)
+        cleanText = cleanText.replace(/[ ]{2,}/g, ' '); // Only reduce multiple spaces to single space, preserve tabs
         
         // Trim the entire text but preserve internal structure
         return cleanText.trim();
       };
       
-      const cleanText = convertMarkdownToCleanText(answerText);
+      // Use extracted text from DOM, or fallback to markdown conversion
+      const cleanText = extractedText || convertMarkdownToCleanText(answerText);
       
       // Add citations if available
       let answerWithCitations = cleanText;

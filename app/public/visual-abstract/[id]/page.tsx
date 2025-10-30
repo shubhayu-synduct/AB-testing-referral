@@ -79,53 +79,80 @@ export default function PublicVisualAbstractPage({ params }: { params: Promise<{
 
   // Function to download SVG as PNG
   const downloadAsPNG = async (svgData: string, filename: string) => {
-    return new Promise<void>((resolve, reject) => {
+    try {
+      // Create a temporary container for the SVG
+      const container = document.createElement('div')
+      container.innerHTML = svgData
+      const svgElement = container.querySelector('svg')
+      
+      if (!svgElement) {
+        logger.error('No SVG element found in content')
+        return
+      }
+
+      // Set SVG dimensions if not already set
+      if (!svgElement.getAttribute('width') || !svgElement.getAttribute('height')) {
+        svgElement.setAttribute('width', '800')
+        svgElement.setAttribute('height', '600')
+      }
+
+      // Convert SVG to data URL using XMLSerializer
+      const svgDataSerialized = new XMLSerializer().serializeToString(svgElement)
+      const svgBlob = new Blob([svgDataSerialized], { type: 'image/svg+xml;charset=utf-8' })
+      const svgUrl = URL.createObjectURL(svgBlob)
+
+      // Create canvas to convert SVG to PNG
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')
       const img = new Image()
-      
+
       img.onload = () => {
         // Calculate dimensions for 400 DPI (assuming 96 DPI screen)
         const dpiScale = 400 / 96
         const scaledWidth = img.width * dpiScale
         const scaledHeight = img.height * dpiScale
         
-        // Set canvas dimensions for high DPI
         canvas.width = scaledWidth
         canvas.height = scaledHeight
         
-        // Enable high quality rendering
-        ctx!.imageSmoothingEnabled = true
-        ctx!.imageSmoothingQuality = 'high'
-        
-        // Draw the image scaled for 400 DPI
-        ctx?.drawImage(img, 0, 0, scaledWidth, scaledHeight)
-        
-        // Convert to PNG and download
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = filename
-            document.body.appendChild(a)
-            a.click()
-            document.body.removeChild(a)
-            URL.revokeObjectURL(url)
-            resolve()
-          } else {
-            reject(new Error('Failed to create PNG blob'))
-          }
-        }, 'image/png')
+        if (ctx) {
+          // Enable high quality rendering
+          ctx.imageSmoothingEnabled = true
+          ctx.imageSmoothingQuality = 'high'
+          
+          // Draw white background
+          ctx.fillStyle = 'white'
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
+          
+          // Draw the image scaled for 400 DPI
+          ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight)
+          
+          // Convert to PNG and download
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `${filename}.png`
+              document.body.appendChild(a)
+              a.click()
+              document.body.removeChild(a)
+              URL.revokeObjectURL(url)
+              URL.revokeObjectURL(svgUrl)
+            }
+          }, 'image/png')
+        }
       }
-      
-      img.onerror = () => reject(new Error('Failed to load SVG image'))
-      
-      // Convert SVG to data URL
-      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
-      const url = URL.createObjectURL(svgBlob)
-      img.src = url
-    })
+
+      img.onerror = () => {
+        logger.error('Failed to load SVG image')
+        URL.revokeObjectURL(svgUrl)
+      }
+
+      img.src = svgUrl
+    } catch (error) {
+      logger.error('Error downloading SVG as PNG:', error)
+    }
   }
 
   if (loading) {
@@ -171,13 +198,14 @@ export default function PublicVisualAbstractPage({ params }: { params: Promise<{
       <div className="bg-[#F9FAFB] min-h-screen">
         <div className="max-w-5xl mx-auto px-4 py-4 md:py-8 mt-0 md:mt-16 relative">
           {/* Header */}
-          <div className="flex flex-col md:flex-row justify-center items-center mb-0 md:mb-[20px]">
+          <div className="flex flex-col md:flex-row justify-center items-center mb-0 md:mb-[32px]">
             <div className="text-center mb-4 md:mb-0">
               <h1 
                 className="hidden md:block text-black mb-[4px] mt-0"
                 style={{ 
                   fontFamily: 'DM Sans', 
                   fontWeight: '600', 
+                  fontStyle: 'normal',
                   fontSize: '20px', 
                   lineHeight: '24px', 
                   letterSpacing: '0%' 
@@ -214,19 +242,20 @@ export default function PublicVisualAbstractPage({ params }: { params: Promise<{
                 style={{ 
                   fontFamily: 'DM Sans', 
                   fontWeight: '400', 
+                  fontStyle: 'normal',
                   fontSize: '14px', 
                   lineHeight: '24px', 
                   letterSpacing: '0%',
                   color: '#919191'
                 }}
               >
-                Created: {formatTimestamp(visualAbstract?.svg.timestamp)}
+                {formatTimestamp(visualAbstract?.svg.timestamp)}
               </span>
             </div>
           </div>
 
           {/* Call to Action */}
-          <div className="text-center mt-8 px-4">
+          <div className="text-center mt-8">
             <div className="bg-white rounded-lg p-4 md:p-6 w-full max-w-[1000px] mx-auto">
               <h3 
                 className="mb-2"

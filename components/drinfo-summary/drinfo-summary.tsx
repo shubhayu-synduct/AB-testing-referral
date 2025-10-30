@@ -2677,6 +2677,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                   ) : (
                                     // Render text content as before
                                     <div
+                                      id={`answer-content-${msg.id}`}
+                                      data-message-id={msg.id}
                                       className="prose prose-slate prose-ul:text-black marker:text-black max-w-none text-base sm:text-base prose-h2:text-base prose-h2:font-semibold prose-h3:text-base prose-h3:font-semibold drinfo-answer-content"
                                       style={{ fontFamily: 'DM Sans, sans-serif' }}
                                       dangerouslySetInnerHTML={{
