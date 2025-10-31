@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useSearchParams, useRouter } from "next/navigation";
 import { CleanupService } from "@/lib/cleanup-service";
 import { track } from "@/lib/analytics";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Linkedin, Mail, Share2 } from "lucide-react";
 import { isQualifiedForIncentive } from "@/lib/signup-integration";
 import { logger } from "@/lib/logger";
 
@@ -1819,18 +1819,18 @@ function ProfilePageContent() {
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-white mb-2">Earn 1 Month Premium Free!</h3>
                   <p className="text-white/90 text-sm mb-4">
-                    Refer 5 people to DR. INFO and get a free month of premium subscription as a thank you for spreading the word.
+                    Refer 3 people to DR. INFO and get a free month of premium subscription as a thank you for spreading the word.
                   </p>
                   {/* Progress Bar */}
                   <div className="mb-2">
                     <div className="flex justify-between text-xs text-white/80 mb-1">
-                      <span>{referralStats.activeUsers} of 5 active users</span>
-                      <span>{Math.min(100, (referralStats.activeUsers / 5) * 100).toFixed(0)}%</span>
+                      <span>{referralStats.activeUsers} of 3 active users</span>
+                      <span>{Math.min(100, (referralStats.activeUsers / 3) * 100).toFixed(0)}%</span>
                     </div>
                     <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-white rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(100, (referralStats.activeUsers / 5) * 100)}%` }}
+                        style={{ width: `${Math.min(100, (referralStats.activeUsers / 3) * 100)}%` }}
                       />
                     </div>
                   </div>
@@ -1934,8 +1934,77 @@ function ProfilePageContent() {
                       </button>
                     </div>
                   </div>
-                  <div className="text-[#747474] text-xs">
+                  <div className="text-[#747474] text-xs mb-4">
                     Share this link with your peers. When they sign up using your link, they'll become part of your referral network.
+                  </div>
+                  
+                  {/* Share Options */}
+                  <div className="flex flex-wrap gap-3">
+                    {/* WhatsApp */}
+                    <button
+                      onClick={() => {
+                        const message = `Join DR. INFO using my referral link: ${referralLink}`;
+                        const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+                        window.open(url, '_blank');
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-[#25D366] text-white rounded-[8px] font-medium hover:bg-[#20BA5A] transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                      </svg>
+                      <span>WhatsApp</span>
+                    </button>
+                    
+                    {/* LinkedIn */}
+                    <button
+                      onClick={() => {
+                        const message = `Join DR. INFO using my referral link: ${referralLink}`;
+                        const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referralLink)}&summary=${encodeURIComponent(message)}`;
+                        window.open(url, '_blank');
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-[#0077B5] text-white rounded-[8px] font-medium hover:bg-[#005885] transition-colors"
+                    >
+                      <Linkedin className="w-5 h-5" />
+                      <span>LinkedIn</span>
+                    </button>
+                    
+                    {/* Email */}
+                    <button
+                      onClick={() => {
+                        const subject = 'Join DR. INFO - Referral Link';
+                        const body = `Join DR. INFO using my referral link: ${referralLink}`;
+                        const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                        window.open(url);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-[#214498] text-white rounded-[8px] font-medium hover:bg-[#1A3577] transition-colors"
+                    >
+                      <Mail className="w-5 h-5" />
+                      <span>Email</span>
+                    </button>
+                    
+                    {/* More Share Options - Native Share API */}
+                    {typeof navigator !== 'undefined' && navigator.share && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            await navigator.share({
+                              title: 'Join DR. INFO',
+                              text: `Join DR. INFO using my referral link: ${referralLink}`,
+                              url: referralLink,
+                            });
+                          } catch (error) {
+                            // User cancelled or share failed
+                            if ((error as any).name !== 'AbortError') {
+                              console.error('Error sharing:', error);
+                            }
+                          }
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-[#747474] text-white rounded-[8px] font-medium hover:bg-[#5A5A5A] transition-colors"
+                      >
+                        <Share2 className="w-5 h-5" />
+                        <span>More Share Options</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

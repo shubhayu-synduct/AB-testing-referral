@@ -25,6 +25,7 @@ interface AnswerFeedbackProps {
   conversationId: string;
   threadId: string;
   answerText?: string;
+  questionText?: string; // Add question text prop
   citations?: Record<string, Citation>;
   onReload?: () => void;
   isReloading?: boolean;
@@ -44,6 +45,7 @@ export default function AnswerFeedback({
   conversationId, 
   threadId, 
   answerText = '',
+  questionText = '',
   citations = {},
   onReload,
   isReloading,
@@ -582,13 +584,32 @@ export default function AnswerFeedback({
         }
       }
       
-      // Format the final text with link and answer
+      // Format the final text according to user requirements:
+      // Link to the whole conversation - [Link]
+      // Question (in bold)
+      // [Insert queried question]
+      // Answer (in bold)
+      // [Insert answer along with citation]
+      
       let finalText = '';
+      
+      // Add link to conversation
       if (publicLink) {
-        finalText = `Link to the answer in DR. INFO: ${publicLink}\n\n${answerWithCitations}`;
-      } else {
-        finalText = answerWithCitations;
+        finalText += `Link to the whole conversation - ${publicLink}\n\n`;
       }
+      
+      // Add Question section
+      if (questionText) {
+        // Remove the "Create a visual abstract" special case text if present
+        const cleanQuestion = questionText.includes('Create a visual abstract for this answer::::::') 
+          ? 'Create a visual abstract for this answer' 
+          : questionText;
+        finalText += `**Question**\n${cleanQuestion}\n\n`;
+      }
+      
+      // Add Answer section
+      finalText += `**Answer**\n`;
+      finalText += `${answerWithCitations}`;
       
       await navigator.clipboard.writeText(finalText);
       setCopied(true);

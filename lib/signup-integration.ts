@@ -253,17 +253,65 @@ export async function isQualifiedForIncentive(userId: string) {
       }
     }
     
-    // Check if qualified (>= 5 total referred AND >= 5 active users)
-    const isQualified = totalReferred >= 5 && activeUsers >= 5;
+    // Check if qualified (>= 5 total referred AND >= 3 active users)
+    const isQualified = totalReferred >= 5 && activeUsers >= 3;
+    
+    // Check if user was already qualified before (to avoid granting subscription multiple times)
+    const wasAlreadyQualified = userData.referralQualified === true;
     
     // Update Firebase if qualified
     if (isQualified) {
-      await updateDoc(userRef, {
-        referralQualified: true,
-        referralTotalReferred: totalReferred,
-        referralActiveUsers: activeUsers
-      });
-      logger.info(`User ${userId} is now qualified for incentive`);
+      // Calculate 1 month from now for subscription expiry - using same logic as Stripe webhook
+      // currentPeriodEnd should be a timestamp in milliseconds, not an ISO string
+      const now = new Date();
+      const expiryDate = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate()).getTime();
+      
+      // Check current subscription status - don't overwrite existing paid subscriptions
+      const currentSubscriptionTier = userData.subscriptionTier || 'free';
+      const currentSubscription = userData.subscription || {};
+      
+      // Check if user has an active paid subscription (has checkoutSessionId from Stripe)
+      // Support both 'clinician' and 'student' paid subscriptions
+      const hasActivePaidSubscription = (currentSubscriptionTier === 'clinician' || currentSubscriptionTier === 'student') && 
+                                        currentSubscription.status === 'active' && 
+                                        !currentSubscription.cancelAtPeriodEnd &&
+                                        currentSubscription.checkoutSessionId; // Paid subscriptions have checkoutSessionId
+      
+      // Grant clinician subscription if:
+      // 1. User was not already qualified (first time qualifying)
+      // 2. User doesn't have an active paid subscription (don't overwrite paid subscriptions)
+      if (!wasAlreadyQualified && !hasActivePaidSubscription) {
+        // Grant 1 month of clinician subscription as reward - matching structure from Stripe purchase
+        await updateDoc(userRef, {
+          referralQualified: true,
+          referralTotalReferred: totalReferred,
+          referralActiveUsers: activeUsers,
+          subscriptionTier: 'clinician',
+          subscription: {
+            status: 'active',
+            currentPeriodEnd: expiryDate, // Timestamp in milliseconds (same as Stripe)
+            plan: 'clinician', // Match the subscriptionTier
+            interval: 'monthly', // Use 'monthly' not 'month' (same as Stripe)
+            cancelAtPeriodEnd: false,
+            source: 'referral_incentive', // Track that this is from referral reward
+            updatedAt: new Date().toISOString()
+          },
+          updatedAt: new Date().toISOString()
+        });
+        logger.info(`User ${userId} is now qualified for incentive and has been granted 1 month of clinician subscription`);
+      } else {
+        // Already qualified or has paid subscription - just update the qualification status
+        await updateDoc(userRef, {
+          referralQualified: true,
+          referralTotalReferred: totalReferred,
+          referralActiveUsers: activeUsers
+        });
+        if (wasAlreadyQualified) {
+          logger.info(`User ${userId} is already qualified for incentive`);
+        } else {
+          logger.info(`User ${userId} is qualified but already has an active paid subscription`);
+        }
+      }
     } else {
       // Update stats even if not qualified yet
       await updateDoc(userRef, {
