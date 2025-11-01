@@ -130,3 +130,89 @@ export const trackConversion = (conversionId: string, value?: number, currency?:
     currency: currency,
   })
 }
+
+// ===== USER-ID TRACKING =====
+// Set User-ID for cross-session tracking (GDPR compliant - uses pseudonymous Firebase UID)
+export const setUserId = (userId: string) => {
+  if (typeof window === 'undefined') return
+
+  // Set User-ID in GA4 configuration
+  window.gtag('config', GA_TRACKING_ID, {
+    user_id: userId,
+  })
+
+  // Also set as a custom parameter for additional flexibility
+  window.gtag('set', 'user_properties', {
+    user_id: userId,
+  })
+
+  console.log('[GA4] User-ID set:', userId)
+}
+
+// Clear User-ID on logout (privacy best practice)
+export const clearUserId = () => {
+  if (typeof window === 'undefined') return
+
+  // Clear User-ID by setting it to undefined
+  window.gtag('config', GA_TRACKING_ID, {
+    user_id: undefined,
+  })
+
+  // Clear user properties
+  window.gtag('set', 'user_properties', {
+    user_id: undefined,
+  })
+
+  console.log('[GA4] User-ID cleared')
+}
+
+// Set custom user properties for segmentation
+export const setUserProperties = (properties: Record<string, any>) => {
+  if (typeof window === 'undefined') return
+
+  // Filter out null/undefined values
+  const cleanedProperties = Object.entries(properties).reduce((acc, [key, value]) => {
+    if (value !== null && value !== undefined) {
+      acc[key] = value
+    }
+    return acc
+  }, {} as Record<string, any>)
+
+  // Set user properties in GA4
+  window.gtag('set', 'user_properties', cleanedProperties)
+
+  console.log('[GA4] User properties set:', cleanedProperties)
+}
+
+// Helper to set all user data at once (User-ID + Properties)
+export const setUserData = (userId: string, properties?: Record<string, any>) => {
+  if (typeof window === 'undefined') return
+
+  // Set User-ID
+  setUserId(userId)
+
+  // Set additional properties if provided
+  if (properties && Object.keys(properties).length > 0) {
+    setUserProperties(properties)
+  }
+}
+
+// Clear all user data (User-ID + Properties)
+export const clearUserData = () => {
+  if (typeof window === 'undefined') return
+
+  clearUserId()
+
+  // Clear all user properties by setting them to undefined
+  window.gtag('set', 'user_properties', {
+    is_medical_professional: undefined,
+    specialty: undefined,
+    subscription_status: undefined,
+    subscription_tier: undefined,
+    onboarding_completed: undefined,
+    account_age_days: undefined,
+    country: undefined,
+  })
+
+  console.log('[GA4] All user data cleared')
+}

@@ -2,6 +2,10 @@ import { track as vercelTrack } from '@vercel/analytics'
 import { trackGA4Event, trackEngagement, trackSearch, trackLogin, trackSignUp } from './gtag'
 import { doc, getDoc } from 'firebase/firestore'
 import { getFirebaseFirestore } from './firebase'
+import { updateUserProperty } from './ga-user-tracking'
+
+// Export the updateUserProperty function for easy access
+export { updateUserProperty }
 
 // Function that requires userId parameter
 export const checkUserCookieConsent = async (userId: string) => {

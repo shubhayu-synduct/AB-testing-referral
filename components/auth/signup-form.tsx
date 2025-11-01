@@ -252,6 +252,9 @@ export function SignUpForm() {
     // Track general signup attempt
     track.signUpAttempted('microsoft', 'microsoft')
     
+    // Track user signup initiated
+    track.userSignupInitiated('microsoft', 'microsoft', true)
+    
     try {
       const { signInWithPopup } = await import("firebase/auth")
       const { doc, getDoc, setDoc } = await import("firebase/firestore")
