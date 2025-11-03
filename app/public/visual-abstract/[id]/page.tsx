@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { getFirebaseFirestore } from '@/lib/firebase'
 import { doc, getDoc } from 'firebase/firestore'
-import { Download, Calendar, X } from 'lucide-react'
+import { Download, Calendar } from 'lucide-react'
 import { PublicLayout } from '@/components/dashboard/public-layout'
 import { logger } from '@/lib/logger'
 
@@ -24,7 +24,6 @@ export default function PublicVisualAbstractPage({ params }: { params: Promise<{
   const [visualAbstract, setVisualAbstract] = useState<PublicVisualAbstractData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showModal, setShowModal] = useState(false)
 
   useEffect(() => {
     const loadPublicVisualAbstract = async () => {
@@ -289,7 +288,7 @@ export default function PublicVisualAbstractPage({ params }: { params: Promise<{
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <button
-                  onClick={() => setShowModal(true)}
+                  onClick={() => window.open('https://www.drinfo.ai/', '_blank')}
                   className="px-4 md:px-6 py-3 rounded-lg transition-colors duration-200 w-full sm:w-auto"
                   style={{ 
                     backgroundColor: '#E7E7E7', 
@@ -322,60 +321,6 @@ export default function PublicVisualAbstractPage({ params }: { params: Promise<{
           </div>
         </div>
       </div>
-
-      {/* Learn More Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg p-8 max-w-md mx-4 relative">
-            {/* Close Button */}
-            <button
-              onClick={() => setShowModal(false)}
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 transition-colors duration-200"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            
-            {/* Modal Content */}
-            <div className="text-center">
-              <h2 
-                className="text-2xl font-semibold mb-4"
-                style={{ 
-                  fontFamily: 'DM Sans', 
-                  fontWeight: '600', 
-                  color: '#0F172A'
-                }}
-              >
-                What is DR.INFO?
-              </h2>
-              
-              <p 
-                className="text-lg mb-6"
-                style={{ 
-                  fontFamily: 'DM Sans', 
-                  fontWeight: '400', 
-                  color: '#64748B',
-                  lineHeight: '28px'
-                }}
-              >
-                Tools that deliver clear, evidence-based answers when you need them.
-              </p>
-              
-              <button
-                onClick={() => window.open('https://app.drinfo.ai', '_blank')}
-                className="px-8 py-3 rounded-lg font-medium transition-colors duration-200 text-white"
-                style={{ 
-                  backgroundColor: '#3771FE',
-                  fontFamily: 'DM Sans', 
-                  fontWeight: '600', 
-                  fontSize: '16px'
-                }}
-              >
-                VISIT NOW
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </PublicLayout>
   )
 }

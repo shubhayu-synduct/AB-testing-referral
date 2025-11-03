@@ -585,7 +585,9 @@ export default function AnswerFeedback({
       }
       
       // Format the final text according to user requirements:
-      // Link to the whole conversation - [Link]
+      // Link to the answer in DR. INFO: [Link]
+      // --open new paragraph--
+      // DR. INFO description
       // Question (in bold)
       // [Insert queried question]
       // Answer (in bold)
@@ -593,10 +595,13 @@ export default function AnswerFeedback({
       
       let finalText = '';
       
-      // Add link to conversation
+      // Add link to answer in DR. INFO
       if (publicLink) {
-        finalText += `Link to the whole conversation - ${publicLink}\n\n`;
+        finalText += `Link to the answer in DR. INFO: ${publicLink}\n\n`;
       }
+      
+      // Add DR. INFO description (always included)
+      finalText += `DR. INFO is an AI-powered online tool delivering cited, guideline-based answers for clinicians and students in seconds.\n\n`;
       
       // Add Question section
       if (questionText) {
