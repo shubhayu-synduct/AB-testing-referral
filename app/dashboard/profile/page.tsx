@@ -781,13 +781,14 @@ function ProfilePageContent() {
           >
             Subscription
           </button>
-          <button
+          {/* Referral Tab - COMMENTED OUT */}
+          {/* <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'referral' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
             onClick={() => handleTabChange('referral')}
           >
             Referral
-          </button>
+          </button> */}
           {/* <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'feedback' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
@@ -1802,13 +1803,14 @@ function ProfilePageContent() {
           </div>
         )}
 
-        {/* Referral Tab Content */}
+        {/* Referral Tab Content - COMMENTED OUT */}
+        {/*
         {activeTab === 'referral' && (
           <div>
             <h2 className="text-xl font-regular text-[#000000] mb-1">Referral Program</h2>
             <p className="text-[#747474] text-sm mb-6">Share DR. INFO with your peers and earn rewards</p>
             
-            {/* Incentive Banner */}
+            Incentive Banner
             <div className="mb-6 p-6 bg-gradient-to-r from-[#3771FE] to-[#2A5CDB] rounded-[10px] text-white">
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0 w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
@@ -1821,7 +1823,7 @@ function ProfilePageContent() {
                   <p className="text-white/90 text-sm mb-4">
                     Refer 3 people to DR. INFO and get a free month of premium subscription as a thank you for spreading the word.
                   </p>
-                  {/* Progress Bar */}
+                  Progress Bar
                   <div className="mb-2">
                     <div className="flex justify-between text-xs text-white/80 mb-1">
                       <span>{referralStats.activeUsers} of 3 active users</span>
@@ -1838,7 +1840,7 @@ function ProfilePageContent() {
               </div>
             </div>
 
-            {/* Generate Link Section */}
+            Generate Link Section
             <div className="border border-[#B5C9FC] rounded-[10px] p-6 bg-[#F4F7FF] mb-6">
               <h3 className="text-lg font-medium text-[#223258] mb-4">Your Referral Link</h3>
               
@@ -1938,9 +1940,9 @@ function ProfilePageContent() {
                     Share this link with your peers. When they sign up using your link, they'll become part of your referral network.
                   </div>
                   
-                  {/* Share Options */}
+                  Share Options
                   <div className="flex flex-wrap gap-3">
-                    {/* WhatsApp */}
+                    WhatsApp
                     <button
                       onClick={() => {
                         const message = `Join DR. INFO using my referral link: ${referralLink}`;
@@ -1955,7 +1957,7 @@ function ProfilePageContent() {
                       <span>WhatsApp</span>
                     </button>
                     
-                    {/* LinkedIn */}
+                    LinkedIn
                     <button
                       onClick={() => {
                         const message = `Join DR. INFO using my referral link: ${referralLink}`;
@@ -1968,7 +1970,7 @@ function ProfilePageContent() {
                       <span>LinkedIn</span>
                     </button>
                     
-                    {/* Email */}
+                    Email
                     <button
                       onClick={() => {
                         const subject = 'Join DR. INFO - Referral Link';
@@ -1982,7 +1984,7 @@ function ProfilePageContent() {
                       <span>Email</span>
                     </button>
                     
-                    {/* More Share Options - Native Share API */}
+                    More Share Options - Native Share API
                     {typeof navigator !== 'undefined' && navigator.share && (
                       <button
                         onClick={async () => {
@@ -2010,7 +2012,7 @@ function ProfilePageContent() {
               )}
             </div>
 
-            {/* Stats Section */}
+            Stats Section
             {referralLoading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3771FE]"></div>
@@ -2048,6 +2050,7 @@ function ProfilePageContent() {
             )}
           </div>
         )}
+        */}
 
         {/* Feedback Tab Content */}
         {/* {activeTab === 'feedback' && (
