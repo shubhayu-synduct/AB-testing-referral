@@ -8,6 +8,7 @@ import { getSessionCookie, setSessionCookie, clearSessionCookie } from "@/lib/au
 import { VerificationModal } from "@/components/auth/verification-modal"
 import { logger } from "@/lib/logger"
 import { CleanupService } from "@/lib/cleanup-service"
+import { fetchAndSetUserProperties, clearGA4UserTracking } from "@/lib/ga-user-tracking"
 
 type AuthContextType = {
   user: User | null
@@ -110,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const authUnsubscribe = onAuthStateChanged(auth, async (user) => {
           if (!mounted) return
-          
+
           // If a user is detected, it's a login or session restoration.
           // Clear any pending logout timer.
           if (user) {
@@ -119,11 +120,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               clearTimeout(logoutTimer.current)
               logoutTimer.current = null
             }
-            
+
             logger.authLog(`Auth state changed: User logged in (ID: ${user.uid})`)
             globalThis.__authUser = user
             setUser(user)
-            
+
             // Only mark as fresh sign-in if this is NOT the initial load
             if (!initialLoad) {
               logger.authLog("Fresh sign-in detected")
@@ -131,10 +132,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
               logger.authLog("Session restored from existing auth")
             }
-            
+
             const currentSession = getSessionCookie()
             if (!currentSession || currentSession.uid !== user.uid) {
               await setSessionCookie(user)
+            }
+
+            // ===== GA4 USER-ID TRACKING =====
+            // Set User-ID and User Properties in GA4 for individual user tracking
+            // This enables user journey analysis, cohort segmentation, and behavioral insights
+            try {
+              await fetchAndSetUserProperties(user)
+              logger.authLog(`[GA4] User tracking set for: ${user.uid}`)
+            } catch (error) {
+              logger.error("[GA4] Error setting user tracking:", error)
             }
           } else {
             // If user is null, it could be a real logout or a Fast Refresh blip.
@@ -147,9 +158,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               clearSessionCookie()
               logoutTimer.current = null
               setFreshSignIn(false) // Reset fresh sign-in flag on logout
+
+              // ===== GA4 USER-ID CLEARING =====
+              // Clear User-ID and User Properties on logout (privacy best practice)
+              try {
+                clearGA4UserTracking()
+                logger.authLog("[GA4] User tracking cleared on logout")
+              } catch (error) {
+                logger.error("[GA4] Error clearing user tracking:", error)
+              }
             }, 3000) // Increased debounce delay to 3 seconds to handle cross-tab operations
           }
-          
+
           globalThis.__authLoading = false
           setLoading(false)
           initialLoad = false // Mark that initial load is complete

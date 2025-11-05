@@ -104,6 +104,9 @@ export function SignUpForm({ referralCode }: SignUpFormProps) {
     setError("")
     setLoading(true)
     
+    // Track specific email signup attempt
+    track.signupAttemptedUsingEmail(email)
+    
     // Track signup initiation
     track.userSignupInitiated('email', undefined, !!email)
 
@@ -178,6 +181,10 @@ export function SignUpForm({ referralCode }: SignUpFormProps) {
   const handleGoogleSignUp = async () => {
     setError("")
     setLoading(true)
+    
+    // Track specific Google signup attempt
+    track.signupAttemptedUsingGoogle()
+    
     // Track signup initiation
     track.userSignupInitiated('google', 'google', true)
     
@@ -272,7 +279,15 @@ export function SignUpForm({ referralCode }: SignUpFormProps) {
   const handleMicrosoftSignUp = async () => {
     setError("")
     setLoading(true)
+    
+    // Track specific Microsoft signup attempt
+    track.signupAttemptedUsingMicrosoft()
+    
+    // Track general signup attempt
     track.signUpAttempted('microsoft', 'microsoft')
+    
+    // Track user signup initiated
+    track.userSignupInitiated('microsoft', 'microsoft', true)
     
     try {
       const { signInWithPopup } = await import("firebase/auth")

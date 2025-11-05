@@ -594,54 +594,87 @@ export default function LibraryPage() {
     }
   }
 
-  // Helper function to convert SVG to PNG and download at 400 DPI
+  // Helper function to convert SVG to PNG and download at 400 DPI with robust parsing
   const downloadAsPNG = async (svgData: string, filename: string) => {
     return new Promise<void>((resolve, reject) => {
-      const canvas = document.createElement('canvas')
-      const ctx = canvas.getContext('2d')
-      const img = new Image()
-      
-      img.onload = () => {
-        // Calculate dimensions for 400 DPI (assuming 96 DPI screen)
-        const dpiScale = 400 / 96
-        const scaledWidth = img.width * dpiScale
-        const scaledHeight = img.height * dpiScale
-        
-        // Set canvas dimensions for high DPI
-        canvas.width = scaledWidth
-        canvas.height = scaledHeight
-        
-        // Enable high quality rendering
-        ctx!.imageSmoothingEnabled = true
-        ctx!.imageSmoothingQuality = 'high'
-        
-        // Draw the image scaled for 400 DPI
-        ctx?.drawImage(img, 0, 0, scaledWidth, scaledHeight)
-        
-        // Convert to PNG and download
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = filename
-            document.body.appendChild(a)
-            a.click()
-            document.body.removeChild(a)
-            URL.revokeObjectURL(url)
-            resolve()
-          } else {
-            reject(new Error('Failed to create PNG blob'))
+      try {
+        // Create a temporary container for the SVG
+        const container = document.createElement('div')
+        container.innerHTML = svgData
+        const svgElement = container.querySelector('svg')
+
+        if (!svgElement) {
+          reject(new Error('No SVG element found in content'))
+          return
+        }
+
+        // Set SVG dimensions if not already set
+        if (!svgElement.getAttribute('width') || !svgElement.getAttribute('height')) {
+          svgElement.setAttribute('width', '800')
+          svgElement.setAttribute('height', '600')
+        }
+
+        // Convert SVG to data URL
+        const svgString = new XMLSerializer().serializeToString(svgElement)
+        const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' })
+        const svgUrl = URL.createObjectURL(svgBlob)
+
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        const img = new Image()
+
+        img.onload = () => {
+          // Calculate dimensions for 400 DPI (assuming 96 DPI screen)
+          const dpiScale = 400 / 96
+          const scaledWidth = img.width * dpiScale
+          const scaledHeight = img.height * dpiScale
+
+          // Set canvas dimensions for high DPI
+          canvas.width = scaledWidth
+          canvas.height = scaledHeight
+
+          if (ctx) {
+            // Enable high quality rendering
+            ctx.imageSmoothingEnabled = true
+            ctx.imageSmoothingQuality = 'high'
+
+            // Draw white background
+            ctx.fillStyle = 'white'
+            ctx.fillRect(0, 0, scaledWidth, scaledHeight)
+
+            // Draw the image scaled for 400 DPI
+            ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight)
           }
-        }, 'image/png')
+
+          // Convert to PNG and download
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = filename
+              document.body.appendChild(a)
+              a.click()
+              document.body.removeChild(a)
+              URL.revokeObjectURL(url)
+              URL.revokeObjectURL(svgUrl)
+              resolve()
+            } else {
+              URL.revokeObjectURL(svgUrl)
+              reject(new Error('Failed to create PNG blob'))
+            }
+          }, 'image/png')
+        }
+
+        img.onerror = () => {
+          URL.revokeObjectURL(svgUrl)
+          reject(new Error('Failed to load SVG image'))
+        }
+
+        img.src = svgUrl
+      } catch (error) {
+        reject(error)
       }
-      
-      img.onerror = () => reject(new Error('Failed to load SVG image'))
-      
-      // Convert SVG to data URL
-      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
-      const url = URL.createObjectURL(svgBlob)
-      img.src = url
     })
   }
 

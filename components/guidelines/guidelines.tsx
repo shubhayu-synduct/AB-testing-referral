@@ -7,7 +7,7 @@ import GuidelineSummaryModal from './guideline-summary-modal'
 import GuidelineSummaryMobileModal from './guideline-summary-mobile-modal'
 import { useAuth } from '@/hooks/use-auth'
 import { getFirebaseFirestore } from '@/lib/firebase'
-import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore'
 import { logger } from '@/lib/logger'
 import { track } from '@/lib/analytics'
 
@@ -129,6 +129,55 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
     router.replace(newUrl, { scroll: false })
   }, [router, searchParams])
 
+  // Function to save guideline query to Firebase
+  const saveGuidelineQuery = useCallback(async (query: string) => {
+    if (!user?.uid) return;
+
+    try {
+      const db = getFirebaseFirestore();
+      const userQueryRef = doc(db, "guideline_queries", user.uid);
+
+      // Check if document exists
+      const userQueryDoc = await getDoc(userQueryRef);
+
+      if (userQueryDoc.exists()) {
+        // Update existing document - add new query to queries array
+        const existingData = userQueryDoc.data();
+        const queries = existingData.queries || [];
+
+        // Check if query already exists (avoid duplicates)
+        const queryExists = queries.some((q: any) => q.query === query);
+
+        if (!queryExists) {
+          const newQuery = {
+            query: query,
+            timestamp: Date.now(),
+            lastUpdated: new Date().toISOString()
+          };
+
+          await updateDoc(userQueryRef, {
+            queries: arrayUnion(newQuery),
+            lastUpdated: new Date().toISOString()
+          });
+        }
+      } else {
+        // Create new document
+        const newQuery = {
+          query: query,
+          timestamp: Date.now(),
+          lastUpdated: new Date().toISOString()
+        };
+
+        await updateDoc(userQueryRef, {
+          queries: [newQuery],
+          lastUpdated: new Date().toISOString()
+        });
+      }
+    } catch (error) {
+      logger.error('Error saving guideline query:', error);
+    }
+  }, [user]);
+
   // Function to get search results
   const getSearchResults = useCallback(async (query: string, country: string, specialties: string[], otherSpecialty: string): Promise<Guideline[]> => {
     try {
@@ -144,12 +193,12 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
           otherSpecialty: otherSpecialty
         })
       })
-      
+
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || `Search failed with status: ${response.status}`)
       }
-      
+
       const data = await response.json()
       return Array.isArray(data) ? data : []
     } catch (error) {
@@ -269,16 +318,21 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
     try {
       setIsLoading(true);
       setError(null);
-      
+
+      // Save guideline query to Firebase
+      if (user && query.trim()) {
+        await saveGuidelineQuery(query.trim());
+      }
+
       // Track search performed
       if (user) {
         track.guidelinesSearchPerformed(query, user.uid, 'guidelines');
       }
-      
+
       const results = await getSearchResults(query, country, specialties, otherSpecialty);
       setGuidelines(results);
       setRetryCount(0);
-      
+
       // Track search results loaded
       // if (user) {
       //   if (results.length > 0) {
@@ -291,7 +345,7 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
       logger.error('Error performing search:', err);
       setError(err.message || 'Search failed. Please try again.');
       setGuidelines([]);
-      
+
       // Track search error
       // if (user) {
       //   track.guidelinesSearchError(query, err.message || 'Search failed', user.uid, 'guidelines');
@@ -299,7 +353,7 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
     } finally {
       setIsLoading(false);
     }
-  }, [getSearchResults, user]);
+  }, [getSearchResults, user, saveGuidelineQuery]);
 
   // Separate effect to handle search parameter changes without re-fetching user profile
   useEffect(() => {
@@ -415,7 +469,12 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
     setHasSearched(true)
     setShowBookmarks(false)
     setLastSearchQuery(term)
-    
+
+    // Save popular search query to Firebase
+    if (user && term.trim()) {
+      await saveGuidelineQuery(term.trim());
+    }
+
     // Get the current user's otherSpecialty from the profile
     let otherSpecialty = '';
     if (user) {
@@ -430,10 +489,10 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
         // Ignore error, continue without otherSpecialty
       }
     }
-    
+
     // Update URL parameters
     updateUrlParams(term, true)
-    
+
     // Perform search
     await performSearch(term, userCountry, userSpecialties, otherSpecialty)
   }
@@ -447,11 +506,16 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
       updateUrlParams('', false)
       return
     }
-    
+
     setHasSearched(true)
     setShowBookmarks(false)
     setLastSearchQuery(searchTerm)
-    
+
+    // Save search query to Firebase
+    if (user && searchTerm.trim()) {
+      await saveGuidelineQuery(searchTerm.trim());
+    }
+
     // Get the current user's otherSpecialty from the profile
     let otherSpecialty = '';
     if (user) {
@@ -466,10 +530,10 @@ export default function Guidelines({ initialGuidelines = [] }: GuidelinesProps) 
         // Ignore error, continue without otherSpecialty
       }
     }
-    
+
     // Update URL parameters
     updateUrlParams(searchTerm, true)
-    
+
     // Perform search
     await performSearch(searchTerm, userCountry, userSpecialties, otherSpecialty)
   }

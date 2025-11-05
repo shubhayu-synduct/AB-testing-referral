@@ -1,12 +1,45 @@
 "use client"
 
 import type React from "react"
-import { Suspense } from "react"
+import { useEffect, Suspense } from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { track } from "@vercel/analytics"
 import { SignInForm } from "@/components/auth/signin-form"
 
 export default function SignIn() {
+  // Track landing on the login page (GA if available, otherwise Vercel Analytics)
+  useEffect(() => {
+    try {
+      const page_location = typeof window !== 'undefined' ? window.location.href : 'https://app.drinfo.ai/login'
+      const page_path = '/login'
+      const page_title = 'Login'
+
+      // Prefer Google Analytics (gtag) if present
+      const gtag = (typeof window !== 'undefined' && (window as any).gtag) ? (window as any).gtag : null
+      if (typeof gtag === 'function') {
+        gtag('event', 'app_login_page', {
+          page_location,
+          page_path,
+          page_title,
+        })
+      } else if (typeof window !== 'undefined' && Array.isArray((window as any).dataLayer)) {
+        // Fallback for GTM dataLayer if used
+        ;(window as any).dataLayer.push({
+          event: 'app_login_page',
+          page_location,
+          page_path,
+          page_title,
+        })
+      } else {
+        // Final fallback to Vercel Analytics
+        track('app_login_page', { page_location, page_path, page_title })
+      }
+    } catch (err) {
+      // Silently ignore tracking errors
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-2 sm:p-4 font-['DM_Sans']">
       <div className="w-full max-w-[95%] sm:max-w-[85%] md:max-w-[75%] lg:max-w-[60%] flex flex-col items-center justify-center">

@@ -5,6 +5,7 @@ import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
+import { track } from "@vercel/analytics"
 import { SignUpForm } from "@/components/auth/signup-form"
 import { CookieConsentBanner } from "@/components/CookieConsentBanner"
 
@@ -20,6 +21,38 @@ function SignUpContent() {
       setReferralCode(ref)
     }
   }, [searchParams])
+
+  // Track landing on the signup page (GA if available, otherwise Vercel Analytics)
+  useEffect(() => {
+    try {
+      const page_location = typeof window !== 'undefined' ? window.location.href : 'https://app.drinfo.ai/signup'
+      const page_path = '/signup'
+      const page_title = 'Sign Up'
+
+      // Prefer Google Analytics (gtag) if present
+      const gtag = (typeof window !== 'undefined' && (window as any).gtag) ? (window as any).gtag : null
+      if (typeof gtag === 'function') {
+        gtag('event', 'app_signup_page', {
+          page_location,
+          page_path,
+          page_title,
+        })
+      } else if (typeof window !== 'undefined' && Array.isArray((window as any).dataLayer)) {
+        // Fallback for GTM dataLayer if used
+        ;(window as any).dataLayer.push({
+          event: 'app_signup_page',
+          page_location,
+          page_path,
+          page_title,
+        })
+      } else {
+        // Final fallback to Vercel Analytics
+        track('app_signup_page', { page_location, page_path, page_title })
+      }
+    } catch (err) {
+      // Silently ignore tracking errors
+    }
+  }, [])
 
   useEffect(() => {
     const deletedParam = searchParams.get('deleted')
