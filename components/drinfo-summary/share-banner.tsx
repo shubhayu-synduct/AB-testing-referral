@@ -9,6 +9,7 @@ interface ShareBannerProps {
   onShareWhatsApp: () => void
   onShareLinkedIn: () => void
   onShareEmail: () => void
+  variant?: 'blue' | 'green' // A/B testing variant
 }
 
 export function ShareBanner({
@@ -17,7 +18,8 @@ export function ShareBanner({
   onShare,
   onShareWhatsApp,
   onShareLinkedIn,
-  onShareEmail
+  onShareEmail,
+  variant = 'blue' // Default to blue variant
 }: ShareBannerProps) {
   const [copied, setCopied] = React.useState(false)
   
@@ -33,12 +35,22 @@ export function ShareBanner({
   
   if (!isVisible) return null
 
+  // Define background gradients for each variant
+  const backgroundGradient = variant === 'green' 
+    ? 'linear-gradient(358.48deg, #FFFFFF -1.72%, #E2FFE2 103.93%)' // Green variant
+    : 'linear-gradient(358.48deg, #FFFFFF -1.72%, #E2EAFF 103.93%)' // Blue variant (default)
+  
+  // Console log to verify gradient is being applied
+  console.log('[ShareBanner] Rendering with variant:', variant)
+  console.log('[ShareBanner] Applied gradient:', backgroundGradient)
+  console.log('[ShareBanner] You should see a', variant === 'green' ? 'GREEN' : 'BLUE', 'tinted background')
+
   return (
     <div className="w-full flex justify-center">
       <div 
         className="text-gray-800 shadow-xl border border-gray-200 flex flex-col w-full max-w-[90%] sm:max-w-[600px] h-auto rounded-[24px] px-3 py-5 lg:px-4 lg:py-8 gap-5 md:gap-3 relative"
         style={{
-          background: 'linear-gradient(358.48deg, #FFFFFF -1.72%, #E2EAFF 103.93%)'
+          background: backgroundGradient
         }}
       >
         <p className="font-['DM_Sans'] text-center max-w-[80%] mx-auto text-lg leading-6" style={{ letterSpacing: '0%', fontWeight: '500', color: '#181D27' }}>

@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { clearSessionCookie, getSessionCookie } from "@/lib/auth-service"
 import { SidebarHistory } from "./sidebar-history"
+import InviteColleaguesCard from "./invite-colleagues-card"
 import { useAuth } from '@/hooks/use-auth'
 import { doc, getDoc } from 'firebase/firestore'
 import { getFirebaseFirestore } from '@/lib/firebase'
@@ -406,8 +407,16 @@ export function Sidebar({ isOpen, setIsOpen, onSignupRequired }: SidebarProps) {
             </div>
           )}
 
+          {/* Spacer when sidebar is closed to push content to bottom */}
+          {!isOpen && <div className="flex-1"></div>}
+
+          {/* Invite Colleagues Card - Above Profile Section */}
+          <div className="w-full p-2">
+            <InviteColleaguesCard isOpen={isOpen} />
+          </div>
+
           {/* Profile Section (always at bottom) */}
-          <div className="mt-auto w-full p-2 border-t border-gray-200">
+          <div className="w-full p-2 border-t border-gray-200">
             <div className="relative">
               <button
                 onClick={() => {

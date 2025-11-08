@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, Suspense } from "react";
 import { unstable_noStore as noStore } from 'next/cache';
-import { doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { getFirebaseAuth, getFirebaseFirestore } from "@/lib/firebase";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { useAuth } from "@/hooks/use-auth";
@@ -12,6 +12,9 @@ import { track } from "@/lib/analytics";
 import { Copy, Check, Linkedin, Mail, Share2 } from "lucide-react";
 import { isQualifiedForIncentive } from "@/lib/signup-integration";
 import { logger } from "@/lib/logger";
+import { useExperiment, useStatsigClient } from "@statsig/react-bindings";
+import ReferralTab from "@/ReferralTab";
+import ReferralBTab from "@/ReferralBTab";
 
 
 function ProfilePageContent() {
@@ -22,7 +25,7 @@ function ProfilePageContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'subscription' | 'feedback' | 'referral'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'subscription' | 'feedback' | 'referralAB'>('profile');
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('yearly');
   const [currentSubscription, setCurrentSubscription] = useState<any>(null);
   const [planLoading, setPlanLoading] = useState(false);
@@ -65,10 +68,83 @@ function ProfilePageContent() {
   const [referralStats, setReferralStats] = useState({
     totalReferred: 0,
     activeUsers: 0,
-    qualified: false
+    qualified: false,
+    monthsEarned: 0
   });
   const [referralLoading, setReferralLoading] = useState(false);
   const [generatingCode, setGeneratingCode] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [referrals, setReferrals] = useState<any[]>([]);
+
+  // Statsig A/B testing for referral sections color variant
+  const referralExperiment = useExperiment('referral_sections_variant')
+  
+  // Statsig A/B testing for referral dashboard variant (A vs B)
+  const referralDashboardExperiment = useExperiment('referral_dashboard_variant')
+  const statsigClient = useStatsigClient()
+  
+  // Debug: Log the full experiment object to see what Statsig returns
+  console.log('[Referral Sections Debug] Full experiment object:', JSON.stringify(referralExperiment, null, 2))
+  console.log('[Referral Sections Debug] Experiment value:', JSON.stringify(referralExperiment.value, null, 2))
+  
+  // Get color variant from experiment - no fallback, only use Statsig value
+  const referralColorObj = referralExperiment.get('section_color') as { variant?: string } | string | undefined
+  
+  // Debug: Log the raw section_color value and its type
+  console.log('[Referral Sections Debug] section_color raw value:', referralColorObj)
+  console.log('[Referral Sections Debug] section_color type:', typeof referralColorObj)
+  console.log('[Referral Sections Debug] section_color JSON:', JSON.stringify(referralColorObj, null, 2))
+  
+  // Extract the variant value from the object structure - only from Statsig, no fallback
+  let referralColor: string | null = null
+  if (typeof referralColorObj === 'string') {
+    referralColor = referralColorObj
+  } else if (referralColorObj && typeof referralColorObj === 'object' && 'variant' in referralColorObj) {
+    referralColor = referralColorObj.variant || null
+  }
+  
+  // Only set variant if we have a valid color from Statsig - no fallback
+  const referralVariant: 'blue' | 'green' | null = referralColor === 'green' ? 'green' : referralColor === 'blue' ? 'blue' : null
+  
+  // Define background colors for each section based on variant
+  const getSectionBackground = (variant: 'blue' | 'green' | null) => {
+    if (!variant) return 'bg-[#F4F7FF]' // Default blue background
+    return variant === 'green' ? 'bg-[#F4FFF4]' : 'bg-[#F4F7FF]' // Green or blue background
+  }
+  
+  const getIncentiveBannerGradient = (variant: 'blue' | 'green' | null) => {
+    if (!variant) return 'bg-gradient-to-r from-[#3771FE] to-[#2A5CDB]' // Default blue gradient
+    return variant === 'green' 
+      ? 'bg-gradient-to-r from-[#17B26A] to-[#0F8A4F]' // Green gradient
+      : 'bg-gradient-to-r from-[#3771FE] to-[#2A5CDB]' // Blue gradient
+  }
+  
+  const sectionBackground = getSectionBackground(referralVariant)
+  const incentiveBannerGradient = getIncentiveBannerGradient(referralVariant)
+  
+  // Console log for debugging
+  if (referralVariant) {
+    console.log('[Referral Sections] Statsig variant:', referralVariant)
+    console.log('[Referral Sections] Section background class:', sectionBackground)
+    console.log('[Referral Sections] Incentive banner gradient:', incentiveBannerGradient)
+    console.log('[Referral Sections] You should see', referralVariant === 'green' ? 'GREEN' : 'BLUE', 'tinted sections')
+  } else {
+    console.log('[Referral Sections] No variant from Statsig - using default blue')
+    console.log('[Referral Sections Debug] Experiment name:', referralExperiment.name)
+    console.log('[Referral Sections Debug] Experiment groupName:', referralExperiment.groupName)
+    console.log('[Referral Sections Debug] Experiment value keys:', Object.keys(referralExperiment.value || {}))
+  }
+  
+  // Event tracking helper function
+  const trackReferralEvent = (eventName: string, metadata?: Record<string, any>) => {
+    if (statsigClient && referralVariant) {
+      statsigClient.logEvent(eventName, {
+        variant: referralVariant as string,
+        ...metadata
+      } as any)
+      console.log(`[Referral Tracking] Event logged: ${eventName}`, { variant: referralVariant, ...metadata })
+    }
+  }
 
   // Occupation and Specialties options
   const occupationOptions = [
@@ -136,8 +212,8 @@ function ProfilePageContent() {
       setActiveTab('preferences');
     } else if (tabParam === 'profile') {
       setActiveTab('profile');
-    } else if (tabParam === 'referral') {
-      setActiveTab('referral');
+    } else if (tabParam === 'referralAB') {
+      setActiveTab('referralAB');
     }
     
     // Check if payment was cancelled
@@ -194,19 +270,22 @@ function ProfilePageContent() {
             setOriginalCookiePreferences(preferences);
           }
           
-          // Set referral data from Firebase
+          // Set referral data from Firebase (only code and link, stats will come from qualification function)
           const userData = docSnap.data();
           if (userData.referralCode) {
             const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
             const fullLink = `${baseUrl}/signup?ref=${userData.referralCode}`;
             setReferralCode(userData.referralCode);
             setReferralLink(fullLink);
+            // Don't set stats from cached values - they will be loaded from database via qualification function
+            // Only set monthsEarned from user document as it's a separate counter
             setReferralStats({
-              totalReferred: userData.referralTotalReferred || 0,
-              activeUsers: userData.referralActiveUsers || 0,
-              qualified: userData.referralQualified || false
+              totalReferred: 0, // Will be updated by qualification function
+              activeUsers: 0, // Will be updated by qualification function
+              qualified: false, // Will be updated by qualification function
+              monthsEarned: userData.referralMonthsEarned || 0
             });
-            console.log('Referral data loaded:', { code: userData.referralCode, link: fullLink, stats: referralStats });
+            console.log('Referral code and link loaded:', { code: userData.referralCode, link: fullLink });
           } else {
             console.log('No referral code found in Firebase');
           }
@@ -253,21 +332,106 @@ function ProfilePageContent() {
     }
   }, [preferencesSuccess]);
 
+  // Fetch referrals data
+  const fetchReferrals = async (userId: string) => {
+    try {
+      const db = getFirebaseFirestore();
+      const referralsRef = collection(db, "referrals");
+      const q = query(referralsRef, where("referrerUserId", "==", userId));
+      const referralsSnapshot = await getDocs(q);
+      
+      const referralsList: any[] = [];
+      
+      for (const referralDoc of referralsSnapshot.docs) {
+        const referralData = referralDoc.data();
+        const referredUserId = referralData.referredUserId;
+        
+        // Get referred user's data
+        const referredUserRef = doc(db, "users", referredUserId);
+        const referredUserDoc = await getDoc(referredUserRef);
+        
+        if (referredUserDoc.exists()) {
+          const referredUserData = referredUserDoc.data();
+          const profileData = referredUserData.profile || {};
+          const questionsAsked = referredUserData.total_questions_asked || 0;
+          
+          referralsList.push({
+            id: referralDoc.id,
+            name: `${profileData.firstName || ''} ${profileData.lastName || ''}`.trim() || 'Anonymous User',
+            questionsAsked: questionsAsked,
+            isComplete: questionsAsked >= 3 // 3+ questions makes them qualified
+          });
+        }
+      }
+      
+      return referralsList;
+    } catch (error) {
+      logger.error('Error fetching referrals:', error);
+      return [];
+    }
+  };
+
+  // Get referral dashboard variant from Statsig
+  const dashboardVariantObj = referralDashboardExperiment.get('dashboard_variant') as { variant?: string } | string | undefined
+  
+  // Extract the variant value from the object structure
+  let dashboardVariant: string | null = null
+  if (typeof dashboardVariantObj === 'string') {
+    dashboardVariant = dashboardVariantObj
+  } else if (dashboardVariantObj && typeof dashboardVariantObj === 'object' && 'variant' in dashboardVariantObj) {
+    dashboardVariant = dashboardVariantObj.variant || null
+  }
+  
+  // Determine which dashboard to show (A or B)
+  // Default to 'A' if Statsig doesn't return a value
+  const showDashboardVariant: 'A' | 'B' = dashboardVariant === 'B' ? 'B' : 'A'
+  
+  // Console log for debugging
+  console.log('[Referral Dashboard] Statsig variant:', showDashboardVariant)
+  console.log('[Referral Dashboard] Raw value:', dashboardVariantObj)
+  console.log('[Referral Dashboard] Extracted variant:', dashboardVariant)
+
   // Check referral qualification when referral tab is opened
   useEffect(() => {
     const checkReferralQualification = async () => {
-      if (!user || !activeTab || activeTab !== 'referral') return;
+      if (!user || !activeTab || activeTab !== 'referralAB') return;
       
       setReferralLoading(true);
       
       try {
-        const userId = user.uid || user.id;
-        const result = await isQualifiedForIncentive(userId);
+        const userId = user.uid;
         
-        setReferralStats({
+        // Call qualification function to get fresh data from database
+        const result = await isQualifiedForIncentive(userId);
+        console.log('[Referral Stats] Qualification function result from database:', {
           totalReferred: result.totalReferred,
           activeUsers: result.activeUsers,
-          qualified: result.isQualified
+          isQualified: result.isQualified
+        });
+        
+        // Fetch referrals data
+        const referralsList = await fetchReferrals(userId);
+        setReferrals(referralsList);
+        
+        // Get monthsEarned from user document
+        const db = getFirebaseFirestore();
+        const userRef = doc(db, "users", userId);
+        const userDoc = await getDoc(userRef);
+        const monthsEarned = userDoc.exists() ? (userDoc.data().referralMonthsEarned || 0) : 0;
+        
+        // Set stats from database query results
+        setReferralStats({
+          totalReferred: result.totalReferred, // From database: count of referrals collection
+          activeUsers: result.activeUsers, // From database: count of users with 3+ questions
+          qualified: result.isQualified, // From database: calculated qualification status
+          monthsEarned: monthsEarned
+        });
+        
+        console.log('[Referral Stats] Stats updated from database:', {
+          totalReferred: result.totalReferred,
+          activeUsers: result.activeUsers,
+          qualified: result.isQualified,
+          monthsEarned: monthsEarned
         });
         
         logger.info('Referral qualification checked:', result);
@@ -276,8 +440,10 @@ function ProfilePageContent() {
         setReferralStats({
           totalReferred: 0,
           activeUsers: 0,
-          qualified: false
+          qualified: false,
+          monthsEarned: 0
         });
+        setReferrals([]);
       } finally {
         setReferralLoading(false);
       }
@@ -482,12 +648,12 @@ function ProfilePageContent() {
     };
   };
 
-  const handleTabChange = (tab: 'profile' | 'preferences' | 'subscription' | 'feedback' | 'referral') => {
+  const handleTabChange = (tab: 'profile' | 'preferences' | 'subscription' | 'feedback' | 'referralAB') => {
     setActiveTab(tab);
     router.push(`/dashboard/profile?tab=${tab}`);
 
     // Track tab click (only for supported tabs)
-    if (user && tab !== 'feedback') {
+    if (user && tab !== 'feedback' && (tab === 'profile' || tab === 'preferences' || tab === 'subscription')) {
       track.profileTabClicked(tab, user.uid, 'profile');
     }
   };
@@ -785,14 +951,13 @@ function ProfilePageContent() {
           >
             Subscription
           </button>
-          {/* Referral Tab - COMMENTED OUT */}
-          {/* <button
+          <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
-              ${activeTab === 'referral' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
-            onClick={() => handleTabChange('referral')}
+              ${activeTab === 'referralAB' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
+            onClick={() => handleTabChange('referralAB')}
           >
             Referral
-          </button> */}
+          </button>
           {/* <button
             className={`px-3 py-2 rounded-[8px] border text-base font-medium transition-colors min-w-[100px]
               ${activeTab === 'feedback' ? 'border-[#223258] text-[#223258] bg-white' : 'border-[#AEAEAE] text-[#AEAEAE] bg-white'}`}
@@ -1807,254 +1972,50 @@ function ProfilePageContent() {
           </div>
         )}
 
-        {/* Referral Tab Content - COMMENTED OUT */}
-        {/*
-        {activeTab === 'referral' && (
-          <div>
-            <h2 className="text-xl font-regular text-[#000000] mb-1">Referral Program</h2>
-            <p className="text-[#747474] text-sm mb-6">Share DR. INFO with your peers and earn rewards</p>
-            
-            Incentive Banner
-            <div className="mb-6 p-6 bg-gradient-to-r from-[#3771FE] to-[#2A5CDB] rounded-[10px] text-white">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0 w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-white mb-2">Earn 1 Month Premium Free!</h3>
-                  <p className="text-white/90 text-sm mb-4">
-                    Refer 3 people to DR. INFO and get a free month of premium subscription as a thank you for spreading the word.
-                  </p>
-                  Progress Bar
-                  <div className="mb-2">
-                    <div className="flex justify-between text-xs text-white/80 mb-1">
-                      <span>{referralStats.activeUsers} of 3 active users</span>
-                      <span>{Math.min(100, (referralStats.activeUsers / 3) * 100).toFixed(0)}%</span>
-                    </div>
-                    <div className="w-full h-2 bg-white/20 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-white rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(100, (referralStats.activeUsers / 3) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            Generate Link Section
-            <div className="border border-[#B5C9FC] rounded-[10px] p-6 bg-[#F4F7FF] mb-6">
-              <h3 className="text-lg font-medium text-[#223258] mb-4">Your Referral Link</h3>
-              
-              {!referralLink ? (
-                <div>
-                  <p className="text-[#747474] text-sm mb-4">
-                    Generate your referral link to share with your peers and colleagues.
-                  </p>
-                  <button
-                    onClick={async () => {
-                      if (!user || !profile) return;
-                      
-                      setGeneratingCode(true);
-                      
-                      // Get user's first name from profile
-                      const firstName = profile.firstName || user.displayName?.split(' ')[0] || 'user';
-                      const first4Letters = firstName.substring(0, 4).toLowerCase().replace(/[^a-z]/g, '').padStart(4, 'user');
-                      
-                      // Generate unique random string (6 characters)
-                      const randomString = Math.random().toString(36).substr(2, 6);
-                      
-                      // Create referral code: first 4 letters of name + random string
-                      const newCode = `${first4Letters}${randomString}`;
-                      
-                      // Create full referral link
-                      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-                      const fullLink = `${baseUrl}/signup?ref=${newCode}`;
-                      
-                      try {
-                        // Save to Firebase
-                        const db = getFirebaseFirestore();
-                        const userRef = doc(db, "users", user.uid);
-                        await updateDoc(userRef, {
-                          referralCode: newCode,
-                          referralQualified: false,
-                          referralActiveUsers: 0,
-                          referralTotalReferred: 0
-                        });
-                        
-                        setReferralCode(newCode);
-                        setReferralLink(fullLink);
-                        setCopied(false);
-                      } catch (error) {
-                        console.error('Error generating referral code:', error);
-                        setError('Failed to generate referral code');
-                      } finally {
-                        setGeneratingCode(false);
-                      }
-                    }}
-                    disabled={generatingCode}
-                    className="px-6 py-3 bg-[#3771FE] text-white rounded-[8px] font-medium hover:bg-[#2A5CDB] transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {generatingCode ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        <span>Generating...</span>
-                      </>
-                    ) : (
-                      'Generate Referral Link'
-                    )}
-                  </button>
-                </div>
-              ) : (
-                <div>
-                  <div className="mb-4">
-                    <label className="block text-[#000000] mb-2 font-medium text-sm">Your Referral Link</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={referralLink}
-                        readOnly
-                        className="flex-1 border border-[#B5C9FC] rounded-[8px] px-4 py-2 bg-white text-[#223258] font-medium outline-none"
-                      />
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(referralLink);
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 2000);
-                        }}
-                        className="px-4 py-2 bg-[#3771FE] text-white rounded-[8px] font-medium hover:bg-[#2A5CDB] transition-colors flex items-center gap-2"
-                      >
-                        {copied ? (
-                          <>
-                            <Check className="w-4 h-4" />
-                            <span>Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-4 h-4" />
-                            <span>Copy</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="text-[#747474] text-xs mb-4">
-                    Share this link with your peers. When they sign up using your link, they'll become part of your referral network.
-                  </div>
-                  
-                  Share Options
-                  <div className="flex flex-wrap gap-3">
-                    WhatsApp
-                    <button
-                      onClick={() => {
-                        const message = `Join DR. INFO using my referral link: ${referralLink}`;
-                        const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
-                        window.open(url, '_blank');
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 bg-[#25D366] text-white rounded-[8px] font-medium hover:bg-[#20BA5A] transition-colors"
-                    >
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
-                      </svg>
-                      <span>WhatsApp</span>
-                    </button>
-                    
-                    LinkedIn
-                    <button
-                      onClick={() => {
-                        const message = `Join DR. INFO using my referral link: ${referralLink}`;
-                        const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referralLink)}&summary=${encodeURIComponent(message)}`;
-                        window.open(url, '_blank');
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 bg-[#0077B5] text-white rounded-[8px] font-medium hover:bg-[#005885] transition-colors"
-                    >
-                      <Linkedin className="w-5 h-5" />
-                      <span>LinkedIn</span>
-                    </button>
-                    
-                    Email
-                    <button
-                      onClick={() => {
-                        const subject = 'Join DR. INFO - Referral Link';
-                        const body = `Join DR. INFO using my referral link: ${referralLink}`;
-                        const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-                        window.open(url);
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 bg-[#214498] text-white rounded-[8px] font-medium hover:bg-[#1A3577] transition-colors"
-                    >
-                      <Mail className="w-5 h-5" />
-                      <span>Email</span>
-                    </button>
-                    
-                    More Share Options - Native Share API
-                    {typeof navigator !== 'undefined' && navigator.share && (
-                      <button
-                        onClick={async () => {
-                          try {
-                            await navigator.share({
-                              title: 'Join DR. INFO',
-                              text: `Join DR. INFO using my referral link: ${referralLink}`,
-                              url: referralLink,
-                            });
-                          } catch (error) {
-                            // User cancelled or share failed
-                            if ((error as any).name !== 'AbortError') {
-                              console.error('Error sharing:', error);
-                            }
-                          }
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 bg-[#747474] text-white rounded-[8px] font-medium hover:bg-[#5A5A5A] transition-colors"
-                      >
-                        <Share2 className="w-5 h-5" />
-                        <span>More Share Options</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            Stats Section
-            {referralLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3771FE]"></div>
-              </div>
+        {/* Referral Tab Content - A/B Testing */}
+        {activeTab === 'referralAB' && (
+          <>
+            {showDashboardVariant === 'B' ? (
+              <ReferralBTab
+                user={user}
+                profile={profile}
+                referralLink={referralLink}
+                setReferralLink={setReferralLink}
+                referralCode={referralCode}
+                setReferralCode={setReferralCode}
+                referralStats={referralStats}
+                referrals={referrals}
+                generatingCode={generatingCode}
+                setGeneratingCode={setGeneratingCode}
+                claiming={claiming}
+                setClaiming={setClaiming}
+                setSuccess={setSuccess}
+                setError={setError}
+                statsigClient={statsigClient}
+                dashboardVariant={showDashboardVariant}
+              />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="border border-[#B5C9FC] rounded-[10px] p-6 bg-[#F4F7FF]">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-12 h-12 bg-[#3771FE]/10 rounded-full flex items-center justify-center">
-                      <svg className="w-6 h-6 text-[#3771FE]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-sm text-[#747474]">People Referred</p>
-                      <p className="text-2xl font-semibold text-[#223258]">{referralStats.totalReferred}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border border-[#B5C9FC] rounded-[10px] p-6 bg-[#F4F7FF]">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-12 h-12 bg-[#17B26A]/10 rounded-full flex items-center justify-center">
-                      <svg className="w-6 h-6 text-[#17B26A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-sm text-[#747474]">Active Users</p>
-                      <p className="text-2xl font-semibold text-[#223258]">{referralStats.activeUsers}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <ReferralTab
+                user={user}
+                profile={profile}
+                referralLink={referralLink}
+                setReferralLink={setReferralLink}
+                referralCode={referralCode}
+                setReferralCode={setReferralCode}
+                referralStats={referralStats}
+                referrals={referrals}
+                generatingCode={generatingCode}
+                setGeneratingCode={setGeneratingCode}
+                claiming={claiming}
+                setClaiming={setClaiming}
+                setSuccess={setSuccess}
+                setError={setError}
+                statsigClient={statsigClient}
+                dashboardVariant={showDashboardVariant}
+              />
             )}
-          </div>
+          </>
         )}
-        */}
 
         {/* Feedback Tab Content */}
         {/* {activeTab === 'feedback' && (

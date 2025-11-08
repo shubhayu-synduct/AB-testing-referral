@@ -23,8 +23,9 @@ import { cn } from "@/lib/utils"
 import { logger } from '@/lib/logger'
 import { useDrinfoSummaryTour } from '@/components/TourContext'
 import { track } from '@/lib/analytics'
-// import { ShareBanner } from './share-banner' // COMMENTED OUT - waiting banner disabled
+import { ShareBanner } from './share-banner'
 import { toast } from 'sonner'
+import { useExperiment } from '@statsig/react-bindings'
 
 interface DrInfoSummaryProps {
   user: any;
@@ -244,9 +245,39 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
   const [questionCount, setQuestionCount] = useState(0)
   const [hasShownInitialModal, setHasShownInitialModal] = useState(false)
 
-  // Share banner state - COMMENTED OUT
-  // const [showShareBanner, setShowShareBanner] = useState(false)
-  // const [bannerDismissed, setBannerDismissed] = useState(false)
+  // Share banner state
+  const [showShareBanner, setShowShareBanner] = useState(false)
+  const [bannerDismissed, setBannerDismissed] = useState(false)
+  
+  // Statsig A/B testing for banner variant
+  const experiment = useExperiment('waiting_banner')
+  
+  // Get banner color from experiment - no fallback, only use Statsig value
+  // The banner_color parameter is an object with structure: { "variant": "blue" } or { "variant": "green" }
+  const bannerColorObj = experiment.get('banner_color') as { variant?: string } | string | undefined
+  
+  // Extract the variant value from the object structure - only from Statsig, no fallback
+  let bannerColor: string | null = null
+  if (typeof bannerColorObj === 'string') {
+    bannerColor = bannerColorObj
+  } else if (bannerColorObj && typeof bannerColorObj === 'object' && 'variant' in bannerColorObj) {
+    bannerColor = bannerColorObj.variant || null
+  }
+  
+  // Only set variant if we have a valid color from Statsig - no fallback
+  const bannerVariant: 'blue' | 'green' | null = bannerColor === 'green' ? 'green' : bannerColor === 'blue' ? 'blue' : null
+  
+  // Console log for debugging - show which gradient should be visible
+  if (bannerVariant) {
+    const gradientColor = bannerVariant === 'green' 
+      ? 'linear-gradient(358.48deg, #FFFFFF -1.72%, #E2FFE2 103.93%)' // Green gradient
+      : 'linear-gradient(358.48deg, #FFFFFF -1.72%, #E2EAFF 103.93%)' // Blue gradient
+    console.log('[Banner Gradient] Statsig variant:', bannerVariant)
+    console.log('[Banner Gradient] Expected gradient:', gradientColor)
+    console.log('[Banner Gradient] You should see a', bannerVariant === 'green' ? 'GREEN' : 'BLUE', 'tinted gradient background')
+  } else {
+    console.log('[Banner Gradient] No variant from Statsig - banner will not display')
+  }
   
   // Visual abstract share functionality state
   const [isSharing, setIsSharing] = useState(false)
@@ -394,28 +425,28 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     }
   }, [isChatLoading, chatHistory]);
 
-  // Share banner logic - COMMENTED OUT
-  // useEffect(() => {
-  //   // Show banner as soon as loading starts (when question is asked) assist doesn't dismissed it
-  //   if (isLoading && !bannerDismissed && messages.length > 0) {
-  //     // Add a 2-second delay before showing the banner
-  //     const timer = setTimeout(() => {
-  //       setShowShareBanner(true);
-  //     }, 2000);
-  //     
-  //     return () => clearTimeout(timer);
-  //   } else {
-  //     setShowShareBanner(false);
-  //   }
-  // }, [isLoading, bannerDismissed, messages.length]);
+  // Share banner logic
+  useEffect(() => {
+    // Show banner as soon as loading starts (when question is asked) assist doesn't dismissed it
+    if (isLoading && !bannerDismissed && messages.length > 0) {
+      // Add a 2-second delay before showing the banner
+      const timer = setTimeout(() => {
+        setShowShareBanner(true);
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    } else {
+      setShowShareBanner(false);
+    }
+  }, [isLoading, bannerDismissed, messages.length]);
 
   // Hide banner when content starts appearing
-  // useEffect(() => {
-  //   const lastMessage = messages[messages.length - 1];
-  //   if (lastMessage && lastMessage.type === 'assistant' && lastMessage.content && lastMessage.content.length > 50) {
-  //     setShowShareBanner(false);
-  //   }
-  // }, [messages]);
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.type === 'assistant' && lastMessage.content && lastMessage.content.length > 50) {
+      setShowShareBanner(false);
+    }
+  }, [messages]);
 
   // Add useEffect to fetch user's country when component mounts
   useEffect(() => {
@@ -1865,74 +1896,74 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
     window.open(url);
   };
 
-  // Share banner handlers - COMMENTED OUT
-  // const handleBannerClose = () => {
-  //   setShowShareBanner(false);
-  //   setBannerDismissed(true);
-  // };
+  // Share banner handlers
+  const handleBannerClose = () => {
+    setShowShareBanner(false);
+    setBannerDismissed(true);
+  };
 
-  // const handleBannerShare = async () => {
-  //   setShowShareBanner(false);
-  //   setBannerDismissed(true);
-  //   
-  //   const shareData = {
-  //     title: 'DR. INFO - AI-Powered Medical Insights',
-  //     text: 'Check out DR. INFO for trusted, evidence-based medical insights powered by AI.',
-  //     url: 'https://app.drinfo.ai'
-  //   };
+  const handleBannerShare = async () => {
+    setShowShareBanner(false);
+    setBannerDismissed(true);
+    
+    const shareData = {
+      title: 'DR. INFO - AI-Powered Medical Insights',
+      text: 'Check out DR. INFO for trusted, evidence-based medical insights powered by AI.',
+      url: 'https://app.drinfo.ai'
+    };
 
-  //   try {
-  //     // Check if Web Share API is supported
-  //     if (navigator.share) {
-  //       await navigator.share(shareData);
-  //     } else {
-  //       // Fallback: copy URL to clipboard
-  //       await navigator.clipboard.writeText('https://app.drinfo.ai');
-  //       // You could also show a toast notification here
-  //       console.log('URL copied to clipboard');
-  //     }
-  //   } catch (error) {
-  //     console.error('Error sharing:', error);
-  //     // Fallback: copy URL to clipboard
-  //     try {
-  //       await navigator.clipboard.writeText('https://app.drinfo.ai');
-  //       console.log('URL copied to clipboard as fallback');
-  //     } catch (clipboardError) {
-  //       console.error('Failed to copy to clipboard:', clipboardError);
-  //     }
-  //   }
-  // };
+    try {
+      // Check if Web Share API is supported
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        // Fallback: copy URL to clipboard
+        await navigator.clipboard.writeText('https://app.drinfo.ai');
+        // You could also show a toast notification here
+        console.log('URL copied to clipboard');
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      // Fallback: copy URL to clipboard
+      try {
+        await navigator.clipboard.writeText('https://app.drinfo.ai');
+        console.log('URL copied to clipboard as fallback');
+      } catch (clipboardError) {
+        console.error('Failed to copy to clipboard:', clipboardError);
+      }
+    }
+  };
 
-  // const handleBannerShareWhatsApp = () => {
-  //   setShowShareBanner(false);
-  //   setBannerDismissed(true);
-  //   // Share the app URL instead of specific chat
-  //   const appUrl = 'https://app.drinfo.ai';
-  //   const message = `Hey there! I am really enjoying using DR. INFO. Take a look at it: ${appUrl}`;
-  //   const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
-  //   window.open(url, '_blank');
-  // };
+  const handleBannerShareWhatsApp = () => {
+    setShowShareBanner(false);
+    setBannerDismissed(true);
+    // Share the app URL instead of specific chat
+    const appUrl = 'https://app.drinfo.ai';
+    const message = `Hey there! I am really enjoying using DR. INFO. Take a look at it: ${appUrl}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
 
-  // const handleBannerShareLinkedIn = () => {
-  //   setShowShareBanner(false);
-  //   setBannerDismissed(true);
-  //   // Share the app URL instead of specific chat
-  //   const appUrl = 'https://app.drinfo.ai';
-  //   const message = `Hey there! I am really enjoying using DR. INFO. Take a look at it: ${appUrl}`;
-  //   const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(appUrl)}&summary=${encodeURIComponent(message)}`;
-  //   window.open(url, '_blank');
-  // };
+  const handleBannerShareLinkedIn = () => {
+    setShowShareBanner(false);
+    setBannerDismissed(true);
+    // Share the app URL instead of specific chat
+    const appUrl = 'https://app.drinfo.ai';
+    const message = `Hey there! I am really enjoying using DR. INFO. Take a look at it: ${appUrl}`;
+    const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(appUrl)}&summary=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
 
-  // const handleBannerShareEmail = () => {
-  //   setShowShareBanner(false);
-  //   setBannerDismissed(true);
-  //   // Share the app URL instead of specific chat
-  //   const appUrl = 'https://app.drinfo.ai';
-  //   const subject = 'Hey there! Check out DR. INFO';
-  //   const body = `Hey there! I am really enjoying using DR. INFO. Take a look at it: ${appUrl}`;
-  //   const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  //   window.open(url);
-  // };
+  const handleBannerShareEmail = () => {
+    setShowShareBanner(false);
+    setBannerDismissed(true);
+    // Share the app URL instead of specific chat
+    const appUrl = 'https://app.drinfo.ai';
+    const subject = 'Hey there! Check out DR. INFO';
+    const body = `Hey there! I am really enjoying using DR. INFO. Take a look at it: ${appUrl}`;
+    const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(url);
+  };
 
   // Helper function to check if content is SVG
   const isSvgContent = (content: string): boolean => {
@@ -2620,8 +2651,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                             </div>
                           </div>
                           
-                          {/* Share Banner - shown during summarizing phase for the last message, above the streaming content - COMMENTED OUT */}
-                          {/* {idx === messages.length - 1 && showShareBanner && (
+                          {/* Share Banner - shown during summarizing phase for the last message, above the streaming content */}
+                          {idx === messages.length - 1 && showShareBanner && bannerVariant && (
                             <div className="mb-4 sm:mb-6">
                               <ShareBanner
                                 isVisible={showShareBanner}
@@ -2630,9 +2661,10 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                                 onShareWhatsApp={handleBannerShareWhatsApp}
                                 onShareLinkedIn={handleBannerShareLinkedIn}
                                 onShareEmail={handleBannerShareEmail}
+                                variant={bannerVariant}
                               />
                             </div>
-                          )} */}
+                          )}
                           
                           {/* Show content during streaming or when complete */}
                           {(msg.content || (idx === messages.length - 1 && isStreaming)) && (

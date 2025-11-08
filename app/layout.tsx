@@ -8,6 +8,7 @@ import { TourProvider, GuidelineTourProvider, DrugTourProvider, DrinfoSummaryTou
 import GoogleAnalytics from "@/components/GoogleAnalytics";
 import PerformanceOptimizer from "@/components/seo/PerformanceOptimizer";
 import SEOMonitor from "@/components/seo/SEOMonitor";
+import MyStatsig from "./my-statsig";
 
 const inter = Inter({ subsets: ["latin"] })
 const poppins = Poppins({ 
@@ -340,9 +341,11 @@ export default function RootLayout({
             <GuidelineTourProvider>
               <TourProvider>
                 <AuthProvider>
-                  <PerformanceOptimizer />
-                  <SEOMonitor />
-                  {children}
+                  <MyStatsig>
+                    <PerformanceOptimizer />
+                    <SEOMonitor />
+                    {children}
+                  </MyStatsig>
                 </AuthProvider>
               </TourProvider>
             </GuidelineTourProvider>

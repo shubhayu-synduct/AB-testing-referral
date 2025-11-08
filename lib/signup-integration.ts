@@ -206,16 +206,7 @@ export async function isQualifiedForIncentive(userId: string) {
       };
     }
     
-    // Check if already qualified
-    if (userData.referralQualified) {
-      logger.info('User is already qualified');
-      return {
-        totalReferred: userData.referralTotalReferred || 0,
-        activeUsers: userData.referralActiveUsers || 0,
-        isQualified: true
-      };
-    }
-    
+    // Always query referrals table to get fresh data from database
     // Query referrals table to find all users referred by this user
     const referralsRef = collection(db, "referrals");
     const q = query(referralsRef, where("referrerUserId", "==", userId));
@@ -235,10 +226,11 @@ export async function isQualifiedForIncentive(userId: string) {
       referredUserIds.push(doc.data().referredUserId);
     });
     
+    // Calculate totalReferred from database
     const totalReferred = referredUserIds.length;
     let activeUsers = 0;
     
-    // Check each referred user's total_questions_asked
+    // Check each referred user's total_questions_asked from database
     for (const referredUserId of referredUserIds) {
       const referredUserRef = doc(db, "users", referredUserId);
       const referredUserDoc = await getDoc(referredUserRef);
@@ -247,14 +239,15 @@ export async function isQualifiedForIncentive(userId: string) {
         const referredUserData = referredUserDoc.data();
         const totalQuestionsAsked = referredUserData.total_questions_asked || 0;
         
-        if (totalQuestionsAsked >= 10) {
+        // Active user = user who asked 3+ questions
+        if (totalQuestionsAsked >= 3) {
           activeUsers++;
         }
       }
     }
     
-    // Check if qualified (>= 5 total referred AND >= 3 active users)
-    const isQualified = totalReferred >= 5 && activeUsers >= 3;
+    // Check if qualified (>= 3 total referred AND >= 3 active users)
+    const isQualified = totalReferred >= 3 && activeUsers >= 3;
     
     // Check if user was already qualified before (to avoid granting subscription multiple times)
     const wasAlreadyQualified = userData.referralQualified === true;
