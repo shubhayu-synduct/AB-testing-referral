@@ -25,7 +25,6 @@ import { useDrinfoSummaryTour } from '@/components/TourContext'
 import { track } from '@/lib/analytics'
 import { ShareBanner } from './share-banner'
 import { toast } from 'sonner'
-import { useExperiment } from '@statsig/react-bindings'
 
 interface DrInfoSummaryProps {
   user: any;
@@ -248,36 +247,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
   // Share banner state
   const [showShareBanner, setShowShareBanner] = useState(false)
   const [bannerDismissed, setBannerDismissed] = useState(false)
-  
-  // Statsig A/B testing for banner variant
-  const experiment = useExperiment('waiting_banner')
-  
-  // Get banner color from experiment - no fallback, only use Statsig value
-  // The banner_color parameter is an object with structure: { "variant": "blue" } or { "variant": "green" }
-  const bannerColorObj = experiment.get('banner_color') as { variant?: string } | string | undefined
-  
-  // Extract the variant value from the object structure - only from Statsig, no fallback
-  let bannerColor: string | null = null
-  if (typeof bannerColorObj === 'string') {
-    bannerColor = bannerColorObj
-  } else if (bannerColorObj && typeof bannerColorObj === 'object' && 'variant' in bannerColorObj) {
-    bannerColor = bannerColorObj.variant || null
-  }
-  
-  // Only set variant if we have a valid color from Statsig - no fallback
-  const bannerVariant: 'blue' | 'green' | null = bannerColor === 'green' ? 'green' : bannerColor === 'blue' ? 'blue' : null
-  
-  // Console log for debugging - show which gradient should be visible
-  if (bannerVariant) {
-    const gradientColor = bannerVariant === 'green' 
-      ? 'linear-gradient(358.48deg, #FFFFFF -1.72%, #E2FFE2 103.93%)' // Green gradient
-      : 'linear-gradient(358.48deg, #FFFFFF -1.72%, #E2EAFF 103.93%)' // Blue gradient
-    console.log('[Banner Gradient] Statsig variant:', bannerVariant)
-    console.log('[Banner Gradient] Expected gradient:', gradientColor)
-    console.log('[Banner Gradient] You should see a', bannerVariant === 'green' ? 'GREEN' : 'BLUE', 'tinted gradient background')
-  } else {
-    console.log('[Banner Gradient] No variant from Statsig - banner will not display')
-  }
+  const [referralLink, setReferralLink] = useState('https://app.drinfo.ai/signup') // Default fallback
   
   // Visual abstract share functionality state
   const [isSharing, setIsSharing] = useState(false)
@@ -469,8 +439,86 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         }
       }
     };
-
+    
     fetchUserCountry();
+  }, [user]);
+
+  // Fetch or create referral link for the share banner
+  useEffect(() => {
+    const fetchOrCreateReferralLink = async () => {
+      if (!user) {
+        setReferralLink('https://app.drinfo.ai/signup');
+        return;
+      }
+
+      try {
+        const db = getFirebaseFirestore();
+        const userId = user.uid || user.id;
+        const userRef = doc(db, "users", userId);
+        const userDoc = await getDoc(userRef);
+        
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://app.drinfo.ai';
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          
+          // If referral code exists, use it
+          if (userData.referralCode) {
+            const fullLink = `${baseUrl}/signup?ref=${userData.referralCode}`;
+            setReferralLink(fullLink);
+            logger.debug('Referral link loaded from existing code:', fullLink);
+            return;
+          }
+        }
+        
+        // If no referral code exists, create one automatically
+        logger.debug('No referral code found, creating new one...');
+        
+        // Get user's first name from profile or displayName
+        let firstName = 'user';
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          firstName = userData?.profile?.firstName || user.displayName?.split(' ')[0] || 'user';
+        } else {
+          firstName = user.displayName?.split(' ')[0] || 'user';
+        }
+        
+        // Generate referral code (same logic as ReferralTab)
+        const first4Letters = firstName.substring(0, 4).toLowerCase().replace(/[^a-z]/g, '').padStart(4, 'user');
+        const randomString = Math.random().toString(36).substr(2, 6);
+        const newCode = `${first4Letters}${randomString}`;
+        const fullLink = `${baseUrl}/signup?ref=${newCode}`;
+        
+        // Update or create Firebase document with the new referral code
+        if (userDoc.exists()) {
+          await updateDoc(userRef, {
+            referralCode: newCode,
+            referralQualified: false,
+            referralActiveUsers: 0,
+            referralTotalReferred: 0
+          });
+        } else {
+          // If document doesn't exist, create it with referral code
+          await setDoc(userRef, {
+            referralCode: newCode,
+            referralQualified: false,
+            referralActiveUsers: 0,
+            referralTotalReferred: 0,
+            email: user.email || '',
+            createdAt: serverTimestamp()
+          });
+        }
+        
+        setReferralLink(fullLink);
+        logger.debug('Referral code created and link set:', fullLink);
+      } catch (error) {
+        logger.error('Error fetching/creating referral link:', error);
+        // Fallback to default link on error
+        setReferralLink('https://app.drinfo.ai/signup');
+      }
+    };
+    
+    fetchOrCreateReferralLink();
   }, [user]);
 
   // Add this new useEffect after the existing useEffects
@@ -1897,19 +1945,14 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
   };
 
   // Share banner handlers
-  const handleBannerClose = () => {
-    setShowShareBanner(false);
-    setBannerDismissed(true);
-  };
-
   const handleBannerShare = async () => {
     setShowShareBanner(false);
     setBannerDismissed(true);
     
     const shareData = {
       title: 'DR. INFO - AI-Powered Medical Insights',
-      text: 'Check out DR. INFO for trusted, evidence-based medical insights powered by AI.',
-      url: 'https://app.drinfo.ai'
+      text: `Hey there! I am really enjoying using DR. INFO. Take a look at it: ${referralLink}`,
+      url: referralLink
     };
 
     try {
@@ -1918,7 +1961,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
         await navigator.share(shareData);
       } else {
         // Fallback: copy URL to clipboard
-        await navigator.clipboard.writeText('https://app.drinfo.ai');
+        await navigator.clipboard.writeText(referralLink);
         // You could also show a toast notification here
         console.log('URL copied to clipboard');
       }
@@ -1926,7 +1969,7 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
       console.error('Error sharing:', error);
       // Fallback: copy URL to clipboard
       try {
-        await navigator.clipboard.writeText('https://app.drinfo.ai');
+        await navigator.clipboard.writeText(referralLink);
         console.log('URL copied to clipboard as fallback');
       } catch (clipboardError) {
         console.error('Failed to copy to clipboard:', clipboardError);
@@ -1937,9 +1980,8 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
   const handleBannerShareWhatsApp = () => {
     setShowShareBanner(false);
     setBannerDismissed(true);
-    // Share the app URL instead of specific chat
-    const appUrl = 'https://app.drinfo.ai';
-    const message = `Hey there! I am really enjoying using DR. INFO. Take a look at it: ${appUrl}`;
+    // Share the referral link
+    const message = `Hey there! I am really enjoying using DR. INFO. Take a look at it: ${referralLink}`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -1947,20 +1989,18 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
   const handleBannerShareLinkedIn = () => {
     setShowShareBanner(false);
     setBannerDismissed(true);
-    // Share the app URL instead of specific chat
-    const appUrl = 'https://app.drinfo.ai';
-    const message = `Hey there! I am really enjoying using DR. INFO. Take a look at it: ${appUrl}`;
-    const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(appUrl)}&summary=${encodeURIComponent(message)}`;
+    // Share the referral link
+    const message = `Hey there! I am really enjoying using DR. INFO. Take a look at it: ${referralLink}`;
+    const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(referralLink)}&summary=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
 
   const handleBannerShareEmail = () => {
     setShowShareBanner(false);
     setBannerDismissed(true);
-    // Share the app URL instead of specific chat
-    const appUrl = 'https://app.drinfo.ai';
+    // Share the referral link
     const subject = 'Hey there! Check out DR. INFO';
-    const body = `Hey there! I am really enjoying using DR. INFO. Take a look at it: ${appUrl}`;
+    const body = `Hey there! I am really enjoying using DR. INFO. Take a look at it: ${referralLink}`;
     const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.open(url);
   };
@@ -2652,16 +2692,15 @@ export function DrInfoSummary({ user, sessionId, onChatCreated, initialMode = 'r
                           </div>
                           
                           {/* Share Banner - shown during summarizing phase for the last message, above the streaming content */}
-                          {idx === messages.length - 1 && showShareBanner && bannerVariant && (
+                          {idx === messages.length - 1 && showShareBanner && (
                             <div className="mb-4 sm:mb-6">
                               <ShareBanner
                                 isVisible={showShareBanner}
-                                onClose={handleBannerClose}
+                                referralLink={referralLink}
                                 onShare={handleBannerShare}
                                 onShareWhatsApp={handleBannerShareWhatsApp}
                                 onShareLinkedIn={handleBannerShareLinkedIn}
                                 onShareEmail={handleBannerShareEmail}
-                                variant={bannerVariant}
                               />
                             </div>
                           )}

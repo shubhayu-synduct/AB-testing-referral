@@ -73,14 +73,13 @@ function ProfilePageContent() {
   });
   const [referralLoading, setReferralLoading] = useState(false);
   const [generatingCode, setGeneratingCode] = useState(false);
-  const [claiming, setClaiming] = useState(false);
   const [referrals, setReferrals] = useState<any[]>([]);
 
   // Statsig A/B testing for referral sections color variant
   const referralExperiment = useExperiment('referral_sections_variant')
   
   // Statsig A/B testing for referral dashboard variant (A vs B)
-  const referralDashboardExperiment = useExperiment('referral_dashboard_variant')
+  const referralDashboardExperiment = useExperiment('ab-testing-referral')
   const statsigClient = useStatsigClient()
   
   // Debug: Log the full experiment object to see what Statsig returns
@@ -374,22 +373,41 @@ function ProfilePageContent() {
   // Get referral dashboard variant from Statsig
   const dashboardVariantObj = referralDashboardExperiment.get('dashboard_variant') as { variant?: string } | string | undefined
   
+  // Enhanced debugging - log full experiment object
+  console.log('[Referral Dashboard Debug] Full experiment object:', JSON.stringify(referralDashboardExperiment, null, 2))
+  console.log('[Referral Dashboard Debug] Experiment name:', referralDashboardExperiment.name)
+  console.log('[Referral Dashboard Debug] Experiment groupName:', referralDashboardExperiment.groupName)
+  console.log('[Referral Dashboard Debug] Experiment value:', JSON.stringify(referralDashboardExperiment.value, null, 2))
+  console.log('[Referral Dashboard Debug] Raw dashboard_variant value:', dashboardVariantObj)
+  console.log('[Referral Dashboard Debug] dashboard_variant type:', typeof dashboardVariantObj)
+  
   // Extract the variant value from the object structure
   let dashboardVariant: string | null = null
   if (typeof dashboardVariantObj === 'string') {
     dashboardVariant = dashboardVariantObj
+    console.log('[Referral Dashboard Debug] Variant is string:', dashboardVariant)
   } else if (dashboardVariantObj && typeof dashboardVariantObj === 'object' && 'variant' in dashboardVariantObj) {
     dashboardVariant = dashboardVariantObj.variant || null
+    console.log('[Referral Dashboard Debug] Variant extracted from object:', dashboardVariant)
+  } else {
+    console.log('[Referral Dashboard Debug] Variant is null or undefined')
+    console.warn('[Referral Dashboard] ⚠️ Statsig experiment not returning a variant. Check:')
+    console.warn('  1. Is the experiment published (not in Draft mode)?')
+    console.warn('  2. Is the experiment active?')
+    console.warn('  3. Is the user in the target population?')
+    console.warn('  4. Is the parameter name "dashboard_variant" correct?')
+    console.warn('  5. Is the parameter type set to "Object"?')
   }
   
   // Determine which dashboard to show (A or B)
-  // Default to 'A' if Statsig doesn't return a value
+  // Default to 'A' if Statsig doesn't return a value (experiment not set up or not active)
   const showDashboardVariant: 'A' | 'B' = dashboardVariant === 'B' ? 'B' : 'A'
   
-  // Console log for debugging
-  console.log('[Referral Dashboard] Statsig variant:', showDashboardVariant)
+  // Enhanced console log for debugging
+  console.log('[Referral Dashboard] Final variant decision:', showDashboardVariant)
   console.log('[Referral Dashboard] Raw value:', dashboardVariantObj)
   console.log('[Referral Dashboard] Extracted variant:', dashboardVariant)
+  console.log('[Referral Dashboard] User ID:', user?.uid || 'no user')
 
   // Check referral qualification when referral tab is opened
   useEffect(() => {
@@ -651,7 +669,7 @@ function ProfilePageContent() {
   const handleTabChange = (tab: 'profile' | 'preferences' | 'subscription' | 'feedback' | 'referralAB') => {
     setActiveTab(tab);
     router.push(`/dashboard/profile?tab=${tab}`);
-
+    
     // Track tab click (only for supported tabs)
     if (user && tab !== 'feedback' && (tab === 'profile' || tab === 'preferences' || tab === 'subscription')) {
       track.profileTabClicked(tab, user.uid, 'profile');
@@ -1987,8 +2005,6 @@ function ProfilePageContent() {
                 referrals={referrals}
                 generatingCode={generatingCode}
                 setGeneratingCode={setGeneratingCode}
-                claiming={claiming}
-                setClaiming={setClaiming}
                 setSuccess={setSuccess}
                 setError={setError}
                 statsigClient={statsigClient}
@@ -2006,8 +2022,6 @@ function ProfilePageContent() {
                 referrals={referrals}
                 generatingCode={generatingCode}
                 setGeneratingCode={setGeneratingCode}
-                claiming={claiming}
-                setClaiming={setClaiming}
                 setSuccess={setSuccess}
                 setError={setError}
                 statsigClient={statsigClient}

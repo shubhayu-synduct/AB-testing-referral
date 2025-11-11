@@ -196,6 +196,69 @@ export async function isQualifiedForIncentive(userId: string) {
     
     const userData = userDoc.data();
     
+    // Check if subscription has expired and reset to free if not a Stripe subscription
+    const userSubscription = userData.subscription || {};
+    const userSubscriptionTier = userData.subscriptionTier || 'free';
+    const hasStripeSubscription = userSubscription.checkoutSessionId;
+    let subscriptionExpiry = userSubscription.currentPeriodEnd;
+    const now = Date.now();
+    
+    // Convert Stripe timestamp to milliseconds if needed
+    // Stripe API returns timestamps in SECONDS, but webhook stores them in MILLISECONDS
+    // Check if timestamp is in seconds (less than year 2000 in milliseconds) and convert
+    if (subscriptionExpiry && subscriptionExpiry < 946684800000) { // Jan 1, 2000 in milliseconds
+      subscriptionExpiry = subscriptionExpiry * 1000; // Convert seconds to milliseconds
+      logger.info(`User ${userId} subscription expiry converted from seconds to milliseconds: ${subscriptionExpiry}`);
+    }
+    
+    // Check if there's a pending referral subscription that should be activated
+    const pendingReferralSubscription = userData.pendingReferralSubscription;
+    if (pendingReferralSubscription && hasStripeSubscription && subscriptionExpiry && subscriptionExpiry <= now) {
+      // Stripe subscription has expired, activate the pending referral subscription
+      await updateDoc(userRef, {
+        subscriptionTier: 'clinician',
+        subscription: {
+          status: 'active',
+          currentPeriodEnd: pendingReferralSubscription.currentPeriodEnd,
+          createdAt: pendingReferralSubscription.createdAt,
+          plan: pendingReferralSubscription.plan,
+          interval: pendingReferralSubscription.interval,
+          cancelAtPeriodEnd: false,
+          source: pendingReferralSubscription.source,
+          updatedAt: new Date().toISOString()
+        },
+        pendingReferralSubscription: null, // Clear pending subscription
+        updatedAt: new Date().toISOString()
+      });
+      logger.info(`User ${userId} Stripe subscription expired. Activated pending referral subscription until ${new Date(pendingReferralSubscription.currentPeriodEnd).toISOString()}`);
+    }
+    
+    // If subscription has expired and it's not a Stripe subscription, reset to free
+    // Check all referral subscriptions (source: 'referral_incentive') and expired active subscriptions
+    if (subscriptionExpiry && subscriptionExpiry < now && !hasStripeSubscription) {
+      // Reset to free if:
+      // 1. User has clinician/student tier (not free)
+      // 2. OR subscription status is active (even if tier is already free, ensure status is updated)
+      // 3. OR subscription is from referral incentive (should be reset when expired)
+      const isReferralSubscription = userSubscription.source === 'referral_incentive';
+      const shouldReset = (userSubscriptionTier !== 'free') || 
+                         (userSubscription.status === 'active') || 
+                         isReferralSubscription;
+      
+      if (shouldReset) {
+        await updateDoc(userRef, {
+          subscriptionTier: 'free',
+          subscription: {
+            status: 'expired',
+            ...userSubscription,
+            updatedAt: new Date().toISOString()
+          },
+          updatedAt: new Date().toISOString()
+        });
+        logger.info(`User ${userId} subscription has expired (expiry: ${new Date(subscriptionExpiry).toISOString()}, now: ${new Date(now).toISOString()}). Reset to free tier.`);
+      }
+    }
+    
     // Check if user has a referral code
     if (!userData.referralCode) {
       logger.info('User does not have a referral code');
@@ -249,67 +312,265 @@ export async function isQualifiedForIncentive(userId: string) {
     // Check if qualified (>= 3 total referred AND >= 3 active users)
     const isQualified = totalReferred >= 3 && activeUsers >= 3;
     
-    // Check if user was already qualified before (to avoid granting subscription multiple times)
-    const wasAlreadyQualified = userData.referralQualified === true;
+    // Calculate current months earned based on active users (3 active users = 1 month)
+    const currentMonthsEarned = Math.floor(activeUsers / 3);
     
-    // Update Firebase if qualified
-    if (isQualified) {
-      // Calculate 1 month from now for subscription expiry - using same logic as Stripe webhook
-      // currentPeriodEnd should be a timestamp in milliseconds, not an ISO string
+    // Re-fetch user data after potential expiration check
+    const updatedUserDoc = await getDoc(userRef);
+    const updatedUserData = updatedUserDoc.exists() ? updatedUserDoc.data() : userData;
+    
+    // Get previous months earned from user document
+    const previousMonthsEarned = updatedUserData.referralMonthsEarned || 0;
+    
+    // Calculate additional months earned (only grant the difference)
+    const additionalMonths = currentMonthsEarned - previousMonthsEarned;
+    
+    // Check current subscription status (after potential expiration reset)
+    const currentSubscriptionTier = updatedUserData.subscriptionTier || 'free';
+    const currentSubscription = updatedUserData.subscription || {};
+    
+    // Check if user has an active paid subscription (has checkoutSessionId from Stripe)
+    const hasActivePaidSubscription = (currentSubscriptionTier === 'clinician' || currentSubscriptionTier === 'student') && 
+                                      currentSubscription.status === 'active' && 
+                                      !currentSubscription.cancelAtPeriodEnd &&
+                                      currentSubscription.checkoutSessionId; // Paid subscriptions have checkoutSessionId
+    
+    // Check if user has an existing referral subscription
+    const hasReferralSubscription = currentSubscription.source === 'referral_incentive' && 
+                                    currentSubscription.status === 'active';
+    
+    // Update Firebase if qualified and has earned months (either first time or additional months)
+    if (isQualified && currentMonthsEarned > 0) {
       const now = new Date();
-      const expiryDate = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate()).getTime();
+      const nowTimestamp = now.getTime();
       
-      // Check current subscription status - don't overwrite existing paid subscriptions
-      const currentSubscriptionTier = userData.subscriptionTier || 'free';
-      const currentSubscription = userData.subscription || {};
+      let newExpiryDate: number;
+      let subscriptionCreatedAt: string;
       
-      // Check if user has an active paid subscription (has checkoutSessionId from Stripe)
-      // Support both 'clinician' and 'student' paid subscriptions
-      const hasActivePaidSubscription = (currentSubscriptionTier === 'clinician' || currentSubscriptionTier === 'student') && 
-                                        currentSubscription.status === 'active' && 
-                                        !currentSubscription.cancelAtPeriodEnd &&
-                                        currentSubscription.checkoutSessionId; // Paid subscriptions have checkoutSessionId
+      if (hasReferralSubscription && !hasActivePaidSubscription) {
+        // User already has referral subscription - extend it only if additional months earned
+        // Check if current subscription is expired - if so, treat as new subscription starting from today
+        const currentExpiry = currentSubscription.currentPeriodEnd || nowTimestamp;
+        
+        // Convert to milliseconds if needed
+        let currentExpiryMs = currentExpiry;
+        if (currentExpiryMs && currentExpiryMs < 946684800000) {
+          currentExpiryMs = currentExpiryMs * 1000;
+        }
+        
+        if (currentExpiryMs < nowTimestamp) {
+          // Subscription is expired - treat as new subscription starting from today with current months earned
+          const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const endDate = new Date(startDate);
+          endDate.setMonth(endDate.getMonth() + currentMonthsEarned);
+          newExpiryDate = endDate.getTime();
+          subscriptionCreatedAt = new Date().toISOString();
+          
+          logger.info(`User ${userId} has expired referral subscription. Creating new subscription with ${currentMonthsEarned} month(s) starting from ${startDate.toISOString()} until ${new Date(newExpiryDate).toISOString()}`);
+        } else {
+          // Subscription is still active - extend it only if additional months earned
+          if (additionalMonths > 0) {
+            // Extend subscription by additional months only
+            const currentExpiryDate = new Date(currentExpiryMs);
+            const newExpiry = new Date(currentExpiryDate);
+            newExpiry.setMonth(newExpiry.getMonth() + additionalMonths);
+            newExpiryDate = newExpiry.getTime();
+            subscriptionCreatedAt = currentSubscription.createdAt || new Date().toISOString(); // Keep original createdAt
+            
+            logger.info(`User ${userId} earned ${additionalMonths} additional month(s) (total: ${currentMonthsEarned}, previous: ${previousMonthsEarned}). Extending subscription from ${new Date(currentExpiryMs).toISOString()} to ${new Date(newExpiryDate).toISOString()}`);
+          } else {
+            // No additional months earned, keep current expiry and don't update subscription
+            newExpiryDate = currentExpiryMs;
+            subscriptionCreatedAt = currentSubscription.createdAt || new Date().toISOString();
+            
+            logger.info(`User ${userId} has ${currentMonthsEarned} months earned (same as before: ${previousMonthsEarned}). No subscription changes needed.`);
+            
+            // Just update stats, don't modify subscription
+            await updateDoc(userRef, {
+              referralQualified: true,
+              referralTotalReferred: totalReferred,
+              referralActiveUsers: activeUsers,
+              referralMonthsEarned: currentMonthsEarned
+            });
+            
+            return {
+              totalReferred,
+              activeUsers,
+              isQualified
+            };
+          }
+        }
+      } else if (!hasActivePaidSubscription) {
+        // First time qualifying - create new subscription starting from today
+        // Only grant if user has 0 previous months earned
+        if (previousMonthsEarned === 0 && currentMonthsEarned > 0) {
+          const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const endDate = new Date(startDate);
+          endDate.setMonth(endDate.getMonth() + currentMonthsEarned);
+          newExpiryDate = endDate.getTime();
+          subscriptionCreatedAt = new Date().toISOString();
+          
+          logger.info(`User ${userId} is qualifying for the first time. Granting ${currentMonthsEarned} month(s) starting from ${startDate.toISOString()} until ${new Date(newExpiryDate).toISOString()}`);
+        } else {
+          // User already has months earned but no active subscription - just update stats
+          await updateDoc(userRef, {
+            referralQualified: true,
+            referralTotalReferred: totalReferred,
+            referralActiveUsers: activeUsers,
+            referralMonthsEarned: currentMonthsEarned
+          });
+          
+          logger.info(`User ${userId} has ${currentMonthsEarned} months earned but no active subscription. Stats updated.`);
+          
+          return {
+            totalReferred,
+            activeUsers,
+            isQualified
+          };
+        }
+      } else {
+        // User has active paid Stripe subscription - schedule referral subscription to start after Stripe expires
+        let stripeExpiry = currentSubscription.currentPeriodEnd;
+        
+        // Convert Stripe timestamp to milliseconds if needed (Stripe uses seconds, webhook stores milliseconds)
+        if (stripeExpiry && stripeExpiry < 946684800000) { // Jan 1, 2000 in milliseconds
+          stripeExpiry = stripeExpiry * 1000; // Convert seconds to milliseconds
+          logger.info(`User ${userId} Stripe expiry converted from seconds to milliseconds: ${stripeExpiry}`);
+        }
+        
+        if (stripeExpiry && stripeExpiry > nowTimestamp) {
+          // Stripe subscription expires in the future - start referral subscription from that date
+          const stripeExpiryDate = new Date(stripeExpiry);
+          
+          // Check if user already has a pending referral subscription
+          const existingPending = updatedUserData.pendingReferralSubscription;
+          let referralEndDate: Date;
+          
+          // Only update if additional months earned
+          if (additionalMonths > 0) {
+            if (existingPending && existingPending.status === 'pending') {
+              // User already has pending subscription - extend it by additional months
+              const previousEndDate = new Date(existingPending.currentPeriodEnd);
+              referralEndDate = new Date(previousEndDate);
+              referralEndDate.setMonth(referralEndDate.getMonth() + additionalMonths);
+              
+              logger.info(`User ${userId} earned ${additionalMonths} additional month(s) (total: ${currentMonthsEarned}, previous: ${previousMonthsEarned}). Extending pending referral subscription from ${previousEndDate.toISOString()} to ${referralEndDate.toISOString()}`);
+            } else {
+              // First time creating pending subscription
+              referralEndDate = new Date(stripeExpiryDate);
+              referralEndDate.setMonth(referralEndDate.getMonth() + currentMonthsEarned);
+              
+              logger.info(`User ${userId} creating new pending referral subscription with ${currentMonthsEarned} month(s) to start after Stripe expires on ${stripeExpiryDate.toISOString()}, will expire on ${referralEndDate.toISOString()}`);
+            }
+            
+            newExpiryDate = referralEndDate.getTime();
+            subscriptionCreatedAt = stripeExpiryDate.toISOString(); // Set createdAt to when Stripe expires
+            
+            // Store/update pending referral subscription info
+            await updateDoc(userRef, {
+              referralQualified: true,
+              referralTotalReferred: totalReferred,
+              referralActiveUsers: activeUsers,
+              referralMonthsEarned: currentMonthsEarned, // Store total months earned
+              // Store pending referral subscription that will activate after Stripe expires
+              pendingReferralSubscription: {
+                status: 'pending',
+                currentPeriodEnd: newExpiryDate,
+                createdAt: subscriptionCreatedAt,
+                plan: 'clinician',
+                interval: 'monthly',
+                monthsEarned: currentMonthsEarned,
+                source: 'referral_incentive',
+                updatedAt: new Date().toISOString()
+              },
+              updatedAt: new Date().toISOString()
+            });
+            
+            logger.info(`User ${userId} has active Stripe subscription. Scheduled referral subscription (${currentMonthsEarned} month(s)) to start after Stripe expires on ${stripeExpiryDate.toISOString()}, will expire on ${new Date(newExpiryDate).toISOString()}`);
+          } else {
+            // No additional months earned, just update stats
+            await updateDoc(userRef, {
+              referralQualified: true,
+              referralTotalReferred: totalReferred,
+              referralActiveUsers: activeUsers,
+              referralMonthsEarned: currentMonthsEarned
+            });
+            
+            logger.info(`User ${userId} has ${currentMonthsEarned} months earned (same as before: ${previousMonthsEarned}). No pending subscription changes needed.`);
+            
+            return {
+              totalReferred,
+              activeUsers,
+              isQualified
+            };
+          }
+        } else {
+          // Stripe subscription has expired or no expiry date - just update stats
+          await updateDoc(userRef, {
+            referralQualified: true,
+            referralTotalReferred: totalReferred,
+            referralActiveUsers: activeUsers,
+            referralMonthsEarned: currentMonthsEarned // Store total months earned
+          });
+          logger.info(`User ${userId} is qualified but Stripe subscription status is unclear - just updating stats`);
+        }
+        
+        return {
+          totalReferred,
+          activeUsers,
+          isQualified
+        };
+      }
       
-      // Grant clinician subscription if:
-      // 1. User was not already qualified (first time qualifying)
-      // 2. User doesn't have an active paid subscription (don't overwrite paid subscriptions)
-      if (!wasAlreadyQualified && !hasActivePaidSubscription) {
-        // Grant 1 month of clinician subscription as reward - matching structure from Stripe purchase
+      // Update subscription if not paid subscription and has additional months to grant
+      // This upgrades user from free/expired to clinician tier OR extends existing subscription
+      if (!hasActivePaidSubscription && additionalMonths > 0) {
+        // Ensure we're upgrading properly - check if user was on free tier or expired
+        const wasFreeOrExpired = currentSubscriptionTier === 'free' || 
+                                 currentSubscription.status === 'expired' || 
+                                 !currentSubscription.status;
+        
         await updateDoc(userRef, {
           referralQualified: true,
           referralTotalReferred: totalReferred,
           referralActiveUsers: activeUsers,
-          subscriptionTier: 'clinician',
+          referralMonthsEarned: currentMonthsEarned, // Store total months earned
+          subscriptionTier: 'clinician', // Upgrade to clinician tier
           subscription: {
-            status: 'active',
-            currentPeriodEnd: expiryDate, // Timestamp in milliseconds (same as Stripe)
-            plan: 'clinician', // Match the subscriptionTier
-            interval: 'monthly', // Use 'monthly' not 'month' (same as Stripe)
+            status: 'active', // Activate subscription
+            currentPeriodEnd: newExpiryDate, // Timestamp in milliseconds (same as Stripe)
+            createdAt: subscriptionCreatedAt, // ISO string
+            plan: 'clinician',
+            interval: 'monthly',
             cancelAtPeriodEnd: false,
             source: 'referral_incentive', // Track that this is from referral reward
             updatedAt: new Date().toISOString()
           },
           updatedAt: new Date().toISOString()
         });
-        logger.info(`User ${userId} is now qualified for incentive and has been granted 1 month of clinician subscription`);
-      } else {
-        // Already qualified or has paid subscription - just update the qualification status
-        await updateDoc(userRef, {
-          referralQualified: true,
-          referralTotalReferred: totalReferred,
-          referralActiveUsers: activeUsers
-        });
-        if (wasAlreadyQualified) {
-          logger.info(`User ${userId} is already qualified for incentive`);
+        
+        if (wasFreeOrExpired) {
+          logger.info(`User ${userId} upgraded from ${currentSubscriptionTier} to clinician tier. Subscription active for ${currentMonthsEarned} month(s), expires ${new Date(newExpiryDate).toISOString()}`);
         } else {
-          logger.info(`User ${userId} is qualified but already has an active paid subscription`);
+          logger.info(`User ${userId} subscription extended by ${additionalMonths} month(s) (total: ${currentMonthsEarned} months). Expires ${new Date(newExpiryDate).toISOString()}`);
         }
+      } else if (!hasActivePaidSubscription && additionalMonths === 0 && currentMonthsEarned > 0) {
+        // User has months earned but no additional months - just update stats, don't modify subscription
+      await updateDoc(userRef, {
+        referralQualified: true,
+        referralTotalReferred: totalReferred,
+          referralActiveUsers: activeUsers,
+          referralMonthsEarned: currentMonthsEarned
+      });
+        
+        logger.info(`User ${userId} has ${currentMonthsEarned} months earned (same as before: ${previousMonthsEarned}). No subscription changes needed.`);
       }
     } else {
       // Update stats even if not qualified yet
       await updateDoc(userRef, {
         referralTotalReferred: totalReferred,
-        referralActiveUsers: activeUsers
+        referralActiveUsers: activeUsers,
+        referralMonthsEarned: currentMonthsEarned // Store total months earned (even if 0)
       });
     }
     

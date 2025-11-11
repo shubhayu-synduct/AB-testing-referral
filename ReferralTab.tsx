@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Copy, Check, Mail, Share2, Gift, Users, MessageCircle, MoreHorizontal, Sparkles } from "lucide-react";
 import { IoLogoWhatsapp } from "react-icons/io";
 import { IoLogoLinkedin } from "react-icons/io5";
 import { FaXTwitter, FaFacebookF, FaLink, FaUserPlus, FaComments, FaGift } from "react-icons/fa6";
-import { updateDoc, doc } from "firebase/firestore";
+import { updateDoc, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getFirebaseFirestore } from "@/lib/firebase";
 import EmailInviteModal from "./Modal";
 
@@ -25,8 +25,6 @@ interface ReferralTabProps {
   referrals: any[];
   generatingCode: boolean;
   setGeneratingCode: (loading: boolean) => void;
-  claiming: boolean;
-  setClaiming: (claiming: boolean) => void;
   setSuccess: (success: boolean) => void;
   setError: (error: string) => void;
   statsigClient?: any;
@@ -44,8 +42,6 @@ export default function ReferralTab({
   referrals,
   generatingCode,
   setGeneratingCode,
-  claiming,
-  setClaiming,
   setSuccess,
   setError,
   statsigClient,
@@ -55,75 +51,74 @@ export default function ReferralTab({
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showMoreShareOptions, setShowMoreShareOptions] = useState(false);
 
-  const handleGenerateCode = async () => {
-    if (!user || !profile) return;
+  // Automatically fetch or create referral link when component mounts
+  useEffect(() => {
+    const fetchOrCreateReferralLink = async () => {
+      if (!user) return;
 
-    setGeneratingCode(true);
-
-    const firstName = profile.firstName || user.displayName?.split(' ')[0] || 'user';
-    const first4Letters = firstName.substring(0, 4).toLowerCase().replace(/[^a-z]/g, '').padStart(4, 'user');
-    const randomString = Math.random().toString(36).substr(2, 6);
-    const newCode = `${first4Letters}${randomString}`;
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    const fullLink = `${baseUrl}/signup?ref=${newCode}`;
-
-    try {
-      const db = getFirebaseFirestore();
-      const userRef = doc(db, "users", user.uid);
-      await updateDoc(userRef, {
-        referralCode: newCode,
-        referralQualified: false,
-        referralActiveUsers: 0,
-        referralTotalReferred: 0
-      });
-
-      setReferralCode(newCode);
-      setReferralLink(fullLink);
-      setCopied(false);
-      
-      // Track event: Generate Referral Link
-      if (statsigClient && dashboardVariant) {
-        statsigClient.logEvent('referral_link_generated', {
-          variant: dashboardVariant,
-          referral_code: newCode
-        } as any);
-        console.log('[Referral Tracking] Event logged: referral_link_generated', { variant: dashboardVariant, referral_code: newCode });
+      // If referral link already exists, don't recreate
+      if (referralLink && referralCode) {
+        return;
       }
-    } catch (error) {
-      console.error('Error generating referral code:', error);
-      setError('Failed to generate referral code');
-    } finally {
-      setGeneratingCode(false);
-    }
-  };
 
-  const handleClaimReward = async () => {
-    if (!user) return;
-    setClaiming(true);
-    try {
-      const response = await fetch('/api/referrals/claim', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId: user.uid }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setSuccess(true);
-        window.location.reload();
-      } else {
-        setError(data.error || 'Failed to claim reward');
+      try {
+        const db = getFirebaseFirestore();
+        const userId = user.uid;
+        const userRef = doc(db, "users", userId);
+        const userDoc = await getDoc(userRef);
+        
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          
+          // If referral code exists, use it
+          if (userData.referralCode) {
+            const fullLink = `${baseUrl}/signup?ref=${userData.referralCode}`;
+            setReferralCode(userData.referralCode);
+            setReferralLink(fullLink);
+            return;
+          }
+        }
+        
+        // If no referral code exists, create one automatically
+        const firstName = profile?.firstName || user.displayName?.split(' ')[0] || 'user';
+        const first4Letters = firstName.substring(0, 4).toLowerCase().replace(/[^a-z]/g, '').padStart(4, 'user');
+        const randomString = Math.random().toString(36).substr(2, 6);
+        const newCode = `${first4Letters}${randomString}`;
+        const fullLink = `${baseUrl}/signup?ref=${newCode}`;
+        
+        // Update or create Firebase document with the new referral code
+        if (userDoc.exists()) {
+          await updateDoc(userRef, {
+            referralCode: newCode,
+            referralQualified: false,
+            referralActiveUsers: 0,
+            referralTotalReferred: 0
+          });
+        } else {
+          // If document doesn't exist, create it with referral code
+          await setDoc(userRef, {
+            referralCode: newCode,
+            referralQualified: false,
+            referralActiveUsers: 0,
+            referralTotalReferred: 0,
+            email: user.email || '',
+            createdAt: serverTimestamp()
+          });
+        }
+        
+        setReferralCode(newCode);
+        setReferralLink(fullLink);
+      } catch (error) {
+        console.error('Error fetching/creating referral link:', error);
+        setError('Failed to create referral link');
       }
-    } catch (error) {
-      console.error('Error claiming reward:', error);
-      setError('Failed to claim reward');
-    } finally {
-      setClaiming(false);
-    }
-  };
+    };
+    
+    fetchOrCreateReferralLink();
+  }, [user, profile, referralLink, referralCode, setReferralCode, setReferralLink, statsigClient, dashboardVariant, setError]);
+
 
   return (
     <div>
@@ -470,23 +465,8 @@ export default function ReferralTab({
       ) : (
         <div className="mb-6">
           <div className="bg-white rounded-xl p-4 md:p-6 border border-gray-200 text-center">
-            <h2 className="text-[17px] md:text-[20px] font-semibold text-[#223258] mb-2 leading-tight">Share the referral link</h2>
-            <p className="text-[#747474] text-[15px] mb-5 leading-relaxed">Generate your referral link to start sharing with users.</p>
-
-            <button
-              onClick={handleGenerateCode}
-              disabled={generatingCode}
-              className="w-full md:w-auto px-8 py-3.5 rounded-lg bg-[#3771FE] hover:bg-[#2A5CDB] text-white text-[15px] font-semibold transition-all inline-flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-md"
-            >
-              {generatingCode ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  <span>Generating...</span>
-                </>
-              ) : (
-                'Generate Referral Link'
-              )}
-            </button>
+            <h2 className="text-[17px] md:text-[20px] font-semibold text-[#223258] mb-2 leading-tight">Share your referral link</h2>
+            <p className="text-[#747474] text-[15px] mb-5 leading-relaxed">Copy and share your referral link with your colleagues to start earning rewards.</p>
           </div>
         </div>
       )}
@@ -532,7 +512,7 @@ export default function ReferralTab({
             {referralStats.qualified ? (
               <span className="inline-flex items-center gap-1 text-[13px] text-green-600 font-semibold">
                 <Check size={14} />
-                Qualified! Claim your reward below
+                Qualified! Your reward has been activated
               </span>
             ) : referralStats.activeUsers > 0 ? (
               <p className="text-[13px] text-gray-600 leading-relaxed">
@@ -647,20 +627,13 @@ export default function ReferralTab({
         </div>
       ) : null}
 
-      {/* Claim Button */}
+      {/* Qualification Success Message */}
       {referralStats.qualified && (
         <div className="mt-6">
           <div className="bg-gradient-to-br from-[#F0FDF4] to-[#ECFDF5] rounded-xl p-6 md:p-8 text-center border-2 border-[#86EFAC]">
             <h3 className="text-[20px] md:text-[22px] font-semibold text-[#1F2937] mb-3 leading-tight">🎉 Congratulations!</h3>
-            <p className="text-[#6B7280] text-[15px] mb-5 leading-relaxed">You've successfully referred 3 users. Claim your reward now!</p>
-            <button
-              onClick={handleClaimReward}
-              disabled={claiming}
-              className="w-full md:w-auto px-8 py-4 rounded-lg bg-[#10B981] hover:bg-[#059669] text-white text-[15px] font-semibold transition-all inline-flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed shadow-lg"
-            >
-              <Gift size={20} />
-              {claiming ? 'Claiming...' : 'Claim 1 Month Free'}
-            </button>
+            <p className="text-[#6B7280] text-[15px] mb-2 leading-relaxed">You've successfully referred 3 users and earned 1 month of free premium!</p>
+            <p className="text-[#10B981] text-[14px] font-semibold">Your subscription has been automatically activated.</p>
           </div>
         </div>
       )}
